@@ -62,16 +62,19 @@ impl Image {
         }
     }
 
+    /// Returns the width of this image, in pixels.
     #[inline]
     pub fn width(&self) -> u32 {
         self.buf.width()
     }
 
+    /// Returns the height of this image, in pixels.
     #[inline]
     pub fn height(&self) -> u32 {
         self.buf.height()
     }
 
+    /// Returns the size of this image.
     #[inline]
     pub fn resolution(&self) -> Resolution {
         Resolution::new(self.width(), self.height())
@@ -85,25 +88,36 @@ impl Image {
         self.as_view().aspect_aware_resize(new_res)
     }
 
+    /// Gets the image color at the given pixel coordinates.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if `(x, y)` is outside the bounds of this image.
     #[inline]
     pub fn get(&self, x: u32, y: u32) -> Color {
         let rgb = &self.buf[(x, y)];
         Color(rgb.0)
     }
 
+    /// Sets the image color at the given pixel coordinates.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if `(x, y)` is outside the bounds of this image.
     #[inline]
     pub fn set(&mut self, x: u32, y: u32, color: Color) {
         self.buf[(x, y)] = Rgba(color.0);
     }
 
-    fn rect(&self) -> Rect {
-        Rect::from_top_left(0, 0, self.width(), self.height())
-    }
-
     /// Creates an immutable view into an area of this image, specified by `rect`.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if `rect` is not fully contained in the bounds of `self`.
     pub fn view(&self, rect: &Rect) -> ImageView<'_> {
+        let my_rect = Rect::from_top_left(0, 0, self.width(), self.height());
         assert!(
-            self.rect().contains_rect(rect),
+            my_rect.contains_rect(rect),
             "attempted to create out-of-bounds view of {}x{} image at {:?}",
             self.width(),
             self.height(),
@@ -118,9 +132,14 @@ impl Image {
     }
 
     /// Creates a mutable view into an area of this image, specified by `rect`.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if `rect` is not fully contained in the bounds of `self`.
     pub fn view_mut(&mut self, rect: &Rect) -> ImageViewMut<'_> {
+        let my_rect = Rect::from_top_left(0, 0, self.width(), self.height());
         assert!(
-            self.rect().contains_rect(rect),
+            my_rect.contains_rect(rect),
             "attempted to create out-of-bounds view of {}x{} image at {:?}",
             self.width(),
             self.height(),
@@ -165,11 +184,17 @@ impl<'a> ImageView<'a> {
         self.sub_image.height()
     }
 
+    /// Returns the size of this view.
     #[inline]
     pub fn resolution(&self) -> Resolution {
         Resolution::new(self.width(), self.height())
     }
 
+    /// Gets the image color at the given pixel coordinates.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if `(x, y)` is outside the bounds of this view.
     #[inline]
     pub fn get(&self, x: u32, y: u32) -> Color {
         let rgb = self.sub_image.get_pixel(x, y);
@@ -188,6 +213,10 @@ impl<'a> ImageView<'a> {
     }
 
     /// Creates an immutable subview into an area of this view, specified by `rect`.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if `rect` is not fully contained in the bounds of `self`.
     pub fn view(&self, rect: &Rect) -> ImageView<'_> {
         let my_rect = Rect::from_top_left(0, 0, self.width(), self.height());
         assert!(
@@ -271,12 +300,28 @@ impl<'a> ImageViewMut<'a> {
         self.sub_image.height()
     }
 
+    /// Returns the size of this view.
+    #[inline]
+    pub fn resolution(&self) -> Resolution {
+        Resolution::new(self.width(), self.height())
+    }
+
+    /// Gets the image color at the given pixel coordinates.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if `(x, y)` is outside the bounds of this view.
     #[inline]
     pub fn get(&self, x: u32, y: u32) -> Color {
         let rgb = self.sub_image.get_pixel(x, y);
         Color(rgb.0)
     }
 
+    /// Sets the image color at the given pixel coordinates.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if `(x, y)` is outside the bounds of this view.
     #[inline]
     pub fn set(&mut self, x: u32, y: u32, color: Color) {
         self.sub_image.put_pixel(x, y, Rgba(color.0));
@@ -294,6 +339,10 @@ impl<'a> ImageViewMut<'a> {
     }
 
     /// Creates an immutable subview into an area of this view, specified by `rect`.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if `rect` is not fully contained in the bounds of `self`.
     pub fn view(&self, rect: &Rect) -> ImageView<'_> {
         let my_rect = Rect::from_top_left(0, 0, self.width(), self.height());
         assert!(
@@ -314,7 +363,11 @@ impl<'a> ImageViewMut<'a> {
         }
     }
 
-    /// Creates a mutable view into an area of this image, specified by `rect`.
+    /// Creates a mutable view into an area of this view, specified by `rect`.
+    ///
+    /// # Panics
+    ///
+    /// This will panic if `rect` is not fully contained in the bounds of `self`.
     pub fn view_mut(&mut self, rect: &Rect) -> ImageViewMut<'_> {
         let my_rect = Rect::from_top_left(0, 0, self.width(), self.height());
         assert!(
@@ -384,6 +437,7 @@ impl Index<usize> for Color {
     }
 }
 
+// FIXME leaks `embedded-graphics` dependency
 impl PixelColor for Color {
     type Raw = RawU32;
 }
@@ -393,6 +447,7 @@ impl PixelColor for Color {
 /// This allows abstracting over [`Image`] and [`ImageView`] and should be used by any code that
 /// takes immutable image data as input.
 pub trait AsImageView {
+    /// Returns an [`ImageView`] covering `self`.
     fn as_view(&self) -> ImageView<'_>;
 }
 
@@ -401,6 +456,7 @@ pub trait AsImageView {
 /// This allows abstracting over [`Image`] and [`ImageViewMut`] and should be used by any code that
 /// writes to image data.
 pub trait AsImageViewMut: AsImageView {
+    /// Returns an [`ImageViewMut`] covering `self`.
     fn as_view_mut(&mut self) -> ImageViewMut<'_>;
 }
 
