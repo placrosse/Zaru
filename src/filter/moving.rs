@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use super::Averager;
+use super::Filter;
 
 /// Moving Average over a fixed history of values (FIR filter).
 ///
@@ -24,7 +24,7 @@ impl MovingAvg {
     }
 }
 
-impl Averager<f32> for MovingAvg {
+impl Filter<f32> for MovingAvg {
     fn push(&mut self, value: f32) -> f32 {
         self.history.push_back(value);
 
@@ -63,7 +63,7 @@ impl Ema {
     }
 }
 
-impl Averager<f32> for Ema {
+impl Filter<f32> for Ema {
     fn push(&mut self, value: f32) -> f32 {
         match self.last {
             Some(last) => {

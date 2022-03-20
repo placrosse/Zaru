@@ -4,7 +4,7 @@ const INIT_STDDEV: f32 = 0.1;
 
 use std::collections::VecDeque;
 
-use super::Averager;
+use super::Filter;
 
 /// An averaging algorithm that quickly adapts to changes with high variance.
 ///
@@ -54,7 +54,7 @@ impl VarianceAwareAvg {
     }
 }
 
-impl Averager<f32> for VarianceAwareAvg {
+impl Filter<f32> for VarianceAwareAvg {
     fn push(&mut self, value: f32) -> f32 {
         if self.history.is_empty() {
             // This is the first value, so we need to bootstrap.

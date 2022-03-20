@@ -1,4 +1,4 @@
-use crate::avg::Averager;
+use crate::filter::Filter;
 
 use super::{BoundingBox, RawDetection};
 
@@ -11,7 +11,7 @@ pub struct DetectionAvg<A> {
     landmarks: [(A, A); 6],
 }
 
-impl<A: Averager<f32> + Clone> DetectionAvg<A> {
+impl<A: Filter<f32> + Clone> DetectionAvg<A> {
     /// Creates a new detection averager that uses clones of `averager` for every coordinate.
     pub fn new(averager: A) -> Self {
         Self {
@@ -31,7 +31,7 @@ impl<A: Averager<f32> + Clone> DetectionAvg<A> {
     }
 }
 
-impl<A: Averager<f32>> Averager<RawDetection> for DetectionAvg<A> {
+impl<A: Filter<f32>> Filter<RawDetection> for DetectionAvg<A> {
     fn push(&mut self, det: RawDetection) -> RawDetection {
         let mut landmarks = det.landmarks;
         for (i, lm) in landmarks.iter_mut().enumerate() {

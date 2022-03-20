@@ -6,7 +6,7 @@
 //! [Face Detection]: https://google.github.io/mediapipe/solutions/face_detection
 
 use crate::{
-    avg::{Averager, Ema},
+    filter::{Ema, Filter},
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
     nn::{Cnn, CnnInputFormat, NeuralNetwork},
     num::TotalF32,
