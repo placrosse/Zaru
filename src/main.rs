@@ -102,16 +102,8 @@ fn main() -> Result<(), Error> {
 
                 for mut image in face_img_recv {
                     let res = landmarker.compute(&image);
-                    for pair in res.landmarks().windows(2) {
-                        let start = pair[0];
-                        let end = pair[0];
-                        image::draw_line(
-                            &mut image,
-                            start.0 as _,
-                            start.1 as _,
-                            end.0 as _,
-                            end.1 as _,
-                        );
+                    for (x, y, _z) in res.landmarks() {
+                        image::draw_marker(&mut image, *x as _, *y as _).size(3);
                     }
                     gui::show_image("landmarks", &image);
 

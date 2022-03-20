@@ -52,6 +52,7 @@ pub struct DrawMarker<'a> {
     x: i32,
     y: i32,
     color: Color,
+    size: u32,
 }
 
 impl<'a> DrawMarker<'a> {
@@ -60,11 +61,20 @@ impl<'a> DrawMarker<'a> {
         self.color = color;
         self
     }
+
+    pub fn size(&mut self, size: u32) -> &mut Self {
+        self.size = size;
+        self
+    }
 }
 
 impl Drop for DrawMarker<'_> {
     fn drop(&mut self) {
-        for (xoff, yoff) in (-2..=2).zip(-2..=2).chain((-2..=2).rev().zip(-2..=2)) {
+        let offset = ((self.size - 1) / 2) as i32;
+        for (xoff, yoff) in (-offset..=offset)
+            .zip(-offset..=offset)
+            .chain((-offset..=offset).rev().zip(-offset..=offset))
+        {
             match Pixel(
                 Point {
                     x: self.x + xoff,
@@ -133,7 +143,7 @@ pub fn draw_rect<I: AsImageViewMut>(image: &mut I, rect: Rect) -> DrawRect<'_> {
     }
 }
 
-/// Draws a cross-shaped marker onto an image.
+/// Draws a marker onto an image.
 ///
 /// This can be used to visualize shape landmarks or points of interest.
 pub fn draw_marker<I: AsImageViewMut>(image: &mut I, x: i32, y: i32) -> DrawMarker<'_> {
@@ -142,6 +152,7 @@ pub fn draw_marker<I: AsImageViewMut>(image: &mut I, x: i32, y: i32) -> DrawMark
         x,
         y,
         color: Color::from_rgb8(255, 0, 0),
+        size: 5,
     }
 }
 
