@@ -132,7 +132,7 @@ impl Detector {
     }
 
     pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
-        [&self.t_infer, &self.t_filter]
+        [&self.t_resize, &self.t_infer, &self.t_filter]
     }
 }
 
@@ -154,6 +154,10 @@ impl Detection {
     /// Returns the bounding box of the detected face, adjusted to include the whole head boundary.
     pub fn bounding_rect_loose(&self) -> Rect {
         self.raw.bounding_box_loose().to_rect(&self.full_res)
+    }
+
+    pub fn confidence(&self) -> f32 {
+        self.raw.confidence
     }
 
     /// Draws the bounding box and landmarks of this detection onto an image.

@@ -1,4 +1,4 @@
-//! Data averaging and smoothing.
+//! Data filtering, averaging and smoothing.
 
 mod moving;
 mod variance_aware;

@@ -1,9 +1,11 @@
 use crossbeam::channel;
 use log::LevelFilter;
 use mizaru::detector::Detector;
+use mizaru::landmark::Landmarker;
+use mizaru::num::TotalF32;
 use mizaru::timer::FpsCounter;
 use mizaru::webcam::Webcam;
-use mizaru::{gui, Error};
+use mizaru::{gui, image, Error};
 
 fn main() -> Result<(), Error> {
     let log_level = if cfg!(debug_assertions) {
@@ -17,10 +19,14 @@ fn main() -> Result<(), Error> {
         .init();
 
     let mut detector = Detector::new();
+    let mut landmarker = Landmarker::new();
+
+    let landmark_input_res = landmarker.input_resolution();
 
     let mut webcam = Webcam::open()?;
 
     let (img_sender, img_recv) = channel::bounded(0);
+    let (face_img_sender, face_img_recv) = channel::bounded(0);
 
     // The detection pipeline uses a quite literal pipeline structure – different processing stages
     // happen in different threads, quite similar to how a pipelined CPU architecture works
@@ -66,12 +72,50 @@ fn main() -> Result<(), Error> {
                     let detections = detector.detect(&image);
                     log::trace!("{:?}", detections);
 
+                    if let Some(target) = detections
+                        .iter()
+                        .max_by_key(|det| TotalF32(det.confidence()))
+                    {
+                        // TODO: rotate to align the eyes
+                        let rect = target.bounding_rect_loose();
+                        let face = image.view(&rect).aspect_aware_resize(landmark_input_res);
+                        if face_img_sender.send(face).is_err() {
+                            break;
+                        }
+                    }
+
                     for det in detections {
                         det.draw(&mut image);
                     }
                     gui::show_image("face_detect", &image);
 
                     fps.tick_with(detector.timers());
+                }
+            })
+            .unwrap();
+
+        scope
+            .builder()
+            .name("Landmarker".into())
+            .spawn(|_| {
+                let mut fps = FpsCounter::new("landmarker");
+
+                for mut image in face_img_recv {
+                    let res = landmarker.compute(&image);
+                    for pair in res.landmarks().windows(2) {
+                        let start = pair[0];
+                        let end = pair[0];
+                        image::draw_line(
+                            &mut image,
+                            start.0 as _,
+                            start.1 as _,
+                            end.0 as _,
+                            end.1 as _,
+                        );
+                    }
+                    gui::show_image("landmarks", &image);
+
+                    fps.tick_with(landmarker.timers());
                 }
             })
             .unwrap();

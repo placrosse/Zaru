@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use embedded_graphics::{
     draw_target::DrawTarget,
     prelude::*,
-    primitives::{PrimitiveStyle, Rectangle},
+    primitives::{Line, PrimitiveStyle, Rectangle},
 };
 
 use crate::image::{AsImageViewMut, Color, ImageViewMut, Rect};
@@ -72,11 +72,53 @@ impl Drop for DrawMarker<'_> {
                 },
                 self.color,
             )
-            .draw(&mut Target(self.image.as_view_mut()))
+            .draw(&mut Target(self.image.reborrow()))
             {
                 Ok(_) => {}
                 Err(infallible) => match infallible {},
             }
+        }
+    }
+}
+
+/// Guard returned by [`draw_line`]; draws the line when dropped and allows customization.
+pub struct DrawLine<'a> {
+    image: ImageViewMut<'a>,
+    start_x: i32,
+    start_y: i32,
+    end_x: i32,
+    end_y: i32,
+    color: Color,
+    stroke_width: u32,
+}
+
+impl<'a> DrawLine<'a> {
+    /// Sets the line's color.
+    pub fn color(&mut self, color: Color) -> &mut Self {
+        self.color = color;
+        self
+    }
+
+    /// Sets the line's stroke width.
+    ///
+    /// By default, a stroke width of 1 is used.
+    pub fn stroke_width(&mut self, width: u32) -> &mut Self {
+        self.stroke_width = width;
+        self
+    }
+}
+
+impl<'a> Drop for DrawLine<'a> {
+    fn drop(&mut self) {
+        match Line::new(
+            Point::new(self.start_x, self.start_y),
+            Point::new(self.end_x, self.end_y),
+        )
+        .into_styled(PrimitiveStyle::with_stroke(self.color, self.stroke_width))
+        .draw(&mut Target(self.image.reborrow()))
+        {
+            Ok(_) => {}
+            Err(infallible) => match infallible {},
         }
     }
 }
@@ -100,6 +142,25 @@ pub fn draw_marker<I: AsImageViewMut>(image: &mut I, x: i32, y: i32) -> DrawMark
         x,
         y,
         color: Color::from_rgb8(255, 0, 0),
+    }
+}
+
+/// Draws a line onto an image.
+pub fn draw_line<I: AsImageViewMut>(
+    image: &mut I,
+    start_x: i32,
+    start_y: i32,
+    end_x: i32,
+    end_y: i32,
+) -> DrawLine<'_> {
+    DrawLine {
+        image: image.as_view_mut(),
+        start_x,
+        start_y,
+        end_x,
+        end_y,
+        color: Color::from_rgb8(0, 0, 255),
+        stroke_width: 1,
     }
 }
 
