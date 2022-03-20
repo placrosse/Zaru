@@ -22,6 +22,18 @@ fn main() -> Result<(), Error> {
 
     let (img_sender, img_recv) = channel::bounded(0);
 
+    // The detection pipeline uses a quite literal pipeline structure – different processing stages
+    // happen in different threads, quite similar to how a pipelined CPU architecture works
+    // (probably not the most helpful analogy unless you're a nerd, sorry).
+    // By splitting the work up like this, what we get is a very simple to write multithreaded
+    // pipeline with latency very close to a single-threaded design, but improved throughput (the
+    // overhead is mostly just sending pipeline outputs through channels and waking the receiving
+    // thread).
+    // "Improved throughput" here means that this pipeline can easily run at 100 FPS or more, at
+    // least on my workstation. We'll see if something like a Raspberry Pi is enough to run it at 60
+    // FPS.
+    // Also note that at the moment, *everything* runs on the CPU, a GPU is not used. I'd like to
+    // change that at some point since it seems fun, but for now this works well enough.
     crossbeam::scope(|scope| {
         scope
             .builder()
