@@ -111,6 +111,7 @@ impl<T> IntoIterator for ActiveReceiver<T> {
     }
 }
 
+/// Iterator over received messages.
 pub struct IntoIter<T> {
     inner: crossbeam::channel::IntoIter<T>,
     /// Restricts the value to the owning thread.
