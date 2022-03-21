@@ -1,5 +1,5 @@
 use std::{
-    fmt,
+    cmp, fmt,
     ops::{Bound, RangeBounds},
 };
 
@@ -77,18 +77,22 @@ impl Rect {
         let x_max = cvt_upper_bound(x.end_bound());
         let y_min = cvt_lower_bound(y.start_bound());
         let y_max = cvt_upper_bound(y.end_bound());
+        assert!(x_min <= x_max);
+        assert!(y_min <= y_max);
 
         Self::span_inner(x_min, y_min, x_max, y_max)
     }
 
-    /// Creates a rectangle from top left and bottom right corner coordinates.
-    pub fn from_corners(top_left: (i32, i32), bottom_right: (i32, i32)) -> Self {
-        Self::span_inner(top_left.0, top_left.1, bottom_right.0, bottom_right.1)
+    /// Creates a rectangle from two opposing corner points.
+    pub fn from_corners(first: (i32, i32), second: (i32, i32)) -> Self {
+        Self::span_inner(first.0, first.1, second.0, second.1)
     }
 
-    fn span_inner(x_min: i32, y_min: i32, x_max: i32, y_max: i32) -> Self {
-        assert!(x_min <= x_max);
-        assert!(y_min <= y_max);
+    fn span_inner(x0: i32, y0: i32, x1: i32, y1: i32) -> Self {
+        let x_min = cmp::min(x0, x1);
+        let y_min = cmp::min(y0, y1);
+        let x_max = cmp::max(x0, x1);
+        let y_max = cmp::max(y0, y1);
 
         Self {
             rect: embedded_graphics::primitives::Rectangle {

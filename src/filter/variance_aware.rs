@@ -139,9 +139,6 @@ fn compute_weight_factor(abs_deviation: f32, stddev: f32) -> f32 {
     // that the values "looks reasonable".
     let stddevs = abs_deviation / stddev;
     let weight = 1.5f32.powf(stddevs);
-    if stddevs > 4.0 {
-        dbg!(stddevs, abs_deviation, weight);
-    }
     weight
 }
 
@@ -155,13 +152,6 @@ struct Entry {
 mod tests {
     use super::*;
 
-    macro_rules! assert_in {
-        ($lo:expr, $val:expr, $hi:expr) => {
-            assert!($lo <= $val, "value below lower bound: {}", $val);
-            assert!($val <= $hi, "value above upper bound: {}", $val);
-        };
-    }
-
     #[test]
     fn test_singular() {
         let mut avg = VarianceAwareAvg::new(1);
@@ -174,10 +164,10 @@ mod tests {
     fn test_same_value() {
         let mut avg = VarianceAwareAvg::new(4);
         assert_eq!(avg.push(1.0), 1.0);
-        assert_in!(1.0, avg.push(2.0), 2.0);
-        assert_in!(1.0, avg.push(2.0), 2.0);
-        assert_in!(1.0, avg.push(2.0), 2.0);
-        assert_in!(1.0, avg.push(2.0), 2.0);
-        assert_in!(1.0, avg.push(1.0), 2.0);
+        assert!((1.0..=2.0).contains(&avg.push(2.0)));
+        assert!((1.0..=2.0).contains(&avg.push(2.0)));
+        assert!((1.0..=2.0).contains(&avg.push(2.0)));
+        assert!((1.0..=2.0).contains(&avg.push(2.0)));
+        assert!((1.0..=2.0).contains(&avg.push(1.0)));
     }
 }
