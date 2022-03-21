@@ -1,11 +1,10 @@
-use crossbeam::channel;
 use log::LevelFilter;
 use mizaru::detector::Detector;
 use mizaru::landmark::Landmarker;
 use mizaru::num::TotalF32;
 use mizaru::timer::FpsCounter;
 use mizaru::webcam::Webcam;
-use mizaru::{gui, image, Error};
+use mizaru::{gui, image, on_drop, pipeline, Error};
 
 fn main() -> Result<(), Error> {
     let log_level = if cfg!(debug_assertions) {
@@ -25,8 +24,8 @@ fn main() -> Result<(), Error> {
 
     let mut webcam = Webcam::open()?;
 
-    let (img_sender, img_recv) = channel::bounded(0);
-    let (face_img_sender, face_img_recv) = channel::bounded(0);
+    let (img_sender, img_recv) = pipeline::channel();
+    let (face_img_sender, face_img_recv) = pipeline::channel();
 
     // The detection pipeline uses a quite literal pipeline structure – different processing stages
     // happen in different threads, quite similar to how a pipelined CPU architecture works
@@ -45,6 +44,9 @@ fn main() -> Result<(), Error> {
             .builder()
             .name("Webcam Decoder".into())
             .spawn(|_| {
+                let mut img_sender = img_sender.activate();
+
+                let _guard = on_drop(|| log::info!("webcam thread exiting"));
                 let mut fps = FpsCounter::new("webcam");
                 loop {
                     let image = match webcam.read() {
@@ -66,9 +68,12 @@ fn main() -> Result<(), Error> {
             .builder()
             .name("Face Detector".into())
             .spawn(|_| {
+                let mut face_img_sender = face_img_sender.activate();
+
+                let _guard = on_drop(|| log::info!("detector thread exiting"));
                 let mut fps = FpsCounter::new("detector");
 
-                for mut image in img_recv {
+                for mut image in img_recv.activate() {
                     let detections = detector.detect(&image);
                     log::trace!("{:?}", detections);
 
@@ -98,9 +103,10 @@ fn main() -> Result<(), Error> {
             .builder()
             .name("Landmarker".into())
             .spawn(|_| {
+                let _guard = on_drop(|| log::info!("landmarking thread exiting"));
                 let mut fps = FpsCounter::new("landmarker");
 
-                for mut image in face_img_recv {
+                for mut image in face_img_recv.activate() {
                     let res = landmarker.compute(&image);
                     for (x, y, _z) in res.landmarks() {
                         image::draw_marker(&mut image, *x as _, *y as _).size(3);
