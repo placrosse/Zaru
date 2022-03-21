@@ -162,8 +162,39 @@ impl Rect {
         self.rect.size.height
     }
 
+    /// Computes the intersection of `self` and `other`.
+    pub fn intersection(&self, other: &Rect) -> Rect {
+        let rect = Rect::from_corners(
+            (self.x().max(other.x()), self.y().max(other.y())),
+            (
+                (i64::from(self.x()) + i64::from(self.width()))
+                    .min(i64::from(other.x()) + i64::from(other.width())) as i32
+                    - 1,
+                (i64::from(self.y()) + i64::from(self.height()))
+                    .min(i64::from(other.y()) + i64::from(other.height())) as i32
+                    - 1,
+            ),
+        );
+        assert!(
+            self.contains_rect(&rect),
+            "intersect self={:?} other={:?} res={:?}",
+            self,
+            other,
+            rect,
+        );
+        assert!(
+            other.contains_rect(&rect),
+            "intersect self={:?} other={:?} res={:?}",
+            self,
+            other,
+            rect,
+        );
+        rect
+    }
+
     /// Returns whether `self` contains `other`.
     pub fn contains_rect(&self, other: &Rect) -> bool {
+        // TODO: specify behavior with 0-area rects
         self.x() <= other.x()
             && self.y() <= other.y()
             && i64::from(self.x()) + i64::from(self.width())
@@ -212,5 +243,17 @@ mod tests {
         assert!(outer.contains_rect(&Rect::from_top_left(-8, -8, 10, 10)));
         assert!(!outer.contains_rect(&Rect::from_top_left(-9, -8, 10, 10)));
         assert!(!outer.contains_rect(&Rect::from_top_left(-8, -9, 10, 10)));
+    }
+
+    #[test]
+    fn test_intersection() {
+        assert_eq!(
+            Rect::from_ranges(0..=10, 0..=10).intersection(&Rect::from_ranges(5..=5, 5..=5)),
+            Rect::from_ranges(5..=5, 5..=5)
+        );
+        assert_eq!(
+            Rect::from_ranges(5..=5, 5..=5).intersection(&Rect::from_ranges(0..=10, 0..=10)),
+            Rect::from_ranges(5..=5, 5..=5)
+        );
     }
 }

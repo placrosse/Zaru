@@ -80,6 +80,14 @@ impl Image {
         Resolution::new(self.width(), self.height())
     }
 
+    /// Returns a [`Rect`] covering this image.
+    ///
+    /// The rectangle will be positioned at `(0, 0)` and have the width and height of the image.
+    #[inline]
+    pub fn rect(&self) -> Rect {
+        Rect::from_top_left(0, 0, self.width(), self.height())
+    }
+
     /// Resizes this image to a new size, adding black bars to keep the original aspect ratio.
     ///
     /// For performance (as this runs on the CPU), this uses nearest neighbor interpolation, so the
@@ -115,9 +123,8 @@ impl Image {
     ///
     /// This will panic if `rect` is not fully contained in the bounds of `self`.
     pub fn view(&self, rect: &Rect) -> ImageView<'_> {
-        let my_rect = Rect::from_top_left(0, 0, self.width(), self.height());
         assert!(
-            my_rect.contains_rect(rect),
+            self.rect().contains_rect(rect),
             "attempted to create out-of-bounds view of {}x{} image at {:?}",
             self.width(),
             self.height(),
@@ -190,6 +197,14 @@ impl<'a> ImageView<'a> {
         Resolution::new(self.width(), self.height())
     }
 
+    /// Returns a [`Rect`] of the size of this view.
+    ///
+    /// The rectangle will be positioned at `(0, 0)` and have the width and height of the view.
+    #[inline]
+    pub fn rect(&self) -> Rect {
+        Rect::from_top_left(0, 0, self.width(), self.height())
+    }
+
     /// Gets the image color at the given pixel coordinates.
     ///
     /// # Panics
@@ -218,9 +233,8 @@ impl<'a> ImageView<'a> {
     ///
     /// This will panic if `rect` is not fully contained in the bounds of `self`.
     pub fn view(&self, rect: &Rect) -> ImageView<'_> {
-        let my_rect = Rect::from_top_left(0, 0, self.width(), self.height());
         assert!(
-            my_rect.contains_rect(rect),
+            self.rect().contains_rect(rect),
             "attempted to create out-of-bounds view of {}x{} view at {:?}",
             self.width(),
             self.height(),
@@ -306,6 +320,14 @@ impl<'a> ImageViewMut<'a> {
         Resolution::new(self.width(), self.height())
     }
 
+    /// Returns a [`Rect`] of the size of this view.
+    ///
+    /// The rectangle will be positioned at `(0, 0)` and have the width and height of the view.
+    #[inline]
+    pub fn rect(&self) -> Rect {
+        Rect::from_top_left(0, 0, self.width(), self.height())
+    }
+
     /// Gets the image color at the given pixel coordinates.
     ///
     /// # Panics
@@ -344,9 +366,8 @@ impl<'a> ImageViewMut<'a> {
     ///
     /// This will panic if `rect` is not fully contained in the bounds of `self`.
     pub fn view(&self, rect: &Rect) -> ImageView<'_> {
-        let my_rect = Rect::from_top_left(0, 0, self.width(), self.height());
         assert!(
-            my_rect.contains_rect(rect),
+            self.rect().contains_rect(rect),
             "attempted to create out-of-bounds view of {}x{} view at {:?}",
             self.width(),
             self.height(),
@@ -369,9 +390,8 @@ impl<'a> ImageViewMut<'a> {
     ///
     /// This will panic if `rect` is not fully contained in the bounds of `self`.
     pub fn view_mut(&mut self, rect: &Rect) -> ImageViewMut<'_> {
-        let my_rect = Rect::from_top_left(0, 0, self.width(), self.height());
         assert!(
-            my_rect.contains_rect(rect),
+            self.rect().contains_rect(rect),
             "attempted to create out-of-bounds view of {}x{} view at {:?}",
             self.width(),
             self.height(),

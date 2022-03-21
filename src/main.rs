@@ -83,7 +83,9 @@ fn main() -> Result<(), Error> {
                     {
                         // TODO: rotate to align the eyes
                         let rect = target.bounding_rect_loose();
-                        let face = image.view(&rect).aspect_aware_resize(landmark_input_res);
+                        let face = image
+                            .view(&image.rect().intersection(&rect))
+                            .aspect_aware_resize(landmark_input_res);
                         if face_img_sender.send(face).is_err() {
                             break;
                         }
