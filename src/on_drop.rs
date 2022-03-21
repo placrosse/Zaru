@@ -1,3 +1,4 @@
+/// Drop guard returned by [`on_drop`].
 #[must_use = "`OnDrop` should be assigned to a variable, or it will be dropped immediately"]
 pub struct OnDrop<F: FnOnce()>(Option<F>);
 
