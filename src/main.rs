@@ -1,5 +1,6 @@
 use log::LevelFilter;
 use mizaru::detector::Detector;
+use mizaru::image::Color;
 use mizaru::landmark::Landmarker;
 use mizaru::num::TotalF32;
 use mizaru::timer::FpsCounter;
@@ -96,6 +97,12 @@ fn main() -> Result<(), Error> {
 
                     for det in detections {
                         det.draw(&mut image);
+
+                        let (x0, y0) = det.left_eye();
+                        let (x1, y1) = det.right_eye();
+                        image::draw_line(&mut image, x0, y0, x1, y1).color(Color::WHITE);
+                        let rot = format!("{:.01}°", det.rotation_radians().to_degrees());
+                        image::draw_text(&mut image, (x0 + x1) / 2, (y0 + y1) / 2, &rot);
                     }
                     gui::show_image("face_detect", &image);
 
@@ -116,6 +123,22 @@ fn main() -> Result<(), Error> {
                     for (x, y, _z) in res.landmarks() {
                         image::draw_marker(&mut image, *x as _, *y as _).size(3);
                     }
+
+                    #[allow(illegal_floating_point_literal_pattern)] // let me have fun
+                    let color = match res.face_confidence() {
+                        20.0.. => Color::GREEN,
+                        10.0..=20.0 => Color::YELLOW,
+                        _ => Color::RED,
+                    };
+                    let x = (image.width() / 2) as _;
+                    image::draw_text(
+                        &mut image,
+                        x,
+                        0,
+                        &format!("conf={:.01}", res.face_confidence()),
+                    )
+                    .align_top()
+                    .color(color);
                     gui::show_image("landmarks", &image);
 
                     fps.tick_with(landmarker.timers());

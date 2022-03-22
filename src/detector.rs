@@ -5,6 +5,8 @@
 //!
 //! [Face Detection]: https://google.github.io/mediapipe/solutions/face_detection
 
+use nalgebra::{Rotation2, Vector2};
+
 use crate::{
     filter::{AlphaBetaFilter, Ema, Filter},
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
@@ -186,6 +188,25 @@ impl Detection {
     /// Returns the confidence of this detection.
     pub fn confidence(&self) -> f32 {
         self.raw.confidence
+    }
+
+    /// Estimated clockwise rotation of the face.
+    pub fn rotation_radians(&self) -> f32 {
+        let left_eye = self.left_eye();
+        let right_eye = self.right_eye();
+        let left_to_right_eye = Vector2::new(
+            (right_eye.0 - left_eye.0) as f32,
+            (right_eye.1 - left_eye.1) as f32,
+        );
+        Rotation2::rotation_between(&Vector2::x(), &left_to_right_eye).angle()
+    }
+
+    pub fn left_eye(&self) -> (i32, i32) {
+        self.raw.landmarks[0].to_img_coord(&self.full_res)
+    }
+
+    pub fn right_eye(&self) -> (i32, i32) {
+        self.raw.landmarks[1].to_img_coord(&self.full_res)
     }
 
     /// Draws the bounding box and landmarks of this detection onto an image.

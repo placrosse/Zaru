@@ -38,10 +38,6 @@ impl Landmarker {
         self.model.input_resolution()
     }
 
-    pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
-        [&self.t_resize, &self.t_infer]
-    }
-
     pub fn compute<V: AsImageView>(&mut self, image: &V) -> &LandmarkResult {
         self.compute_impl(image.as_view())
     }
@@ -74,6 +70,10 @@ impl Landmarker {
 
         &self.result_buffer
     }
+
+    pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
+        [&self.t_resize, &self.t_infer]
+    }
 }
 
 pub struct LandmarkResult {
@@ -87,6 +87,12 @@ impl LandmarkResult {
         &self.landmarks
     }
 
+    /// Returns the confidence that the input image contains a proper face.
+    ///
+    /// This can be used to estimate the fit quality, or to re-run face detection if that isn't done
+    /// each frame. Typical values are >20.0 when a good landmark fit is produced, between 10 and 20
+    /// when the face is rotated a bit too far, and <10 when the face is rotated much too far or
+    /// there is no face in the input image.
     pub fn face_confidence(&self) -> f32 {
         self.face_flag
     }
