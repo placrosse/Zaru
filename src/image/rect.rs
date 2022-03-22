@@ -1,5 +1,5 @@
 use std::{
-    cmp, fmt,
+    fmt,
     ops::{Bound, RangeBounds},
 };
 
@@ -77,23 +77,18 @@ impl Rect {
         let x_max = cvt_upper_bound(x.end_bound());
         let y_min = cvt_lower_bound(y.start_bound());
         let y_max = cvt_upper_bound(y.end_bound());
-        assert!(x_min <= x_max);
-        assert!(y_min <= y_max);
 
         Self::span_inner(x_min, y_min, x_max, y_max)
     }
 
     /// Creates a rectangle from two opposing corner points.
-    pub fn from_corners(first: (i32, i32), second: (i32, i32)) -> Self {
-        Self::span_inner(first.0, first.1, second.0, second.1)
+    pub fn from_corners(top_left: (i32, i32), bottom_right: (i32, i32)) -> Self {
+        Self::span_inner(top_left.0, top_left.1, bottom_right.0, bottom_right.1)
     }
 
-    fn span_inner(x0: i32, y0: i32, x1: i32, y1: i32) -> Self {
-        let x_min = cmp::min(x0, x1);
-        let y_min = cmp::min(y0, y1);
-        let x_max = cmp::max(x0, x1);
-        let y_max = cmp::max(y0, y1);
-
+    fn span_inner(x_min: i32, y_min: i32, x_max: i32, y_max: i32) -> Self {
+        assert!(x_min <= x_max, "x_min={}, x_max={}", x_min, x_max);
+        assert!(y_min <= y_max, "y_min={}, y_max={}", y_min, y_max);
         Self {
             rect: embedded_graphics::primitives::Rectangle {
                 top_left: Point { x: x_min, y: y_min },
@@ -167,18 +162,21 @@ impl Rect {
     }
 
     /// Computes the intersection of `self` and `other`.
-    pub fn intersection(&self, other: &Rect) -> Rect {
-        let rect = Rect::from_corners(
-            (self.x().max(other.x()), self.y().max(other.y())),
-            (
-                (i64::from(self.x()) + i64::from(self.width()))
-                    .min(i64::from(other.x()) + i64::from(other.width())) as i32
-                    - 1,
-                (i64::from(self.y()) + i64::from(self.height()))
-                    .min(i64::from(other.y()) + i64::from(other.height())) as i32
-                    - 1,
-            ),
-        );
+    ///
+    /// Returns `None` when the intersection is empty (ie. the rectangles do not overlap).
+    pub fn intersection(&self, other: &Rect) -> Option<Rect> {
+        let x_min = self.x().max(other.x());
+        let y_min = self.y().max(other.y());
+        let x_max = (i64::from(self.x()) + i64::from(self.width()))
+            .min(i64::from(other.x()) + i64::from(other.width())) as i32
+            - 1;
+        let y_max = (i64::from(self.y()) + i64::from(self.height()))
+            .min(i64::from(other.y()) + i64::from(other.height())) as i32
+            - 1;
+        if x_min > x_max || y_min > y_max {
+            return None;
+        }
+        let rect = Rect::from_corners((x_min, y_min), (x_max, y_max));
         assert!(
             self.contains_rect(&rect),
             "intersect self={:?} other={:?} res={:?}",
@@ -193,7 +191,7 @@ impl Rect {
             other,
             rect,
         );
-        rect
+        Some(rect)
     }
 
     /// Returns whether `self` contains `other`.
@@ -253,11 +251,15 @@ mod tests {
     fn test_intersection() {
         assert_eq!(
             Rect::from_ranges(0..=10, 0..=10).intersection(&Rect::from_ranges(5..=5, 5..=5)),
-            Rect::from_ranges(5..=5, 5..=5)
+            Some(Rect::from_ranges(5..=5, 5..=5))
         );
         assert_eq!(
             Rect::from_ranges(5..=5, 5..=5).intersection(&Rect::from_ranges(0..=10, 0..=10)),
-            Rect::from_ranges(5..=5, 5..=5)
+            Some(Rect::from_ranges(5..=5, 5..=5))
+        );
+        assert_eq!(
+            Rect::from_ranges(5..=5, 5..=5).intersection(&Rect::from_ranges(6..=10, 0..=10)),
+            None,
         );
     }
 }

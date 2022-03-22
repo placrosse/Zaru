@@ -82,12 +82,15 @@ fn main() -> Result<(), Error> {
                         .max_by_key(|det| TotalF32(det.confidence()))
                     {
                         // TODO: rotate to align the eyes
-                        let rect = target.bounding_rect_loose();
-                        let face = image
-                            .view(&image.rect().intersection(&rect))
-                            .aspect_aware_resize(landmark_input_res);
-                        if face_img_sender.send(face).is_err() {
-                            break;
+                        if let Some(crop_rect) =
+                            image.rect().intersection(&target.bounding_rect_loose())
+                        {
+                            let face = image
+                                .view(&crop_rect)
+                                .aspect_aware_resize(landmark_input_res);
+                            if face_img_sender.send(face).is_err() {
+                                break;
+                            }
                         }
                     }
 
