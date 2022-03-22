@@ -6,7 +6,7 @@
 //! [Face Detection]: https://google.github.io/mediapipe/solutions/face_detection
 
 use crate::{
-    filter::{Ema, Filter},
+    filter::{AlphaBetaFilter, Ema, Filter},
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
     nn::{Cnn, CnnInputFormat, NeuralNetwork},
     num::TotalF32,
@@ -15,7 +15,7 @@ use crate::{
 };
 
 use self::{
-    avg::DetectionAvg,
+    avg::DetectionFilter,
     nma::NonMaxAvg,
     ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
 };
@@ -26,13 +26,31 @@ mod ssd;
 
 /// Detection confidence threshold.
 ///
+/// Minimum confidence at which a detection is used as the "seed" of a non-maximum suppression round
+/// (or in this case, non-maximum averaging).
+///
 /// Tested thresholds for short-range model:
 /// - 0.5 creates false positives when blocking the camera with my hand.
 const SEED_THRESH: f32 = 0.6;
+/// Thresholds for detections to *contribute* to an NMS/NMA round started by another detection with
+/// at least `SEED_THRESH`.
 const CONTRIB_THRESH: f32 = 0.0;
+/// Minimum Intersection-over-Union value to consider two detections to overlap.
 const IOU_THRESH: f32 = 0.3;
 
+/// If this is `true`, an [`AlphaBetaFilter`] is used to smooth detections across frames. If it is
+/// `false` an exponentially-weighted moving average is used instead ([`Ema`]).
+///
+/// Typically, the exponential moving average performs well enough for face detection.
+const USE_AB_FILTER: bool = false;
+
+/// Alpha parameter of the exponentially-weighted moving average filter.
 const EMA_ALPHA: f32 = 0.25;
+
+/// Alpha parameter of the alpha beta filter.
+const AB_FILTER_ALPHA: f32 = 0.2;
+/// Beta parameter of the alpha beta filter.
+const AB_FILTER_BETA: f32 = 0.03;
 
 const MODEL_PATH: &str = "models/face_detection_short_range.onnx";
 
@@ -44,7 +62,7 @@ pub struct Detector {
     t_infer: Timer,
     t_filter: Timer,
     nma: NonMaxAvg,
-    avg: DetectionAvg<Ema>,
+    avg: Box<dyn Filter<RawDetection> + Send>,
     raw_detections: Vec<RawDetection>,
     detections: Vec<Detection>,
 }
@@ -55,6 +73,15 @@ impl Detector {
         let anchors = Anchors::calculate(&AnchorParams {
             layers: &[LayerInfo::new(2, 16, 16), LayerInfo::new(6, 8, 8)],
         });
+
+        let avg: Box<dyn Filter<RawDetection> + Send> = if USE_AB_FILTER {
+            Box::new(DetectionFilter::new(AlphaBetaFilter::new(
+                AB_FILTER_ALPHA,
+                AB_FILTER_BETA,
+            )))
+        } else {
+            Box::new(DetectionFilter::new(Ema::new(EMA_ALPHA)))
+        };
 
         Self {
             anchors,
@@ -68,7 +95,7 @@ impl Detector {
             t_infer: Timer::new("infer"),
             t_filter: Timer::new("filter"),
             nma: NonMaxAvg::new(SEED_THRESH, IOU_THRESH),
-            avg: DetectionAvg::new(Ema::new(EMA_ALPHA)),
+            avg,
             raw_detections: Vec::new(),
             detections: Vec::new(),
         }
@@ -156,6 +183,7 @@ impl Detection {
         self.raw.bounding_box_loose().to_rect(&self.full_res)
     }
 
+    /// Returns the confidence of this detection.
     pub fn confidence(&self) -> f32 {
         self.raw.confidence
     }

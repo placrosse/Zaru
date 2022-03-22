@@ -1,5 +1,20 @@
 use super::Filter;
 
+/// An [alpha beta filter] that predicts a variable using its previous value and estimated rate of
+/// change.
+///
+/// This type of filter is related to the Kalman filter, but much simpler. It is also a sort of
+/// extension of moving averages and specifically the exponentially-weighted moving average
+/// [`Ema`][super::Ema].
+///
+/// Alpha beta filters perform well when the measured value has an expected rate of change that is
+/// constant over short periods (ie. it isn't subject to large accelerations).
+///
+/// Note that this implementation does not allow adjusting for uneven measurement intervals, so it
+/// expects that `push` is called roughly in constant intervals. This also means that using a
+/// different interval might require a change to the `alpha` or `beta` parameters to perform well.
+///
+/// [alpha beta filter]: https://en.wikipedia.org/wiki/Alpha_beta_filter
 #[derive(Clone, Debug)]
 pub struct AlphaBetaFilter {
     alpha: f32,
@@ -11,8 +26,8 @@ pub struct AlphaBetaFilter {
 
 impl AlphaBetaFilter {
     pub fn new(alpha: f32, beta: f32) -> Self {
-        assert!(0.0 < alpha && alpha < 1.0);
-        assert!(0.0 < beta && beta < 1.0);
+        assert!(0.0 <= alpha && alpha <= 1.0);
+        assert!(0.0 <= beta && beta <= 1.0);
         Self {
             alpha,
             beta,

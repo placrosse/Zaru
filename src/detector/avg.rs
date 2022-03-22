@@ -2,8 +2,10 @@ use crate::filter::Filter;
 
 use super::{BoundingBox, RawDetection};
 
-/// An [`Averager`] that operates on [`RawDetection`]s.
-pub struct DetectionAvg<A> {
+/// A [`Filter`] that operates on [`RawDetection`]s.
+///
+/// This applies the same (configurable) type of filter to all detection coordinates.
+pub struct DetectionFilter<A> {
     xc: A,
     yc: A,
     w: A,
@@ -11,27 +13,27 @@ pub struct DetectionAvg<A> {
     landmarks: [(A, A); 6],
 }
 
-impl<A: Filter<f32> + Clone> DetectionAvg<A> {
-    /// Creates a new detection averager that uses clones of `averager` for every coordinate.
-    pub fn new(averager: A) -> Self {
+impl<A: Filter<f32> + Clone> DetectionFilter<A> {
+    /// Creates a new detection filter that uses a clone of `filter` for every coordinate.
+    pub fn new(filter: A) -> Self {
         Self {
-            xc: averager.clone(),
-            yc: averager.clone(),
-            w: averager.clone(),
-            h: averager.clone(),
+            xc: filter.clone(),
+            yc: filter.clone(),
+            w: filter.clone(),
+            h: filter.clone(),
             landmarks: [
-                (averager.clone(), averager.clone()),
-                (averager.clone(), averager.clone()),
-                (averager.clone(), averager.clone()),
-                (averager.clone(), averager.clone()),
-                (averager.clone(), averager.clone()),
-                (averager.clone(), averager.clone()),
+                (filter.clone(), filter.clone()),
+                (filter.clone(), filter.clone()),
+                (filter.clone(), filter.clone()),
+                (filter.clone(), filter.clone()),
+                (filter.clone(), filter.clone()),
+                (filter.clone(), filter.clone()),
             ],
         }
     }
 }
 
-impl<A: Filter<f32>> Filter<RawDetection> for DetectionAvg<A> {
+impl<A: Filter<f32>> Filter<RawDetection> for DetectionFilter<A> {
     fn push(&mut self, det: RawDetection) -> RawDetection {
         let mut landmarks = det.landmarks;
         for (i, lm) in landmarks.iter_mut().enumerate() {
