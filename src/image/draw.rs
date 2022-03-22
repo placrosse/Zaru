@@ -2,8 +2,10 @@ use std::convert::Infallible;
 
 use embedded_graphics::{
     draw_target::DrawTarget,
+    mono_font::{ascii::FONT_10X20, MonoTextStyle},
     prelude::*,
     primitives::{Line, PrimitiveStyle, Rectangle},
+    text::{self, Text, TextStyleBuilder},
 };
 
 use crate::image::{AsImageViewMut, Color, ImageViewMut, Rect};
@@ -62,7 +64,13 @@ impl<'a> DrawMarker<'a> {
         self
     }
 
+    /// Sets the width and height of the marker.
+    ///
+    /// The default size is 5. The size must be *uneven* and *non-zero*. A size of 1 will result in
+    /// a single pixel getting drawn.
     pub fn size(&mut self, size: u32) -> &mut Self {
+        assert!(size != 0, "marker size must be greater than zero");
+        assert!(size % 2 == 1, "marker size must be an uneven number");
         self.size = size;
         self
     }
@@ -133,6 +141,71 @@ impl<'a> Drop for DrawLine<'a> {
     }
 }
 
+/// Guard returned by [`draw_text`]; draws the text when dropped and allows customization.
+pub struct DrawText<'a> {
+    image: ImageViewMut<'a>,
+    x: i32,
+    y: i32,
+    text: &'a str,
+    color: Color,
+    alignment: text::Alignment,
+    baseline: text::Baseline,
+}
+
+impl<'a> DrawText<'a> {
+    /// Sets the text color.
+    pub fn color(&mut self, color: Color) -> &mut Self {
+        self.color = color;
+        self
+    }
+
+    /// Aligns the top of the text with the `y` coordinate.
+    pub fn align_top(&mut self) -> &mut Self {
+        self.baseline = text::Baseline::Top;
+        self
+    }
+
+    /// Aligns the bottom of the text with the `y` coordinate.
+    pub fn align_bottom(&mut self) -> &mut Self {
+        self.baseline = text::Baseline::Bottom;
+        self
+    }
+
+    /// Aligns the left side of the text with the `x` coordinate.
+    pub fn align_left(&mut self) -> &mut Self {
+        self.alignment = text::Alignment::Left;
+        self
+    }
+
+    /// Aligns the right side of the text with the `x` coordinate.
+    pub fn align_right(&mut self) -> &mut Self {
+        self.alignment = text::Alignment::Right;
+        self
+    }
+}
+
+impl<'a> Drop for DrawText<'a> {
+    fn drop(&mut self) {
+        // FIXME: do this in a better way, e-g's fonts lack some common glyphs
+        let character_style = MonoTextStyle::new(&FONT_10X20, self.color);
+        let text_style = TextStyleBuilder::new()
+            .alignment(self.alignment)
+            .baseline(self.baseline)
+            .build();
+        match Text::with_text_style(
+            self.text,
+            Point::new(self.x, self.y),
+            character_style,
+            text_style,
+        )
+        .draw(&mut Target(self.image.reborrow()))
+        {
+            Ok(_) => {}
+            Err(infallible) => match infallible {},
+        }
+    }
+}
+
 /// Draws a rectangle onto an image.
 pub fn draw_rect<I: AsImageViewMut>(image: &mut I, rect: Rect) -> DrawRect<'_> {
     DrawRect {
@@ -172,6 +245,26 @@ pub fn draw_line<I: AsImageViewMut>(
         end_y,
         color: Color::from_rgb8(0, 0, 255),
         stroke_width: 1,
+    }
+}
+
+/// Draws a text string onto an image.
+///
+/// By default, the text is drawn centered horizontally and vertically around `x` and `y`.
+pub fn draw_text<'a, I: AsImageViewMut>(
+    image: &'a mut I,
+    x: i32,
+    y: i32,
+    text: &'a str,
+) -> DrawText<'a> {
+    DrawText {
+        image: image.as_view_mut(),
+        x,
+        y,
+        text,
+        color: Color::from_rgb8(255, 0, 0),
+        alignment: text::Alignment::Center,
+        baseline: text::Baseline::Middle,
     }
 }
 
