@@ -13,12 +13,21 @@ pub struct Resolution {
 
 impl Resolution {
     /// 1080p – 1920x1080
-    pub const RES_1080P: Self = Self::new(1920, 1080);
+    pub const RES_1080P: Self = Self {
+        width: 1920,
+        height: 1080,
+    };
     /// 720p – 1280x720
-    pub const RES_720P: Self = Self::new(1280, 720);
+    pub const RES_720P: Self = Self {
+        width: 1280,
+        height: 720,
+    };
 
-    #[inline]
-    pub const fn new(width: u32, height: u32) -> Self {
+    pub fn new(width: u32, height: u32) -> Self {
+        assert!(
+            width != 0 && height != 0,
+            "attempted to create a resolution with 0 width or height"
+        );
         Self { width, height }
     }
 
@@ -107,6 +116,10 @@ impl AspectRatio {
     };
 
     pub fn new(width: u32, height: u32) -> Self {
+        assert!(
+            width != 0 && height != 0,
+            "attempted to create an aspect ratio with 0 width or height"
+        );
         let gcd = gcd(width, height);
         Self {
             width: width / gcd,
@@ -158,6 +171,11 @@ mod tests {
         assert_eq!(gcd(7, 13), 1);
         assert_eq!(1920 / gcd(1920, 1080), 16);
         assert_eq!(1080 / gcd(1920, 1080), 9);
+
+        // degenerate case where one of the arguments is 0 - the other one will be returned
+        assert_eq!(gcd(0, 7), 7);
+        assert_eq!(gcd(7, 0), 7);
+        assert_eq!(gcd(0, 0), 0);
     }
 
     #[test]
