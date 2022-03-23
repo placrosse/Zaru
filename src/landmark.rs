@@ -1,6 +1,10 @@
 //! Facial landmark detection.
 //!
 //! Also known as *face alignment* or *registration*.
+//!
+//! This uses one of the neural networks also used in MediaPipe's [Face Mesh] pipeline.
+//!
+//! [Face Mesh]: https://google.github.io/mediapipe/solutions/face_mesh.html
 
 use crate::{
     image::{AsImageView, ImageView},
@@ -86,6 +90,7 @@ impl Landmarker {
         &self.result_buffer
     }
 
+    /// Returns profiling timers for image resizing and neural inference.
     pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
         [&self.t_resize, &self.t_infer]
     }
