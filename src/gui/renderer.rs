@@ -34,7 +34,7 @@ impl Window {
         resolution: Resolution,
     ) -> anyhow::Result<Self> {
         let win = WindowBuilder::new()
-            .with_resizable(false)
+            .with_resizable(false) // TODO make resizeable
             .with_inner_size(PhysicalSize::new(resolution.width(), resolution.height()))
             .with_title(title)
             .build(&event_loop)?;
@@ -132,8 +132,9 @@ impl Texture {
 
         let mut reallocated = false;
 
+        // FIXME reuse the old texture if the new size is smaller
         if self.size != size {
-            log::debug!(
+            log::trace!(
                 "reallocating texture '{}' ({}x{} -> {}x{})",
                 self.label,
                 self.size.width,
