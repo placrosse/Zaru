@@ -251,6 +251,13 @@ impl<'a> ImageView<'a> {
         }
     }
 
+    /// Copies the contents of this view into a new [`Image`].
+    pub fn to_image(&self) -> Image {
+        Image {
+            buf: self.sub_image.to_image(),
+        }
+    }
+
     /// Resizes this image to a new size, adding black bars to keep the original aspect ratio.
     ///
     /// For performance (as this runs on the CPU), this uses nearest neighbor interpolation, so the
@@ -407,6 +414,13 @@ impl<'a> ImageViewMut<'a> {
             ),
         }
     }
+
+    /// Copies the contents of this view into a new [`Image`].
+    pub fn to_image(&self) -> Image {
+        Image {
+            buf: self.sub_image.to_image(),
+        }
+    }
 }
 
 impl fmt::Debug for ImageViewMut<'_> {
@@ -510,5 +524,23 @@ impl<'a> AsImageView for ImageViewMut<'a> {
 impl<'a> AsImageViewMut for ImageViewMut<'a> {
     fn as_view_mut(&mut self) -> ImageViewMut<'_> {
         self.reborrow()
+    }
+}
+
+impl<'a, V: AsImageView> AsImageView for &'a V {
+    fn as_view(&self) -> ImageView<'_> {
+        (*self).as_view()
+    }
+}
+
+impl<'a, V: AsImageView> AsImageView for &'a mut V {
+    fn as_view(&self) -> ImageView<'_> {
+        (**self).as_view()
+    }
+}
+
+impl<'a, V: AsImageViewMut> AsImageViewMut for &'a mut V {
+    fn as_view_mut(&mut self) -> ImageViewMut<'_> {
+        (*self).as_view_mut()
     }
 }
