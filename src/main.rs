@@ -21,8 +21,6 @@ fn main() -> Result<(), Error> {
     let mut detector = Detector::new();
     let mut landmarker = Landmarker::new();
 
-    let landmark_input_res = landmarker.input_resolution();
-
     let mut webcam = Webcam::open()?;
 
     let (img_sender, img_recv) = pipeline::channel();
@@ -86,9 +84,7 @@ fn main() -> Result<(), Error> {
                         if let Some(crop_rect) =
                             image.rect().intersection(&target.bounding_rect_loose())
                         {
-                            let face = image
-                                .view(&crop_rect)
-                                .aspect_aware_resize(landmark_input_res);
+                            let face = image.view(&crop_rect).to_image();
                             if face_img_sender.send(face).is_err() {
                                 break;
                             }
@@ -98,11 +94,13 @@ fn main() -> Result<(), Error> {
                     for det in detections {
                         det.draw(&mut image);
 
+                        let alignment_color = Color::from_rgb8(180, 180, 180);
                         let (x0, y0) = det.left_eye();
                         let (x1, y1) = det.right_eye();
-                        image::draw_line(&mut image, x0, y0, x1, y1).color(Color::WHITE);
+                        image::draw_line(&mut image, x0, y0, x1, y1).color(alignment_color);
                         let rot = format!("{:.01}°", det.rotation_radians().to_degrees());
-                        image::draw_text(&mut image, (x0 + x1) / 2, (y0 + y1) / 2, &rot);
+                        image::draw_text(&mut image, (x0 + x1) / 2, (y0 + y1) / 2 - 10, &rot)
+                            .color(alignment_color);
                     }
                     gui::show_image("face_detect", &image);
 
@@ -139,7 +137,8 @@ fn main() -> Result<(), Error> {
                     )
                     .align_top()
                     .color(color);
-                    gui::show_image("landmarks", &image);
+
+                    gui::show_image("raw_landmarks", &image);
 
                     fps.tick_with(landmarker.timers());
                 }

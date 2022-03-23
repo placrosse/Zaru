@@ -10,7 +10,7 @@ use nalgebra::{Rotation2, Vector2};
 use crate::{
     filter::{AlphaBetaFilter, Ema, Filter},
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
-    nn::{Cnn, CnnInputFormat, NeuralNetwork},
+    nn::{point_to_img, Cnn, CnnInputFormat, NeuralNetwork},
     num::TotalF32,
     resolution::Resolution,
     timer::Timer,
@@ -201,15 +201,24 @@ impl Detection {
         Rotation2::rotation_between(&Vector2::x(), &left_to_right_eye).angle()
     }
 
+    /// Returns the coordinates of the left eye's landmark (from the perspective of the input image,
+    /// not the depicted person).
     pub fn left_eye(&self) -> (i32, i32) {
         self.raw.landmarks[0].to_img_coord(&self.full_res)
     }
 
+    /// Returns the coordinates of the right eye's landmark (from the perspective of the input image,
+    /// not the depicted person).
     pub fn right_eye(&self) -> (i32, i32) {
         self.raw.landmarks[1].to_img_coord(&self.full_res)
     }
 
     /// Draws the bounding box and landmarks of this detection onto an image.
+    ///
+    /// # Panics
+    ///
+    /// The image must have the same resolution as the image the detection was performed on,
+    /// otherwise this method will panic.
     pub fn draw<I: AsImageViewMut>(&self, image: &mut I) {
         self.draw_impl(&mut image.as_view_mut());
     }
@@ -376,19 +385,4 @@ impl BoundingBox {
     fn iou(&self, other: &BoundingBox) -> f32 {
         self.intersection_area(other) / self.union_area(other)
     }
-}
-
-fn point_to_img(mut x: f32, mut y: f32, full_res: &Resolution) -> (i32, i32) {
-    let ratio = full_res.width() as f32 / full_res.height() as f32;
-    if ratio > 1.0 {
-        // going from 1:1 to something wider, undo letterboxing
-        y = (y - 0.5) * ratio + 0.5;
-    } else {
-        // going from 1:1 to something taller, undo pillarboxing
-        x = (x - 0.5) * ratio + 0.5;
-    }
-
-    let x = (x * full_res.width() as f32) as i32;
-    let y = (y * full_res.height() as f32) as i32;
-    (x, y)
 }

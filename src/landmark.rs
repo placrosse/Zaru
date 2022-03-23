@@ -1,14 +1,17 @@
 //! Facial landmark detection.
+//!
+//! Also known as *face alignment* or *registration*.
 
 use crate::{
     image::{AsImageView, ImageView},
-    nn::{Cnn, CnnInputFormat, NeuralNetwork},
+    nn::{unadjust_aspect_ratio, Cnn, CnnInputFormat, NeuralNetwork},
     resolution::Resolution,
     timer::Timer,
 };
 
 const MODEL_PATH: &str = "models/face_landmark.onnx";
 
+/// A neural network based facial landmark predictor.
 pub struct Landmarker {
     model: Cnn,
     t_resize: Timer,
@@ -18,6 +21,7 @@ pub struct Landmarker {
 }
 
 impl Landmarker {
+    /// Creates a new facial landmark calculator.
     pub fn new() -> Self {
         Self {
             model: Cnn::new(
@@ -34,10 +38,17 @@ impl Landmarker {
         }
     }
 
+    /// Returns the expected input resolution of the internal neural network.
     pub fn input_resolution(&self) -> Resolution {
         self.model.input_resolution()
     }
 
+    /// Computes facial landmarks in `image`.
+    ///
+    /// `image` must be a cropped image of a face. When using [`crate::detector::Detector`], the
+    /// rectangle returned by [`Detection::bounding_rect_loose`] produces good results.
+    ///
+    /// [`Detection::bounding_rect_loose`]: crate::detector::Detection::bounding_rect_loose
     pub fn compute<V: AsImageView>(&mut self, image: &V) -> &LandmarkResult {
         self.compute_impl(image.as_view())
     }
@@ -45,6 +56,7 @@ impl Landmarker {
     fn compute_impl(&mut self, image: ImageView<'_>) -> &LandmarkResult {
         let input_res = self.model.input_resolution();
         let full_res = image.resolution();
+        let orig_aspect = full_res.aspect_ratio();
 
         let mut image = image.reborrow();
         let resized;
@@ -63,8 +75,11 @@ impl Landmarker {
             .zip(&mut self.result_buffer.landmarks)
         {
             let (x, y, z) = (coords[0], coords[1], coords[2]);
-            *res_x = x / input_res.width() as f32 * full_res.width() as f32;
-            *res_y = y / input_res.height() as f32 * full_res.height() as f32;
+            let x = x / input_res.width() as f32;
+            let y = y / input_res.height() as f32;
+            let (x, y) = unadjust_aspect_ratio(x, y, orig_aspect);
+            *res_x = x * full_res.width() as f32;
+            *res_y = y * full_res.height() as f32;
             *res_z = z;
         }
 
@@ -76,6 +91,7 @@ impl Landmarker {
     }
 }
 
+/// Landmark results returned by [`Landmarker::compute`].
 pub struct LandmarkResult {
     /// Landmarks scaled to fit the input image.
     landmarks: [(f32, f32, f32); 468],
@@ -83,6 +99,10 @@ pub struct LandmarkResult {
 }
 
 impl LandmarkResult {
+    /// Returns the 3D landmarks fitted to the face.
+    ///
+    /// X and Y coordinates correspond to the input image's coordinate system, Z coordinates are
+    /// raw model output.
     pub fn landmarks(&self) -> &[(f32, f32, f32)] {
         &self.landmarks
     }
