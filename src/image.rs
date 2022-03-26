@@ -46,10 +46,15 @@ impl Image {
                 .expect("failed to create ImageBuffer");
             buf
         } else {
+            // FIXME: this might be using multithreading internally
             image::load_from_memory_with_format(data, ImageFormat::Jpeg)?.to_rgba8()
         };
 
         Ok(Self { buf })
+    }
+
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), crate::Error> {
+        Ok(self.buf.save(path)?)
     }
 
     /// Creates an empty image of a specified size.
@@ -413,6 +418,14 @@ impl<'a> ImageViewMut<'a> {
                 rect.height(),
             ),
         }
+    }
+
+    pub fn flip_horizontal_in_place(&mut self) {
+        image::imageops::flip_horizontal_in_place(&mut *self.sub_image);
+    }
+
+    pub fn flip_vertical_in_place(&mut self) {
+        image::imageops::flip_vertical_in_place(&mut *self.sub_image);
     }
 
     /// Copies the contents of this view into a new [`Image`].

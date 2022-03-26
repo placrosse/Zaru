@@ -94,6 +94,22 @@ fn main() -> Result<(), Error> {
                     for det in detections {
                         det.draw(&mut image);
 
+                        #[allow(illegal_floating_point_literal_pattern)] // let me have fun
+                        let color = match det.confidence() {
+                            1.5.. => Color::GREEN,
+                            0.5..=1.5 => Color::YELLOW,
+                            _ => Color::RED,
+                        };
+                        image::draw_text(
+                            &mut image,
+                            det.bounding_rect_loose().x()
+                                + (det.bounding_rect_loose().width() / 2) as i32,
+                            det.bounding_rect_loose().y(),
+                            &format!("conf={:.01}", det.confidence()),
+                        )
+                        .align_top()
+                        .color(color);
+
                         let alignment_color = Color::from_rgb8(180, 180, 180);
                         let (x0, y0) = det.left_eye();
                         let (x1, y1) = det.right_eye();
@@ -118,8 +134,8 @@ fn main() -> Result<(), Error> {
 
                 for mut image in face_img_recv.activate() {
                     let res = landmarker.compute(&image);
-                    for (x, y, _z) in res.landmarks() {
-                        image::draw_marker(&mut image, *x as _, *y as _).size(3);
+                    for pos in res.landmark_positions() {
+                        image::draw_marker(&mut image, pos.x() as _, pos.y() as _).size(3);
                     }
 
                     #[allow(illegal_floating_point_literal_pattern)] // let me have fun

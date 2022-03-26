@@ -1,6 +1,8 @@
 const INIT_STDDEV: f32 = 0.1;
 
 // TODO find existing terminology for this, it must exist
+// this seems similar to the 1€ filter and alpha beta filter, but those use the velocity/derivative
+// of the measured quantity
 
 use std::collections::VecDeque;
 

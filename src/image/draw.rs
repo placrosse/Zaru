@@ -2,7 +2,7 @@ use std::convert::Infallible;
 
 use embedded_graphics::{
     draw_target::DrawTarget,
-    mono_font::{ascii::FONT_10X20, MonoTextStyle},
+    mono_font::{ascii, MonoTextStyle},
     prelude::*,
     primitives::{Line, PrimitiveStyle, Rectangle},
     text::{self, Text, TextStyleBuilder},
@@ -187,7 +187,7 @@ impl<'a> DrawText<'a> {
 impl<'a> Drop for DrawText<'a> {
     fn drop(&mut self) {
         // FIXME: do this in a better way, e-g's fonts lack some common glyphs
-        let character_style = MonoTextStyle::new(&FONT_10X20, self.color);
+        let character_style = MonoTextStyle::new(&ascii::FONT_6X10, self.color);
         let text_style = TextStyleBuilder::new()
             .alignment(self.alignment)
             .baseline(self.baseline)

@@ -98,6 +98,18 @@ impl fmt::Debug for Resolution {
     }
 }
 
+impl std::ops::Mul<u32> for Resolution {
+    type Output = Self;
+
+    fn mul(self, rhs: u32) -> Self::Output {
+        assert!(rhs != 0, "attempt to multiply resolution with 0");
+        Resolution {
+            width: self.width * rhs,
+            height: self.height * rhs,
+        }
+    }
+}
+
 /// Ratio of a width to a height of an image.
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct AspectRatio {

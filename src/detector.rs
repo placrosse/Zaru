@@ -54,7 +54,7 @@ const AB_FILTER_ALPHA: f32 = 0.2;
 /// Beta parameter of the alpha beta filter.
 const AB_FILTER_BETA: f32 = 0.03;
 
-const MODEL_PATH: &str = "models/face_detection_short_range.onnx";
+const MODEL_PATH: &str = "onnx/face_detection_short_range.onnx";
 
 /// Neural-Network based face detector.
 pub struct Detector {
@@ -187,6 +187,9 @@ impl Detection {
     }
 
     /// Returns the confidence of this detection.
+    ///
+    /// Typically, values >1.5 indicate a decent detection, values >0.5 indicate a partially
+    /// occluded face, and anything below that is unlikely to be a valid detection at all.
     pub fn confidence(&self) -> f32 {
         self.raw.confidence
     }

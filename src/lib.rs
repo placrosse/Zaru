@@ -1,6 +1,7 @@
 //! See no evil.
 
 pub mod detector;
+pub mod eye;
 pub mod filter;
 pub mod gui;
 pub mod image;
