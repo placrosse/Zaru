@@ -4,7 +4,7 @@ use embedded_graphics::{
     draw_target::DrawTarget,
     mono_font::{ascii, MonoTextStyle},
     prelude::*,
-    primitives::{Line, PrimitiveStyle, Rectangle},
+    primitives::{self, Line, PrimitiveStyle, Rectangle},
     text::{self, Text, TextStyleBuilder},
 };
 
@@ -206,6 +206,51 @@ impl<'a> Drop for DrawText<'a> {
     }
 }
 
+pub struct DrawCircle<'a> {
+    image: ImageViewMut<'a>,
+    x: i32,
+    y: i32,
+    diameter: u32,
+    stroke_width: u32,
+    color: Color,
+}
+
+impl<'a> DrawCircle<'a> {
+    /// Sets the circle's color.
+    pub fn color(&mut self, color: Color) -> &mut Self {
+        self.color = color;
+        self
+    }
+
+    /// Sets the circle's stroke width.
+    ///
+    /// By default, a stroke width of 1 is used.
+    pub fn stroke_width(&mut self, width: u32) -> &mut Self {
+        self.stroke_width = width;
+        self
+    }
+}
+
+impl<'a> Drop for DrawCircle<'a> {
+    fn drop(&mut self) {
+        let top_left = Point {
+            x: self.x - (self.diameter / 2) as i32,
+            y: self.y - (self.diameter / 2) as i32,
+        };
+        let circle = primitives::Circle {
+            top_left,
+            diameter: self.diameter,
+        };
+        match circle
+            .into_styled(PrimitiveStyle::with_stroke(self.color, self.stroke_width))
+            .draw(&mut Target(self.image.reborrow()))
+        {
+            Ok(_) => {}
+            Err(infallible) => match infallible {},
+        }
+    }
+}
+
 /// Draws a rectangle onto an image.
 pub fn draw_rect<I: AsImageViewMut>(image: &mut I, rect: Rect) -> DrawRect<'_> {
     DrawRect {
@@ -265,6 +310,23 @@ pub fn draw_text<'a, I: AsImageViewMut>(
         color: Color::from_rgb8(255, 0, 0),
         alignment: text::Alignment::Center,
         baseline: text::Baseline::Middle,
+    }
+}
+
+/// Draws a circle onto an image.
+pub fn draw_circle<'a, I: AsImageViewMut>(
+    image: &'a mut I,
+    x: i32,
+    y: i32,
+    diameter: u32,
+) -> DrawCircle<'a> {
+    DrawCircle {
+        image: image.as_view_mut(),
+        x,
+        y,
+        diameter,
+        stroke_width: 1,
+        color: Color::GREEN,
     }
 }
 

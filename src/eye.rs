@@ -1,7 +1,10 @@
 //! Eye and iris landmark computation.
 
+use nalgebra::Point2;
+
 use crate::{
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut},
+    iter::zip_exact,
     nn::{unadjust_aspect_ratio, Cnn, CnnInputFormat, NeuralNetwork},
     resolution::Resolution,
     timer::Timer,
@@ -9,6 +12,7 @@ use crate::{
 
 const MODEL_PATH: &str = "onnx/iris_landmark.onnx";
 
+/// An eye and iris landmark predictor.
 pub struct EyeLandmarker {
     model: Cnn,
     t_resize: Timer,
@@ -62,12 +66,10 @@ impl EyeLandmarker {
         log::trace!("inference result: {:?}", result);
 
         self.result_buf.full_res = full_res;
-        for (coords, (out_x, out_y)) in result[0]
-            .as_slice::<f32>()
-            .unwrap()
-            .chunks(2)
-            .zip(&mut self.result_buf.eye_contour)
-        {
+        for (coords, (out_x, out_y)) in zip_exact(
+            result[0].as_slice::<f32>().unwrap().chunks(3), // x, y, and z coordinates
+            &mut self.result_buf.eye_contour,
+        ) {
             let (x, y) = (coords[0], coords[1]);
             let x = x / input_res.width() as f32;
             let y = y / input_res.height() as f32;
@@ -76,12 +78,10 @@ impl EyeLandmarker {
             *out_y = y * full_res.height() as f32;
         }
 
-        for (coords, (out_x, out_y)) in result[1]
-            .as_slice::<f32>()
-            .unwrap()
-            .chunks(2)
-            .zip(&mut self.result_buf.iris_contour)
-        {
+        for (coords, (out_x, out_y)) in zip_exact(
+            result[1].as_slice::<f32>().unwrap().chunks(3), // x, y, and z coordinates
+            &mut self.result_buf.iris_contour,
+        ) {
             let (x, y) = (coords[0], coords[1]);
             let x = x / input_res.width() as f32;
             let y = y / input_res.height() as f32;
@@ -110,13 +110,32 @@ pub struct EyeLandmarks {
 }
 
 impl EyeLandmarks {
-    pub fn eye_contour(&self) -> &[(f32, f32)] {
-        &self.eye_contour
+    /// Returns the center coordinates of the iris.
+    pub fn iris_center(&self) -> (f32, f32) {
+        self.iris_contour[0]
     }
 
+    /// Computes the iris diameter from the landmarks.
+    pub fn iris_diameter(&self) -> f32 {
+        let (cx, cy) = self.iris_center();
+        let center = Point2::new(cx, cy);
+
+        // Average data from all landmarks.
+        let mut acc_radius = 0.0;
+        for (x, y) in self.iris_contour() {
+            acc_radius += nalgebra::distance(&center, &Point2::new(*x, *y));
+        }
+        let diameter = acc_radius / self.iris_contour().len() as f32 * 2.0;
+        diameter
+    }
+
+    /// Returns the outer landmarks of the iris.
     pub fn iris_contour(&self) -> &[(f32, f32)] {
-        // FIXME replace with center and radius/diameter
-        &self.iris_contour
+        &self.iris_contour[1..]
+    }
+
+    pub fn eye_contour(&self) -> &[(f32, f32)] {
+        &self.eye_contour
     }
 
     /// Flips all landmark coordinates along the X axis.
@@ -136,15 +155,20 @@ impl EyeLandmarks {
     }
 
     fn draw_impl(&self, mut image: ImageViewMut<'_>) {
-        for (x, y) in self.eye_contour() {
+        assert_eq!(image.resolution(), self.full_res);
+        for (x, y) in self.eye_contour().iter().take(16) {
+            image::draw_marker(&mut image, *x as _, *y as _)
+                .size(1)
+                .color(Color::MAGENTA);
+        }
+        for (x, y) in self.eye_contour().iter().skip(16) {
             image::draw_marker(&mut image, *x as _, *y as _)
                 .size(1)
                 .color(Color::GREEN);
         }
-        for (x, y) in self.iris_contour() {
-            image::draw_marker(&mut image, *x as _, *y as _)
-                .size(1)
-                .color(Color::RED);
-        }
+
+        let (x, y) = self.iris_center();
+        image::draw_circle(&mut image, x as _, y as _, self.iris_diameter() as u32)
+            .color(Color::RED);
     }
 }

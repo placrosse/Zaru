@@ -5,6 +5,7 @@ pub mod eye;
 pub mod filter;
 pub mod gui;
 pub mod image;
+pub mod iter;
 pub mod landmark;
 pub mod nn;
 pub mod num;

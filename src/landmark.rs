@@ -12,6 +12,7 @@ use std::ops::Index;
 
 use crate::{
     image::{AsImageView, ImageView},
+    iter::zip_exact,
     nn::{unadjust_aspect_ratio, Cnn, CnnInputFormat, NeuralNetwork},
     resolution::{AspectRatio, Resolution},
     timer::Timer,
@@ -86,12 +87,10 @@ impl Landmarker {
         log::trace!("inference result: {:?}", result);
 
         self.result_buffer.face_flag = result[1].as_slice::<f32>().unwrap()[0];
-        for (coords, out) in result[0]
-            .as_slice::<f32>()
-            .unwrap()
-            .chunks(3)
-            .zip(&mut self.result_buffer.landmarks.positions)
-        {
+        for (coords, out) in zip_exact(
+            result[0].as_slice::<f32>().unwrap().chunks(3),
+            &mut self.result_buffer.landmarks.positions,
+        ) {
             out.0 = coords[0];
             out.1 = coords[1];
             out.2 = coords[2];

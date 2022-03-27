@@ -71,13 +71,14 @@ impl fmt::Display for Timer {
             // (this can't actually fail, `time` takes `&mut self` and this function can't be
             // invoked more than once at the same time because `Timer` isn't `Sync`)
             let mut durations = self.durations.borrow_mut();
+            let len = durations.len();
             let num = durations.len() as f32;
             let avg_ms = durations
                 .iter()
                 .fold(0.0, |prev, new| prev + new.as_secs_f32() * 1000.0 / num);
             durations.clear();
 
-            write!(f, "{}: {avg_ms:.01}ms", self.name)
+            write!(f, "{}: {len}x{avg_ms:.01}ms", self.name)
         }
     }
 }

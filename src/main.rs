@@ -4,7 +4,7 @@ use mizaru::eye::EyeLandmarker;
 use mizaru::image::{Color, Rect};
 use mizaru::landmark::{self, Landmarker};
 use mizaru::num::TotalF32;
-use mizaru::timer::FpsCounter;
+use mizaru::timer::{FpsCounter, Timer};
 use mizaru::webcam::Webcam;
 use mizaru::{gui, image, on_drop, pipeline, Error};
 
@@ -135,10 +135,13 @@ fn main() -> Result<(), Error> {
             .spawn(|_| {
                 let _guard = on_drop(|| log::info!("landmarking thread exiting"));
                 let mut fps = FpsCounter::new("landmarker");
+                let mut t_total = Timer::new("total");
 
                 let mut eye_img_sender = eye_img_sender.activate();
 
                 for mut image in face_img_recv.activate() {
+                    let guard = t_total.start();
+
                     let res = landmarker.compute(&image);
                     if res.face_confidence() >= 10.0 {
                         use landmark::Idx::*;
@@ -167,11 +170,12 @@ fn main() -> Result<(), Error> {
                         }))
                         .unwrap();
 
+                        const MARGIN: f32 = 0.5;
                         let left = left
-                            .grow_rel(0.25, 0.25, 0.25, 0.25)
+                            .grow_rel(MARGIN, MARGIN, MARGIN, MARGIN)
                             .grow_to_fit_aspect(landmark_input_aspect);
                         let right = right
-                            .grow_rel(0.25, 0.25, 0.25, 0.25)
+                            .grow_rel(MARGIN, MARGIN, MARGIN, MARGIN)
                             .grow_to_fit_aspect(landmark_input_aspect);
 
                         let left = image.rect().intersection(&left);
@@ -207,7 +211,8 @@ fn main() -> Result<(), Error> {
 
                     gui::show_image("raw_landmarks", &image);
 
-                    fps.tick_with(landmarker.timers());
+                    drop(guard);
+                    fps.tick_with([&t_total].into_iter().chain(landmarker.timers()));
                 }
             })
             .unwrap();
