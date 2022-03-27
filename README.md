@@ -9,6 +9,8 @@
     - in part, caused by aspect-aware image resizing
     - currently using short-range model, should try the long range sparse variant
       (once https://github.com/onnx/tensorflow-onnx/issues/1877 is fixed)
+- ext. resources like neural nets are loaded from disk at runtime
+    - should be `include!`d instead
 
 ## other notes
 

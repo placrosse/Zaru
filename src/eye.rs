@@ -1,4 +1,8 @@
 //! Eye and iris landmark computation.
+//!
+//! This uses the neural network from MediaPipe's [Iris] pipeline.
+//!
+//! [Iris]: https://google.github.io/mediapipe/solutions/iris
 
 use nalgebra::Point2;
 
@@ -21,6 +25,7 @@ pub struct EyeLandmarker {
 }
 
 impl EyeLandmarker {
+    /// Creates a new eye landmarker.
     pub fn new() -> Self {
         Self {
             model: Cnn::new(
@@ -115,6 +120,11 @@ impl EyeLandmarks {
         self.iris_contour[0]
     }
 
+    /// Returns the outer landmarks of the iris.
+    pub fn iris_contour(&self) -> &[(f32, f32)] {
+        &self.iris_contour[1..]
+    }
+
     /// Computes the iris diameter from the landmarks.
     pub fn iris_diameter(&self) -> f32 {
         let (cx, cy) = self.iris_center();
@@ -127,11 +137,6 @@ impl EyeLandmarks {
         }
         let diameter = acc_radius / self.iris_contour().len() as f32 * 2.0;
         diameter
-    }
-
-    /// Returns the outer landmarks of the iris.
-    pub fn iris_contour(&self) -> &[(f32, f32)] {
-        &self.iris_contour[1..]
     }
 
     pub fn eye_contour(&self) -> &[(f32, f32)] {

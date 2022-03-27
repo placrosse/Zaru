@@ -150,7 +150,7 @@ pub(crate) fn point_to_img(x: f32, y: f32, full_res: &Resolution) -> (i32, i32) 
 /// - `N` is the number of images, often fixed at 1.
 /// - `C` is the number of color channels, often 3 for RGB inputs.
 /// - `H` and `W` are the height and width of the input, respectively.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CnnInputFormat {
     /// Shape is `(N, C, H, W)`.
     NCHW,
