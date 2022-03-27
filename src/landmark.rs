@@ -61,6 +61,9 @@ impl Landmarker {
     ///
     /// `image` must be a cropped image of a face. When using [`crate::detector::Detector`], the
     /// rectangle returned by [`Detection::bounding_rect_loose`] produces good results.
+    /// 
+    /// The image should depict a face that is mostly upright. Results will be poor if the face is
+    /// rotated too much.
     ///
     /// [`Detection::bounding_rect_loose`]: crate::detector::Detection::bounding_rect_loose
     pub fn compute<V: AsImageView>(&mut self, image: &V) -> &LandmarkResult {
@@ -223,4 +226,11 @@ pub enum Idx {
     RightEyebrowLeftCorner = 295,
     LeftEyebrowRightCorner = 65,
     // idle thought: you could use this data to render an AR unibrow :)
+}
+
+impl Into<usize> for Idx {
+    #[inline]
+    fn into(self) -> usize {
+        self as usize
+    }
 }

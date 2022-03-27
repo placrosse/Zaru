@@ -1,10 +1,12 @@
 use std::{
-    fmt,
+    cmp, fmt,
     ops::{Bound, RangeBounds},
 };
 
 use embedded_graphics::prelude::*;
 use itertools::Itertools;
+
+use crate::resolution::AspectRatio;
 
 /// An axis-aligned rectangle.
 ///
@@ -86,6 +88,22 @@ impl Rect {
         Self::span_inner(top_left.0, top_left.1, bottom_right.0, bottom_right.1)
     }
 
+    /// Computes the (axis-aligned) bounding rectangle that encompasses `points`.
+    ///
+    /// If `points` is empty, some zero-sized rectangle will be returned.
+    pub fn bounding<I: IntoIterator<Item = (i32, i32)>>(points: I) -> Self {
+        let (mut x_min, mut x_max, mut y_min, mut y_max) = (0, 0, 0, 0);
+
+        for (x, y) in points {
+            x_min = cmp::min(x_min, x);
+            x_max = cmp::max(x_max, x);
+            y_min = cmp::min(y_min, y);
+            y_max = cmp::max(y_max, y);
+        }
+
+        Self::span_inner(x_min, y_min, x_max, y_max)
+    }
+
     fn span_inner(x_min: i32, y_min: i32, x_max: i32, y_max: i32) -> Self {
         assert!(x_min <= x_max, "x_min={}, x_max={}", x_min, x_max);
         assert!(y_min <= y_max, "y_min={}, y_max={}", y_min, y_max);
@@ -137,6 +155,30 @@ impl Rect {
         let top = self.rect.size.height as f32 * top;
         let bottom = self.rect.size.height as f32 * bottom;
         self.grow(left as i32, right as i32, top as i32, bottom as i32)
+    }
+
+    /// Symmetrically extends one dimension of `self` so that the resulting rectangle has the given
+    /// aspect ratio.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if `self` has a width or height of 0.
+    #[must_use]
+    pub fn grow_to_fit_aspect(&self, target_aspect: AspectRatio) -> Self {
+        let mut res = *self;
+        let target_width = (self.height() as f32 * target_aspect.as_f32() + 0.5) as u32;
+        if target_width >= self.width() {
+            let inc_w = target_width - self.width();
+            res.rect.top_left.x -= (inc_w / 2) as i32;
+            res.rect.size.width += inc_w;
+        } else {
+            let target_height = (self.width() as f32 / target_aspect.as_f32() + 0.5) as u32;
+            let inc_h = target_height - self.height();
+            res.rect.top_left.y -= (inc_h / 2) as i32;
+            res.rect.size.height += inc_h;
+        }
+
+        res
     }
 
     /// Returns the X coordinate of the left side of the rectangle.
@@ -260,6 +302,38 @@ mod tests {
         assert_eq!(
             Rect::from_ranges(5..=5, 5..=5).intersection(&Rect::from_ranges(6..=10, 0..=10)),
             None,
+        );
+    }
+
+    #[test]
+    fn test_bounding() {
+        assert_eq!(
+            Rect::bounding([(0, 0), (1, 1), (-1, -1)]),
+            Rect::from_corners((-1, -1), (1, 1)),
+        );
+        assert_eq!(
+            Rect::bounding([(1, 1), (-1, -1)]),
+            Rect::from_corners((-1, -1), (1, 1)),
+        );
+        assert_eq!(
+            Rect::bounding([(-1, -1), (1, 1)]),
+            Rect::from_corners((-1, -1), (1, 1)),
+        );
+    }
+
+    #[test]
+    fn test_fit_aspect() {
+        assert_eq!(
+            Rect::from_center(10, 10, 50, 100).grow_to_fit_aspect(AspectRatio::SQUARE),
+            Rect::from_center(10, 10, 100, 100),
+        );
+        assert_eq!(
+            Rect::from_center(10, 10, 100, 50).grow_to_fit_aspect(AspectRatio::SQUARE),
+            Rect::from_center(10, 10, 100, 100),
+        );
+        assert_eq!(
+            Rect::from_center(10, 10, 100, 98).grow_to_fit_aspect(AspectRatio::SQUARE),
+            Rect::from_center(10, 10, 100, 100),
         );
     }
 }

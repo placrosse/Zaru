@@ -127,6 +127,11 @@ impl AspectRatio {
         height: 1,
     };
 
+    /// Creates the aspect ratio representing `width:height`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if `width` or `height` are zero.
     pub fn new(width: u32, height: u32) -> Self {
         assert!(
             width != 0 && height != 0,
@@ -139,6 +144,7 @@ impl AspectRatio {
         }
     }
 
+    /// Returns the `f32` corresponding to this ratio.
     #[inline]
     pub fn as_f32(&self) -> f32 {
         self.width as f32 / self.height as f32
