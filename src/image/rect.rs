@@ -90,18 +90,21 @@ impl Rect {
 
     /// Computes the (axis-aligned) bounding rectangle that encompasses `points`.
     ///
-    /// If `points` is empty, some zero-sized rectangle will be returned.
-    pub fn bounding<I: IntoIterator<Item = (i32, i32)>>(points: I) -> Self {
-        let (mut x_min, mut x_max, mut y_min, mut y_max) = (0, 0, 0, 0);
+    /// Returns `None` if `points` is an empty iterator.
+    pub fn bounding<I: IntoIterator<Item = (i32, i32)>>(points: I) -> Option<Self> {
+        let mut iter = points.into_iter();
 
-        for (x, y) in points {
+        let (x, y) = iter.next()?;
+        let (mut x_min, mut x_max, mut y_min, mut y_max) = (x, x, y, y);
+
+        for (x, y) in iter {
             x_min = cmp::min(x_min, x);
             x_max = cmp::max(x_max, x);
             y_min = cmp::min(y_min, y);
             y_max = cmp::max(y_max, y);
         }
 
-        Self::span_inner(x_min, y_min, x_max, y_max)
+        Some(Self::span_inner(x_min, y_min, x_max, y_max))
     }
 
     fn span_inner(x_min: i32, y_min: i32, x_max: i32, y_max: i32) -> Self {
@@ -308,16 +311,20 @@ mod tests {
     #[test]
     fn test_bounding() {
         assert_eq!(
-            Rect::bounding([(0, 0), (1, 1), (-1, -1)]),
+            Rect::bounding([(0, 0), (1, 1), (-1, -1)]).unwrap(),
             Rect::from_corners((-1, -1), (1, 1)),
         );
         assert_eq!(
-            Rect::bounding([(1, 1), (-1, -1)]),
+            Rect::bounding([(1, 1), (-1, -1)]).unwrap(),
             Rect::from_corners((-1, -1), (1, 1)),
         );
         assert_eq!(
-            Rect::bounding([(-1, -1), (1, 1)]),
+            Rect::bounding([(-1, -1), (1, 1)]).unwrap(),
             Rect::from_corners((-1, -1), (1, 1)),
+        );
+        assert_eq!(
+            Rect::bounding([(1, 1), (2, 2)]).unwrap(),
+            Rect::from_corners((1, 1), (2, 2)),
         );
     }
 
