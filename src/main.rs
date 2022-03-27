@@ -21,14 +21,16 @@ fn main() -> Result<(), Error> {
 
     let mut detector = Detector::new();
     let mut landmarker = Landmarker::new();
-    let mut eye_landmarker = EyeLandmarker::new();
-    let landmark_input_aspect = eye_landmarker.input_resolution().aspect_ratio();
+    let mut left_eye_landmarker = EyeLandmarker::new();
+    let mut right_eye_landmarker = EyeLandmarker::new();
+    let landmark_input_aspect = left_eye_landmarker.input_resolution().aspect_ratio();
 
     let mut webcam = Webcam::open()?;
 
     let (img_sender, img_recv) = pipeline::channel();
     let (face_img_sender, face_img_recv) = pipeline::channel();
-    let (eye_img_sender, eye_img_recv) = pipeline::channel();
+    let (left_eye_img_sender, left_eye_img_recv) = pipeline::channel();
+    let (right_eye_img_sender, right_eye_img_recv) = pipeline::channel();
 
     // The detection pipeline uses a quite literal pipeline structure – different processing stages
     // happen in different threads, quite similar to how a pipelined CPU architecture works
@@ -137,7 +139,8 @@ fn main() -> Result<(), Error> {
                 let mut fps = FpsCounter::new("landmarker");
                 let mut t_total = Timer::new("total");
 
-                let mut eye_img_sender = eye_img_sender.activate();
+                let mut left_eye_img_sender = left_eye_img_sender.activate();
+                let mut right_eye_img_sender = right_eye_img_sender.activate();
 
                 for mut image in face_img_recv.activate() {
                     let guard = t_total.start();
@@ -183,7 +186,10 @@ fn main() -> Result<(), Error> {
                         if let (Some(left), Some(right)) = (left, right) {
                             let left = image.view(&left).to_image();
                             let right = image.view(&right).to_image();
-                            if eye_img_sender.send((left, right)).is_err() {
+                            if left_eye_img_sender.send(left).is_err() {
+                                break;
+                            }
+                            if right_eye_img_sender.send(right).is_err() {
                                 break;
                             }
                         }
@@ -219,23 +225,37 @@ fn main() -> Result<(), Error> {
 
         scope
             .builder()
-            .name("Iris Tracker".into())
+            .name("Left Iris".into())
             .spawn(|_| {
-                let _guard = on_drop(|| log::info!("iris tracking thread exiting"));
-                let mut fps = FpsCounter::new("iris tracker");
+                let _guard = on_drop(|| log::info!("left iris tracking thread exiting"));
+                let mut fps = FpsCounter::new("left iris");
 
-                for (mut left_img, mut right_img) in eye_img_recv.activate() {
-                    let left_marks = eye_landmarker.compute(&left_img);
+                for mut left_img in left_eye_img_recv.activate() {
+                    let left_marks = left_eye_landmarker.compute(&left_img);
                     left_marks.draw(&mut left_img);
 
-                    let right_marks = eye_landmarker.compute(&right_img.flip_horizontal());
+                    gui::show_image("left_eye", &left_img);
+
+                    fps.tick_with(left_eye_landmarker.timers());
+                }
+            })
+            .unwrap();
+
+        scope
+            .builder()
+            .name("Right Iris".into())
+            .spawn(|_| {
+                let _guard = on_drop(|| log::info!("right iris tracking thread exiting"));
+                let mut fps = FpsCounter::new("right iris");
+
+                for mut right_img in right_eye_img_recv.activate() {
+                    let right_marks = right_eye_landmarker.compute(&right_img.flip_horizontal());
                     right_marks.flip_horizontal_in_place();
                     right_marks.draw(&mut right_img);
 
-                    gui::show_image("left_eye", &left_img);
                     gui::show_image("right_eye", &right_img);
 
-                    fps.tick_with(eye_landmarker.timers());
+                    fps.tick_with(right_eye_landmarker.timers());
                 }
             })
             .unwrap();
