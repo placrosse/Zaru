@@ -61,7 +61,7 @@ impl Landmarker {
     ///
     /// `image` must be a cropped image of a face. When using [`crate::detector::Detector`], the
     /// rectangle returned by [`Detection::bounding_rect_loose`] produces good results.
-    /// 
+    ///
     /// The image should depict a face that is mostly upright. Results will be poor if the face is
     /// rotated too much.
     ///
@@ -137,16 +137,12 @@ pub struct LandmarkResult {
 }
 
 impl LandmarkResult {
-    #[inline]
-    pub fn raw_landmarks(&self) -> &Landmarks {
-        &self.landmarks
-    }
-
     /// Returns the 3D landmark positions in the input image's coordinate system.
     pub fn landmark_positions(&self) -> impl Iterator<Item = Pos> + '_ {
         (0..self.landmark_count()).map(|index| self.landmark_position(index))
     }
 
+    /// Returns a landmark's position in the input image's coordinate system.
     pub fn landmark_position(&self, index: usize) -> Pos {
         let Pos(x, y, z) = self.landmarks.positions[index];
         let (x, y) = unadjust_aspect_ratio(
@@ -164,6 +160,11 @@ impl LandmarkResult {
     #[inline]
     pub fn landmark_count(&self) -> usize {
         self.landmarks.positions.len()
+    }
+
+    #[inline]
+    pub fn raw_landmarks(&self) -> &Landmarks {
+        &self.landmarks
     }
 
     /// Returns the confidence that the input image contains a proper face.

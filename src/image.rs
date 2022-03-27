@@ -168,6 +168,26 @@ impl Image {
         }
     }
 
+    pub fn flip_horizontal(&self) -> Image {
+        Image {
+            buf: image::imageops::flip_horizontal(&self.buf),
+        }
+    }
+
+    pub fn flip_vertical(&self) -> Image {
+        Image {
+            buf: image::imageops::flip_vertical(&self.buf),
+        }
+    }
+
+    pub fn flip_horizontal_in_place(&mut self) {
+        image::imageops::flip_horizontal_in_place(&mut self.buf);
+    }
+
+    pub fn flip_vertical_in_place(&mut self) {
+        image::imageops::flip_vertical_in_place(&mut self.buf);
+    }
+
     #[inline]
     pub(crate) fn data(&self) -> &[u8] {
         self.buf.as_raw()
@@ -417,6 +437,18 @@ impl<'a> ImageViewMut<'a> {
                 rect.width(),
                 rect.height(),
             ),
+        }
+    }
+
+    pub fn flip_horizontal(&self) -> Image {
+        Image {
+            buf: image::imageops::flip_horizontal(&*self.sub_image),
+        }
+    }
+
+    pub fn flip_vertical(&self) -> Image {
+        Image {
+            buf: image::imageops::flip_vertical(&*self.sub_image),
         }
     }
 

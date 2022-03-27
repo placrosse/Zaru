@@ -1,7 +1,7 @@
 //! Eye and iris landmark computation.
 
 use crate::{
-    image::{AsImageView, ImageView},
+    image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut},
     nn::{unadjust_aspect_ratio, Cnn, CnnInputFormat, NeuralNetwork},
     resolution::Resolution,
     timer::Timer,
@@ -127,6 +127,24 @@ impl EyeLandmarks {
         }
         for (x, _) in &mut self.iris_contour {
             *x = -(*x - half_width) + half_width;
+        }
+    }
+
+    /// Draws the eye landmarks onto an image.
+    pub fn draw<I: AsImageViewMut>(&self, image: &mut I) {
+        self.draw_impl(image.as_view_mut());
+    }
+
+    fn draw_impl(&self, mut image: ImageViewMut<'_>) {
+        for (x, y) in self.eye_contour() {
+            image::draw_marker(&mut image, *x as _, *y as _)
+                .size(1)
+                .color(Color::GREEN);
+        }
+        for (x, y) in self.iris_contour() {
+            image::draw_marker(&mut image, *x as _, *y as _)
+                .size(1)
+                .color(Color::RED);
         }
     }
 }

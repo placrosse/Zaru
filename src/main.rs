@@ -1,7 +1,8 @@
 use log::LevelFilter;
 use mizaru::detector::Detector;
-use mizaru::image::Color;
-use mizaru::landmark::Landmarker;
+use mizaru::eye::EyeLandmarker;
+use mizaru::image::{Color, Rect};
+use mizaru::landmark::{self, Landmarker};
 use mizaru::num::TotalF32;
 use mizaru::timer::FpsCounter;
 use mizaru::webcam::Webcam;
@@ -20,11 +21,14 @@ fn main() -> Result<(), Error> {
 
     let mut detector = Detector::new();
     let mut landmarker = Landmarker::new();
+    let mut eye_landmarker = EyeLandmarker::new();
+    let landmark_input_aspect = eye_landmarker.input_resolution().aspect_ratio();
 
     let mut webcam = Webcam::open()?;
 
     let (img_sender, img_recv) = pipeline::channel();
     let (face_img_sender, face_img_recv) = pipeline::channel();
+    let (eye_img_sender, eye_img_recv) = pipeline::channel();
 
     // The detection pipeline uses a quite literal pipeline structure – different processing stages
     // happen in different threads, quite similar to how a pipelined CPU architecture works
@@ -67,10 +71,10 @@ fn main() -> Result<(), Error> {
             .builder()
             .name("Face Detector".into())
             .spawn(|_| {
-                let mut face_img_sender = face_img_sender.activate();
-
                 let _guard = on_drop(|| log::info!("detector thread exiting"));
                 let mut fps = FpsCounter::new("detector");
+
+                let mut face_img_sender = face_img_sender.activate();
 
                 for mut image in img_recv.activate() {
                     let detections = detector.detect(&image);
@@ -132,8 +136,55 @@ fn main() -> Result<(), Error> {
                 let _guard = on_drop(|| log::info!("landmarking thread exiting"));
                 let mut fps = FpsCounter::new("landmarker");
 
+                let mut eye_img_sender = eye_img_sender.activate();
+
                 for mut image in face_img_recv.activate() {
                     let res = landmarker.compute(&image);
+                    if res.face_confidence() >= 10.0 {
+                        use landmark::Idx::*;
+
+                        let left = [
+                            LeftEyeLeftCorner,
+                            LeftEyeRightCorner,
+                            LeftEyeBottom,
+                            LeftEyeTop,
+                        ];
+                        let right = [
+                            RightEyeLeftCorner,
+                            RightEyeRightCorner,
+                            RightEyeBottom,
+                            RightEyeTop,
+                        ];
+
+                        let left = Rect::bounding(left.into_iter().map(|idx| {
+                            let pos = res.landmark_position(idx.into());
+                            (pos.x() as i32, pos.y() as i32)
+                        }))
+                        .unwrap();
+                        let right = Rect::bounding(right.into_iter().map(|idx| {
+                            let pos = res.landmark_position(idx.into());
+                            (pos.x() as i32, pos.y() as i32)
+                        }))
+                        .unwrap();
+
+                        let left = left
+                            .grow_rel(0.25, 0.25, 0.25, 0.25)
+                            .grow_to_fit_aspect(landmark_input_aspect);
+                        let right = right
+                            .grow_rel(0.25, 0.25, 0.25, 0.25)
+                            .grow_to_fit_aspect(landmark_input_aspect);
+
+                        let left = image.rect().intersection(&left);
+                        let right = image.rect().intersection(&right);
+                        if let (Some(left), Some(right)) = (left, right) {
+                            let left = image.view(&left).to_image();
+                            let right = image.view(&right).to_image();
+                            if eye_img_sender.send((left, right)).is_err() {
+                                break;
+                            }
+                        }
+                    }
+
                     for pos in res.landmark_positions() {
                         image::draw_marker(&mut image, pos.x() as _, pos.y() as _).size(3);
                     }
@@ -157,6 +208,29 @@ fn main() -> Result<(), Error> {
                     gui::show_image("raw_landmarks", &image);
 
                     fps.tick_with(landmarker.timers());
+                }
+            })
+            .unwrap();
+
+        scope
+            .builder()
+            .name("Iris Tracker".into())
+            .spawn(|_| {
+                let _guard = on_drop(|| log::info!("iris tracking thread exiting"));
+                let mut fps = FpsCounter::new("iris tracker");
+
+                for (mut left_img, mut right_img) in eye_img_recv.activate() {
+                    let left_marks = eye_landmarker.compute(&left_img);
+                    left_marks.draw(&mut left_img);
+
+                    let right_marks = eye_landmarker.compute(&right_img.flip_horizontal());
+                    right_marks.flip_horizontal_in_place();
+                    right_marks.draw(&mut right_img);
+
+                    gui::show_image("left_eye", &left_img);
+                    gui::show_image("right_eye", &right_img);
+
+                    fps.tick_with(eye_landmarker.timers());
                 }
             })
             .unwrap();
