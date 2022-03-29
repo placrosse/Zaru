@@ -101,6 +101,7 @@ fn start_gui() -> EventLoopProxy<Msg> {
 }
 
 fn send(msg: Msg) {
+    // TODO: backpressure
     SENDER
         .get_or_init(|| Mutex::new(start_gui()))
         .lock()

@@ -206,6 +206,7 @@ impl<'a> Drop for DrawText<'a> {
     }
 }
 
+/// Guard returned by [`draw_circle`]; draws the circle when dropped and allows customization.
 pub struct DrawCircle<'a> {
     image: ImageViewMut<'a>,
     x: i32,
