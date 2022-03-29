@@ -11,6 +11,7 @@ pub mod nn;
 pub mod num;
 mod on_drop;
 pub mod pipeline;
+pub mod procrustes;
 pub mod resolution;
 pub mod timer;
 pub mod webcam;
