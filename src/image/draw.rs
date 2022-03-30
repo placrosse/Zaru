@@ -7,6 +7,7 @@ use embedded_graphics::{
     primitives::{self, Line, PrimitiveStyle, Rectangle},
     text::{self, Text, TextStyleBuilder},
 };
+use nalgebra::{UnitQuaternion, Vector2, Vector3};
 
 use crate::image::{AsImageViewMut, Color, ImageViewMut, Rect};
 
@@ -252,6 +253,68 @@ impl<'a> Drop for DrawCircle<'a> {
     }
 }
 
+/// Guard returned by [`draw_quaternion`]; draws the rotated coordinate axes when dropped.
+pub struct DrawQuaternion<'a> {
+    image: ImageViewMut<'a>,
+    x: i32,
+    y: i32,
+    quaternion: UnitQuaternion<f32>,
+    axis_length: u32,
+    stroke_width: u32,
+}
+
+impl<'a> DrawQuaternion<'a> {
+    pub fn stroke_width(&mut self, width: u32) -> &mut Self {
+        self.stroke_width = width;
+        self
+    }
+
+    pub fn axis_length(&mut self, length: u32) -> &mut Self {
+        self.axis_length = length;
+        self
+    }
+}
+
+impl<'a> Drop for DrawQuaternion<'a> {
+    fn drop(&mut self) {
+        let axis_length = self.axis_length as f32;
+        let origin = Vector2::new(self.x as f32, self.y as f32);
+
+        let x = (self.quaternion * Vector3::x() * axis_length).xy();
+        let y = (self.quaternion * Vector3::y() * axis_length).xy();
+        let z = (self.quaternion * Vector3::z() * axis_length).xy();
+        // Flip Y axis, since it points up in 3D space but down in image coordinates.
+        let x_end = origin + Vector2::new(x.x, -x.y);
+        let y_end = origin + Vector2::new(y.x, -y.y);
+        let z_end = origin + Vector2::new(z.x, -z.y);
+
+        draw_line(
+            &mut self.image,
+            self.x,
+            self.y,
+            x_end.x as i32,
+            x_end.y as i32,
+        )
+        .color(Color::RED);
+        draw_line(
+            &mut self.image,
+            self.x,
+            self.y,
+            y_end.x as i32,
+            y_end.y as i32,
+        )
+        .color(Color::GREEN);
+        draw_line(
+            &mut self.image,
+            self.x,
+            self.y,
+            z_end.x as i32,
+            z_end.y as i32,
+        )
+        .color(Color::BLUE);
+    }
+}
+
 /// Draws a rectangle onto an image.
 pub fn draw_rect<I: AsImageViewMut>(image: &mut I, rect: Rect) -> DrawRect<'_> {
     DrawRect {
@@ -328,6 +391,23 @@ pub fn draw_circle<'a, I: AsImageViewMut>(
         diameter,
         stroke_width: 1,
         color: Color::GREEN,
+    }
+}
+
+/// Visualizes a rotation in 3D space by drawing XYZ coordinates rotated accordingly.
+pub fn draw_quaternion<'a, I: AsImageViewMut>(
+    image: &'a mut I,
+    x: i32,
+    y: i32,
+    quaternion: UnitQuaternion<f32>,
+) -> DrawQuaternion<'a> {
+    DrawQuaternion {
+        image: image.as_view_mut(),
+        x,
+        y,
+        quaternion,
+        axis_length: 10,
+        stroke_width: 1,
     }
 }
 
