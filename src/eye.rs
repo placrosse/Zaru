@@ -108,6 +108,7 @@ impl EyeLandmarker {
 ///
 /// All coordinates use the coordinate system of the input image passed to
 /// [`EyeLandmarker::compute`].
+#[derive(Clone)]
 pub struct EyeLandmarks {
     eye_contour: [(f32, f32); 71],
     iris_contour: [(f32, f32); 5],

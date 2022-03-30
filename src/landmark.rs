@@ -127,6 +127,7 @@ impl Pos {
 }
 
 /// Landmark results returned by [`Landmarker::compute`].
+#[derive(Clone)]
 pub struct LandmarkResult {
     landmarks: Landmarks,
     face_flag: f32,
@@ -179,6 +180,7 @@ impl LandmarkResult {
 }
 
 /// Raw face landmark positions.
+#[derive(Clone)]
 pub struct Landmarks {
     positions: [Pos; 468],
 }

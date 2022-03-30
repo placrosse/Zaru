@@ -19,7 +19,7 @@ pub struct ProcrustesAnalyzer {
     buf: Vec<Vector3<f32>>,
     /// `Q` matrix for Kabsch algorithm, computed from reference points.
     q: Matrix<f32, Dynamic, Const<3>, VecStorage<f32, Dynamic, Const<3>>>,
-    /// Transposed `T` matrix for Kabsch algorithm.
+    /// Transposed `P` matrix for Kabsch algorithm.
     p_t: Matrix<f32, Const<3>, Dynamic, VecStorage<f32, Const<3>, Dynamic>>,
 }
 

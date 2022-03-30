@@ -23,6 +23,7 @@ fn main() -> Result<(), Error> {
     let mut landmarker = Landmarker::new();
     let mut left_eye_landmarker = EyeLandmarker::new();
     let mut right_eye_landmarker = EyeLandmarker::new();
+
     let landmark_input_aspect = left_eye_landmarker.input_resolution().aspect_ratio();
 
     let mut webcam = Webcam::open()?;
@@ -31,6 +32,9 @@ fn main() -> Result<(), Error> {
     let (face_img_sender, face_img_recv) = pipeline::channel();
     let (left_eye_img_sender, left_eye_img_recv) = pipeline::channel();
     let (right_eye_img_sender, right_eye_img_recv) = pipeline::channel();
+    let (landmark_sender, landmark_recv) = pipeline::channel();
+    let (left_eye_landmark_sender, left_eye_landmark_recv) = pipeline::channel();
+    let (right_eye_landmark_sender, right_eye_landmark_recv) = pipeline::channel();
 
     // The detection pipeline uses a quite literal pipeline structure – different processing stages
     // happen in different threads, quite similar to how a pipelined CPU architecture works
@@ -49,7 +53,7 @@ fn main() -> Result<(), Error> {
             .builder()
             .name("Webcam Decoder".into())
             .spawn(|_| {
-                let mut img_sender = img_sender.activate();
+                let img_sender = img_sender.activate();
 
                 let _guard = on_drop(|| log::info!("webcam thread exiting"));
                 let mut fps = FpsCounter::new("webcam");
@@ -76,7 +80,7 @@ fn main() -> Result<(), Error> {
                 let _guard = on_drop(|| log::info!("detector thread exiting"));
                 let mut fps = FpsCounter::new("detector");
 
-                let mut face_img_sender = face_img_sender.activate();
+                let face_img_sender = face_img_sender.activate();
 
                 for mut image in img_recv.activate() {
                     let detections = detector.detect(&image);
@@ -139,14 +143,19 @@ fn main() -> Result<(), Error> {
                 let mut fps = FpsCounter::new("landmarker");
                 let mut t_total = Timer::new("total");
 
-                let mut left_eye_img_sender = left_eye_img_sender.activate();
-                let mut right_eye_img_sender = right_eye_img_sender.activate();
+                let left_eye_img_sender = left_eye_img_sender.activate();
+                let right_eye_img_sender = right_eye_img_sender.activate();
+                let landmark_sender = landmark_sender.activate();
 
                 for mut image in face_img_recv.activate() {
                     let guard = t_total.start();
 
                     let res = landmarker.compute(&image);
                     if res.face_confidence() >= 10.0 {
+                        if landmark_sender.send(res.clone()).is_err() {
+                            break;
+                        }
+
                         use landmark::Idx::*;
 
                         let left = [
@@ -230,8 +239,14 @@ fn main() -> Result<(), Error> {
                 let _guard = on_drop(|| log::info!("left iris tracking thread exiting"));
                 let mut fps = FpsCounter::new("left iris");
 
+                let landmark_sender = left_eye_landmark_sender.activate();
+
                 for mut left_img in left_eye_img_recv.activate() {
                     let left_marks = left_eye_landmarker.compute(&left_img);
+                    if landmark_sender.send(left_marks.clone()).is_err() {
+                        break;
+                    }
+
                     left_marks.draw(&mut left_img);
 
                     gui::show_image("left_eye", &left_img);
@@ -248,14 +263,45 @@ fn main() -> Result<(), Error> {
                 let _guard = on_drop(|| log::info!("right iris tracking thread exiting"));
                 let mut fps = FpsCounter::new("right iris");
 
+                let landmark_sender = right_eye_landmark_sender.activate();
+
                 for mut right_img in right_eye_img_recv.activate() {
                     let right_marks = right_eye_landmarker.compute(&right_img.flip_horizontal());
                     right_marks.flip_horizontal_in_place();
+                    if landmark_sender.send(right_marks.clone()).is_err() {
+                        break;
+                    }
+
                     right_marks.draw(&mut right_img);
 
                     gui::show_image("right_eye", &right_img);
 
                     fps.tick_with(right_eye_landmarker.timers());
+                }
+            })
+            .unwrap();
+
+        scope
+            .builder()
+            .name("Assembler".into())
+            .spawn(|_| {
+                let _guard = on_drop(|| log::info!("assembler thread exiting"));
+                let mut fps = FpsCounter::new("assembler");
+
+                let left_eye = left_eye_landmark_recv.activate();
+                let right_eye = right_eye_landmark_recv.activate();
+
+                // Receive face landmarks first to unblock the landmarking thread.
+                for _face_landmarks in landmark_recv.activate() {
+                    let _left = match left_eye.recv() {
+                        Ok(lm) => lm,
+                        Err(_) => break,
+                    };
+                    let _right = match right_eye.recv() {
+                        Ok(lm) => lm,
+                        Err(_) => break,
+                    };
+                    fps.tick();
                 }
             })
             .unwrap();
