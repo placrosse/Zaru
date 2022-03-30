@@ -12,11 +12,6 @@ use crate::iter::zip_exact;
 /// can then compute the linear transformation needed to turn these reference points into a new set
 /// of points passed to [`ProcrustesAnalyzer::analyze`].
 pub struct ProcrustesAnalyzer {
-    /// Reference points, modified so that their centroid is at 0,0,0 and their scale is 1.
-    ///
-    /// The former centroid that was subtracted out is stored as `ref_centroid`, and the original
-    /// scale is stored as `ref_scale`.
-    reference: Vec<Vector3<f32>>,
     /// Transform to apply to the reference data to remove its translation and scaling, yielding
     /// "base" data.
     ref_to_base_transform: Matrix4<f32>,
@@ -49,7 +44,6 @@ impl ProcrustesAnalyzer {
         let p_t = Matrix::zeros_generic(Const, Dynamic::new(reference.len()));
 
         Self {
-            reference,
             ref_to_base_transform,
             buf: Vec::new(),
             q,
@@ -76,7 +70,7 @@ impl ProcrustesAnalyzer {
 
         assert_eq!(
             self.buf.len(),
-            self.reference.len(),
+            self.q.shape().0,
             "`analyze` called on data of different length than the reference"
         );
 
@@ -152,8 +146,6 @@ fn remove_translation(points: &mut [Vector3<f32>]) -> Vector3<f32> {
 ///
 /// Uses root mean square distance to the origin to determine the object's scale.
 fn remove_scale(points: &mut [Vector3<f32>]) -> f32 {
-    // FIXME: this seems like it could easily work with a non-uniform scaling too
-
     let mut scale = 0.0;
     for point in &*points {
         scale += point.x * point.x + point.y * point.y + point.z * point.z;
