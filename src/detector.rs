@@ -54,7 +54,7 @@ const AB_FILTER_ALPHA: f32 = 0.2;
 /// Beta parameter of the alpha beta filter.
 const AB_FILTER_BETA: f32 = 0.03;
 
-const MODEL: &[u8] = include_bytes!("../onnx/face_detection_short_range.onnx");
+const MODEL: &[u8] = include_bytes!("../3rdparty/onnx/face_detection_short_range.onnx");
 
 /// Neural-Network based face detector.
 pub struct Detector {

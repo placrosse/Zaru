@@ -183,15 +183,19 @@ mod tests {
         (-1.0, -1.0, 0.0),
     ];
 
+    const LOG: bool = false;
+
     /// Applies `transform` to `orig`, then applies procrustes analysis and checks if we get
     /// approximately `transform` back.
     fn test(orig: &[(f32, f32, f32)], transform: Matrix4<f32>) {
         const MAX_DELTA: f32 = 0.01;
 
-        env_logger::builder()
-            .filter_module(env!("CARGO_CRATE_NAME"), log::LevelFilter::Trace)
-            .try_init()
-            .ok();
+        if LOG {
+            env_logger::builder()
+                .filter_module(env!("CARGO_CRATE_NAME"), log::LevelFilter::Trace)
+                .try_init()
+                .ok();
+        }
 
         let mut analysis = ProcrustesAnalyzer::new(orig.iter().copied());
         let recovered_transform = analysis.analyze(orig.iter().map(|&(x, y, z)| {

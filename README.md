@@ -1,19 +1,14 @@
 # Mizaru sees no evil
 
-## oddities, subtleties, limitations, bugs, TODOs
+Mizaru is a neural-network based face tracking solution that works with normal USB webcams.
 
-- insufficient lighting makes the framerate drop (because of auto-exposure)
-    - turn off auto-exposure, warn user when images are too dark?
-    - should choose max. exposure that still captures an image every 1/60 secs
-- face detection range is *very* limited (50cm or so on my setup)
-    - in part, caused by aspect-aware image resizing
-    - currently using short-range model, should try the long range sparse variant
-      (once https://github.com/onnx/tensorflow-onnx/issues/1877 is fixed)
-- ext. resources like neural nets are loaded from disk at runtime
-    - should be `include!`d instead
+It is also, more or less by accident, a pretty usable computer vision library, which is a little bit terrifying.
 
-## other notes
+## License
 
-- consider using hysteresis to switch between "no tracking data" and "yes tracking data"
-    - this avoids spurious tracking data from incorrect face detections (false positives)
-    - also avoids spurious loss of tracking from false negatives
+To be lost in the beauty of sorcery is divine; to be lost in its power is monstrous.
+
+To the extent permitted by law, this software comes with no warranties.
+
+This software incorporates files licensed under other licenses in the `3rdparty` directory.
+Please refer to `3rdparty/README.md` for attribution.

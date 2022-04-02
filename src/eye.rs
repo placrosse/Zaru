@@ -14,7 +14,7 @@ use crate::{
     timer::Timer,
 };
 
-const MODEL: &[u8] = include_bytes!("../onnx/iris_landmark.onnx");
+const MODEL: &[u8] = include_bytes!("../3rdparty/onnx/iris_landmark.onnx");
 
 /// An eye and iris landmark predictor.
 pub struct EyeLandmarker {

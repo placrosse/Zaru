@@ -18,7 +18,7 @@ use crate::{
     timer::Timer,
 };
 
-const MODEL: &[u8] = include_bytes!("../onnx/face_landmark.onnx");
+const MODEL: &[u8] = include_bytes!("../3rdparty/onnx/face_landmark.onnx");
 
 /// A neural network based facial landmark predictor.
 pub struct Landmarker {
