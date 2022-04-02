@@ -30,6 +30,11 @@ impl ProcrustesAnalyzer {
             .map(|(x, y, z)| Vector3::new(x, y, z))
             .collect::<Vec<_>>();
 
+        assert!(
+            reference.len() > 1,
+            "need at least 2 points for procrustes analysis"
+        );
+
         let centroid = remove_translation(&mut reference);
         let scale = remove_scale(&mut reference);
         log::trace!("ref scale: {scale}, ref centroid: {centroid:?}");

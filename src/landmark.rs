@@ -18,7 +18,7 @@ use crate::{
     timer::Timer,
 };
 
-const MODEL_PATH: &str = "onnx/face_landmark.onnx";
+const MODEL: &[u8] = include_bytes!("../onnx/face_landmark.onnx");
 
 /// A neural network based facial landmark predictor.
 pub struct Landmarker {
@@ -33,7 +33,7 @@ impl Landmarker {
     /// Creates a new facial landmark calculator.
     pub fn new() -> Self {
         let model = Cnn::new(
-            NeuralNetwork::load(MODEL_PATH).unwrap(),
+            NeuralNetwork::from_onnx(MODEL).unwrap(),
             CnnInputFormat::NHWC,
         )
         .unwrap();

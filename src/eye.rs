@@ -14,7 +14,7 @@ use crate::{
     timer::Timer,
 };
 
-const MODEL_PATH: &str = "onnx/iris_landmark.onnx";
+const MODEL: &[u8] = include_bytes!("../onnx/iris_landmark.onnx");
 
 /// An eye and iris landmark predictor.
 pub struct EyeLandmarker {
@@ -29,7 +29,7 @@ impl EyeLandmarker {
     pub fn new() -> Self {
         Self {
             model: Cnn::new(
-                NeuralNetwork::load(MODEL_PATH).unwrap(),
+                NeuralNetwork::from_onnx(MODEL).unwrap(),
                 CnnInputFormat::NHWC,
             )
             .unwrap(),
