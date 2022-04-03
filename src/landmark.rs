@@ -6,8 +6,6 @@
 //!
 //! [Face Mesh]: https://google.github.io/mediapipe/solutions/face_mesh.html
 
-mod reference_data;
-
 use std::ops::Index;
 
 use crate::{
@@ -211,6 +209,8 @@ impl Index<usize> for Landmarks {
     }
 }
 
+include!("../3rdparty/3d/canonical_face_model.rs");
+
 /// Returns an iterator over the vertices of the reference face model.
 ///
 /// Each point yielded by the returned iterator corresponds to the same point in the sequence
@@ -219,7 +219,7 @@ impl Index<usize> for Landmarks {
 /// while [`Landmarker`] yields points that have Y point down, and X and Y are in term of the input
 /// image's coordinates.
 pub fn reference_positions() -> impl Iterator<Item = Pos> {
-    reference_data::POSITIONS.iter().copied()
+    REFERENCE_POSITIONS.iter().copied()
 }
 
 /// Assigns a name to certain important landmark indices.

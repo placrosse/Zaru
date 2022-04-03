@@ -1,8 +1,6 @@
-use super::Pos;
-
 // Copied out of `canonical_face_model.obj`.
 
-pub(super) const POSITIONS: [Pos; 468] = [
+const REFERENCE_POSITIONS: &[Pos] = &[
     Pos(0.000000, -3.406404, 5.979507),
     Pos(0.000000, -1.126865, 7.475604),
     Pos(0.000000, -2.089024, 6.058267),

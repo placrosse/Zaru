@@ -49,6 +49,7 @@ impl Webcam {
             return Ok(None);
         }
 
+        // TODO do actual format negotiation
         let capture = dev.video_capture(PixFormat::new(1280, 720, Pixelformat::MJPG))?;
 
         let format = capture.format();
