@@ -276,6 +276,18 @@ impl<'a> ImageView<'a> {
         }
     }
 
+    pub fn flip_horizontal(&self) -> Image {
+        Image {
+            buf: image::imageops::flip_horizontal(&*self.sub_image),
+        }
+    }
+
+    pub fn flip_vertical(&self) -> Image {
+        Image {
+            buf: image::imageops::flip_vertical(&*self.sub_image),
+        }
+    }
+
     /// Copies the contents of this view into a new [`Image`].
     pub fn to_image(&self) -> Image {
         Image {
