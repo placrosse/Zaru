@@ -195,6 +195,11 @@ impl Detection {
     }
 
     /// Estimated clockwise rotation of the face.
+    ///
+    /// Note that this value is quite imprecise. If you need a more accurate angle, use
+    /// [`Landmarker`] instead and compute it from the returned landmarks.
+    ///
+    /// [`Landmarker`]: crate::landmark::Landmarker
     pub fn rotation_radians(&self) -> f32 {
         let left_eye = self.left_eye();
         let right_eye = self.right_eye();

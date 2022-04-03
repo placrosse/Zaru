@@ -104,8 +104,6 @@ impl Landmarker {
 }
 
 /// Landmark position in 3D space.
-///
-/// The X and Y coordinates are in terms of the input image, so Y points *down* instead of up.
 #[derive(Debug, Clone, Copy)]
 pub struct Pos(f32, f32, f32);
 

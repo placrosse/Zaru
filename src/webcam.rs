@@ -49,6 +49,8 @@ impl Webcam {
             return Ok(None);
         }
 
+        let path = dev.path()?;
+
         // TODO do actual format negotiation
         let capture = dev.video_capture(PixFormat::new(1280, 720, Pixelformat::MJPG))?;
 
@@ -60,10 +62,10 @@ impl Webcam {
             e => return Err(format!("unsupported pixel format {}", e).into()),
         }
 
-        log::debug!("opened webcam, format {:?}", format);
+        log::debug!("opened {}, format {:?}", path.display(), format);
 
         let actual = capture.set_frame_interval(livid::Fract::new(1, 200))?;
-        log::info!("set frame interval to {}", actual);
+        log::debug!("set frame interval to {}", actual);
         let stream = capture.into_stream(2)?;
 
         Ok(Some(Self {
