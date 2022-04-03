@@ -253,7 +253,7 @@ impl<'a> Drop for DrawCircle<'a> {
     }
 }
 
-/// Guard returned by [`draw_quaternion`]; draws the rotated coordinate axes when dropped.
+/// Guard returned by [`draw_quaternion`]; draws the rotated coordinate system when dropped.
 pub struct DrawQuaternion<'a> {
     image: ImageViewMut<'a>,
     x: i32,
@@ -264,11 +264,13 @@ pub struct DrawQuaternion<'a> {
 }
 
 impl<'a> DrawQuaternion<'a> {
+    /// Sets the stroke width of each coordinate axis.
     pub fn stroke_width(&mut self, width: u32) -> &mut Self {
         self.stroke_width = width;
         self
     }
 
+    /// Sets the length of each coordinate axis, in pixels.
     pub fn axis_length(&mut self, length: u32) -> &mut Self {
         self.axis_length = length;
         self
@@ -395,6 +397,12 @@ pub fn draw_circle<'a, I: AsImageViewMut>(
 }
 
 /// Visualizes a rotation in 3D space by drawing XYZ coordinates rotated accordingly.
+///
+/// This assumes that the quaternion describes a rotation in Mizaru's 3D coordinate reference frame
+/// (X points right, Y points up, Z points into the screen).
+///
+/// The `x` and `y` parameters describe where to put the origin of the coordinate system. Typically
+/// this is the center of an image or of the object of interest.
 pub fn draw_quaternion<'a, I: AsImageViewMut>(
     image: &'a mut I,
     x: i32,

@@ -2,7 +2,9 @@
 //!
 //! [Procrustes analysis]: https://en.wikipedia.org/wiki/Procrustes_analysis
 
-use nalgebra::{Const, Dynamic, Matrix, Matrix3, Matrix4, VecStorage, Vector3};
+use nalgebra::{
+    Const, Dynamic, Matrix, Matrix3, Matrix4, Rotation3, UnitQuaternion, VecStorage, Vector3,
+};
 
 use crate::iter::zip_exact;
 
@@ -68,7 +70,7 @@ impl ProcrustesAnalyzer {
     /// # Limitations
     ///
     /// This function does not work in the presence of reflections or non-uniform scaling.
-    pub fn analyze(&mut self, points: impl Iterator<Item = (f32, f32, f32)>) -> Matrix4<f32> {
+    pub fn analyze(&mut self, points: impl Iterator<Item = (f32, f32, f32)>) -> AnalysisResult {
         self.buf.clear();
         self.buf
             .extend(points.map(|(x, y, z)| Vector3::new(x, y, z)));
@@ -97,11 +99,16 @@ impl ProcrustesAnalyzer {
         rot4.slice_mut((0, 0), (3, 3)).copy_from(&rotation);
 
         // NB: `A*B` does B, then A (must be some upstream bug in maths)
-        Matrix4::identity()
+        let final_transform = Matrix4::identity()
             .append_scaling(scale)
             .append_translation(&centroid)
             * rot4
-            * self.ref_to_base_transform
+            * self.ref_to_base_transform;
+
+        AnalysisResult {
+            transform: final_transform,
+            rotation: Rotation3::from_matrix(&rotation),
+        }
     }
 
     fn compute_rotation(&mut self) -> Matrix3<f32> {
@@ -165,6 +172,30 @@ fn remove_scale(points: &mut [Vector3<f32>]) -> f32 {
     scale
 }
 
+/// Result of procrustes analysis as returned by [`ProcrustesAnalyzer::analyze`].
+#[derive(Debug, Clone, Copy)]
+pub struct AnalysisResult {
+    transform: Matrix4<f32>,
+    rotation: Rotation3<f32>,
+}
+
+impl AnalysisResult {
+    /// Returns the computed transformation matrix.
+    #[inline]
+    pub fn transformation_matrix(&self) -> Matrix4<f32> {
+        self.transform
+    }
+
+    #[inline]
+    pub fn rotation(&self) -> Rotation3<f32> {
+        self.rotation
+    }
+
+    pub fn rotation_as_quaternion(&self) -> UnitQuaternion<f32> {
+        UnitQuaternion::from_rotation_matrix(&self.rotation)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::f32::consts::PI;
@@ -184,12 +215,9 @@ mod tests {
     ];
 
     const LOG: bool = false;
+    const MAX_DELTA: f32 = 0.01;
 
-    /// Applies `transform` to `orig`, then applies procrustes analysis and checks if we get
-    /// approximately `transform` back.
-    fn test(orig: &[(f32, f32, f32)], transform: Matrix4<f32>) {
-        const MAX_DELTA: f32 = 0.01;
-
+    fn analyze(orig: &[(f32, f32, f32)], transform: Matrix4<f32>) -> AnalysisResult {
         if LOG {
             env_logger::builder()
                 .filter_module(env!("CARGO_CRATE_NAME"), log::LevelFilter::Trace)
@@ -198,10 +226,17 @@ mod tests {
         }
 
         let mut analysis = ProcrustesAnalyzer::new(orig.iter().copied());
-        let recovered_transform = analysis.analyze(orig.iter().map(|&(x, y, z)| {
+        analysis.analyze(orig.iter().map(|&(x, y, z)| {
             let pt = transform.transform_point(&Point3::new(x, y, z));
             (pt.x, pt.y, pt.z)
-        }));
+        }))
+    }
+
+    /// Applies `transform` to `orig`, then applies procrustes analysis and checks if we get
+    /// approximately `transform` back.
+    fn test(orig: &[(f32, f32, f32)], transform: Matrix4<f32>) {
+        let recovered_transform = analyze(orig, transform);
+        let recovered_transform = recovered_transform.transformation_matrix();
 
         for (a, b) in zip_exact(transform.iter(), recovered_transform.iter()) {
             assert!(!a.is_nan(), "NaN in reference transform");
@@ -219,6 +254,26 @@ mod tests {
     #[test]
     fn test_identity() {
         test(RIGHT_ARROW, Matrix4::identity());
+
+        let res = analyze(RIGHT_ARROW, Matrix4::identity());
+        let rot = res.rotation();
+        let rot_id = Rotation3::<f32>::identity();
+        for (a, b) in zip_exact(rot.matrix().iter(), rot_id.matrix().iter()) {
+            if (a - b).abs() > MAX_DELTA {
+                panic!(
+                    "failed to recover transformation; original transform: {}, recovered transform: {}",
+                    rot.matrix(), rot_id.matrix()
+                );
+            }
+        }
+
+        let quat = res.rotation_as_quaternion();
+        let quat_id = UnitQuaternion::identity();
+        assert!(
+            quat.angle_to(&quat_id) <= MAX_DELTA,
+            "{}",
+            quat.angle_to(&quat_id)
+        );
     }
 
     #[test]

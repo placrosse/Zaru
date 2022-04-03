@@ -4,6 +4,7 @@ use mizaru::eye::EyeLandmarker;
 use mizaru::image::{Color, Rect};
 use mizaru::landmark::{self, Landmarker};
 use mizaru::num::TotalF32;
+use mizaru::procrustes::ProcrustesAnalyzer;
 use mizaru::timer::{FpsCounter, Timer};
 use mizaru::webcam::Webcam;
 use mizaru::{gui, image, on_drop, pipeline, Error};
@@ -23,6 +24,9 @@ fn main() -> Result<(), Error> {
     let mut landmarker = Landmarker::new();
     let mut left_eye_landmarker = EyeLandmarker::new();
     let mut right_eye_landmarker = EyeLandmarker::new();
+    let mut procrustes_analyzer = ProcrustesAnalyzer::new(
+        landmark::reference_positions().map(|pos| (pos.x(), pos.y(), pos.z())),
+    );
 
     let landmark_input_aspect = left_eye_landmarker.input_resolution().aspect_ratio();
 
@@ -142,6 +146,7 @@ fn main() -> Result<(), Error> {
                 let _guard = on_drop(|| log::info!("landmarking thread exiting"));
                 let mut fps = FpsCounter::new("landmarker");
                 let mut t_total = Timer::new("total");
+                let mut t_procrustes = Timer::new("procrustes");
 
                 let left_eye_img_sender = left_eye_img_sender.activate();
                 let right_eye_img_sender = right_eye_img_sender.activate();
@@ -204,6 +209,15 @@ fn main() -> Result<(), Error> {
                         }
                     }
 
+                    let procrustes_result = t_procrustes.time(|| {
+                        procrustes_analyzer.analyze(res.raw_landmarks().positions().map(|pos| {
+                            // Flip Y to bring us to canonical 3D coordinates (where Y points up).
+                            // Only rotation matters, so we don't have to correct for the added
+                            // translation.
+                            (pos.x(), -pos.y(), pos.z())
+                        }))
+                    });
+
                     for pos in res.landmark_positions() {
                         image::draw_marker(&mut image, pos.x() as _, pos.y() as _).size(3);
                     }
@@ -224,10 +238,23 @@ fn main() -> Result<(), Error> {
                     .align_top()
                     .color(color);
 
+                    let cx = (image.width() / 2) as i32;
+                    let cy = (image.height() / 2) as i32;
+                    image::draw_quaternion(
+                        &mut image,
+                        cx,
+                        cy,
+                        procrustes_result.rotation_as_quaternion(),
+                    );
+
                     gui::show_image("raw_landmarks", &image);
 
                     drop(guard);
-                    fps.tick_with([&t_total].into_iter().chain(landmarker.timers()));
+                    fps.tick_with(
+                        [&t_total, &t_procrustes]
+                            .into_iter()
+                            .chain(landmarker.timers()),
+                    );
                 }
             })
             .unwrap();

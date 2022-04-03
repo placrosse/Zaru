@@ -106,6 +106,8 @@ impl Landmarker {
 }
 
 /// Landmark position in 3D space.
+///
+/// The X and Y coordinates are in terms of the input image, so Y points *down* instead of up.
 #[derive(Debug, Clone, Copy)]
 pub struct Pos(f32, f32, f32);
 
@@ -162,6 +164,7 @@ impl LandmarkResult {
         self.landmarks.positions.len()
     }
 
+    /// Returns a reference to the raw landmarks, unadjusted for the input image resolution.
     #[inline]
     pub fn raw_landmarks(&self) -> &Landmarks {
         &self.landmarks
@@ -186,10 +189,10 @@ pub struct Landmarks {
 }
 
 impl Landmarks {
-    /// Landmark positions from the reference/canonical face model.
-    pub const REFERENCE_LANDMARKS: &'static Self = &Self {
-        positions: reference_data::POSITIONS,
-    };
+    /// Returns an iterator over the positions of all landmarks.
+    pub fn positions(&self) -> impl Iterator<Item = Pos> + '_ {
+        self.positions.iter().copied()
+    }
 }
 
 impl Index<Idx> for Landmarks {
@@ -206,6 +209,17 @@ impl Index<usize> for Landmarks {
     fn index(&self, index: usize) -> &Self::Output {
         &self.positions[index]
     }
+}
+
+/// Returns an iterator over the vertices of the reference face model.
+///
+/// Each point yielded by the returned iterator corresponds to the same point in the sequence
+/// of landmarks output by [`Landmarker`], but the scale and coordinate system does not: The points
+/// returned by this function have Y pointing up, and X and Y are in a smaller range around `(0,0)`,
+/// while [`Landmarker`] yields points that have Y point down, and X and Y are in term of the input
+/// image's coordinates.
+pub fn reference_positions() -> impl Iterator<Item = Pos> {
+    reference_data::POSITIONS.iter().copied()
 }
 
 /// Assigns a name to certain important landmark indices.
