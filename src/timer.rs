@@ -115,7 +115,7 @@ impl FpsCounter {
     ///
     /// The logged string will also include the timer's name passed to [`Timer::new`].
     pub fn tick(&mut self) {
-        self.tick_imp(format_args!(""));
+        self.tick_impl(format_args!(""));
     }
 
     /// Advances the frame counter by 1 and logs FPS and `extra` data if one second has passed.
@@ -144,13 +144,13 @@ impl FpsCounter {
             }
         }
 
-        self.tick_imp(format_args!(
+        self.tick_impl(format_args!(
             "{}",
             DisplayExtra(Cell::new(Some(extra.into_iter())))
         ));
     }
 
-    fn tick_imp(&mut self, args: Arguments<'_>) {
+    fn tick_impl(&mut self, args: Arguments<'_>) {
         self.frames += 1;
         if self.start.elapsed() > Duration::from_secs(1) {
             log::debug!("{}: {} FPS{}", self.name, self.frames, args);

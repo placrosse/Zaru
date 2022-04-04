@@ -22,6 +22,9 @@ pub struct Webcam {
 
 impl Webcam {
     /// Opens the first supported webcam found.
+    ///
+    /// This function can block for a significant amount of time while the webcam initializes (on
+    /// the order of hundreds of milliseconds).
     pub fn open() -> Result<Self, crate::Error> {
         for res in livid::list()? {
             match res {
@@ -105,8 +108,57 @@ impl Webcam {
         })
     }
 
+    /// Returns a borrowing iterator over the frames produced by this webcam.
+    pub fn iter_mut(&mut self) -> IterMut<'_> {
+        IterMut { webcam: self }
+    }
+
     /// Returns profiling timers for webcam access and decoding.
     pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
         [&self.t_dequeue, &self.t_decode]
+    }
+}
+
+impl IntoIterator for Webcam {
+    type Item = Result<Image, crate::Error>;
+    type IntoIter = IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter { webcam: self }
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Webcam {
+    type Item = Result<Image, crate::Error>;
+    type IntoIter = IterMut<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IterMut { webcam: self }
+    }
+}
+
+/// An owned iterator over the frames captured by a [`Webcam`].
+pub struct IntoIter {
+    webcam: Webcam,
+}
+
+/// A borrowing iterator over the frames captured by a [`Webcam`].
+pub struct IterMut<'a> {
+    webcam: &'a mut Webcam,
+}
+
+impl Iterator for IntoIter {
+    type Item = Result<Image, crate::Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.webcam.read())
+    }
+}
+
+impl Iterator for IterMut<'_> {
+    type Item = Result<Image, crate::Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.webcam.read())
     }
 }
