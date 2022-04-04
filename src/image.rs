@@ -1,15 +1,17 @@
 //! Image manipulation.
 
+mod blend;
 mod draw;
 mod rect;
 
 use std::{fmt, ops::Index, path::Path};
 
 use embedded_graphics::{pixelcolor::raw::RawU32, prelude::PixelColor};
-use image::{GenericImage, GenericImageView, ImageBuffer, ImageFormat, Rgba};
+use image::{GenericImage, GenericImageView, ImageBuffer, ImageFormat, Rgba, RgbaImage};
 
 use crate::resolution::Resolution;
 
+pub use blend::*;
 pub use draw::*;
 pub use rect::Rect;
 
@@ -17,14 +19,12 @@ pub use rect::Rect;
 /// (6-7 ms instead of ~10ms for 1080p frames).
 const USE_MOZJPEG: bool = true;
 
-type Img = ImageBuffer<Rgba<u8>, Vec<u8>>;
-
-/// An 8-bit RGB image.
+/// An 8-bit sRGB image with alpha channel.
 #[derive(Clone)]
 pub struct Image {
     // Internal representation is meant to be compatible with wgpu's texture formats. The alpha
     // channel is otherwise unused and not exposed to the user.
-    pub(crate) buf: Img,
+    pub(crate) buf: RgbaImage,
 }
 
 impl Image {
@@ -59,9 +59,8 @@ impl Image {
 
     /// Creates an empty image of a specified size.
     ///
-    /// The image will start out black.
+    /// The image will start out black and fully transparent.
     pub fn new(width: u32, height: u32) -> Self {
-        // FIXME alpha channel?
         Self {
             buf: ImageBuffer::new(width, height),
         }
@@ -188,6 +187,17 @@ impl Image {
         image::imageops::flip_vertical_in_place(&mut self.buf);
     }
 
+    /// Overwrites the data in `self` with a `src` image, stretching or shrinking `src` as
+    /// necessary.
+    ///
+    /// Note that this always blends the *entire* `src` with the *entire* destination. A smaller
+    /// source/destination area can be selected by creating a sub-view first.
+    ///
+    /// By default, this performs alpha blending.
+    pub fn blend_from<'b, V: AsImageView>(&'b mut self, src: &'b V) -> Blend<'b> {
+        Blend::new(self.as_view_mut(), src.as_view())
+    }
+
     #[inline]
     pub(crate) fn data(&self) -> &[u8] {
         self.buf.as_raw()
@@ -202,7 +212,7 @@ impl fmt::Debug for Image {
 
 /// An immutable view of a rectangular section of an [`Image`].
 pub struct ImageView<'a> {
-    sub_image: image::SubImage<&'a Img>,
+    pub(crate) sub_image: image::SubImage<&'a RgbaImage>,
 }
 
 impl<'a> ImageView<'a> {
@@ -326,9 +336,7 @@ impl<'a> ImageView<'a> {
                     * self.height() as f32) as u32;
 
                 let pixel = self.get(src_x, src_y);
-                target_view
-                    .sub_image
-                    .put_pixel(dest_x, dest_y, Rgba(pixel.0));
+                target_view.set(dest_x, dest_y, pixel);
             }
         }
 
@@ -344,7 +352,7 @@ impl fmt::Debug for ImageView<'_> {
 
 /// A mutable view of a rectangular section of an [`Image`].
 pub struct ImageViewMut<'a> {
-    sub_image: image::SubImage<&'a mut Img>,
+    sub_image: image::SubImage<&'a mut RgbaImage>,
 }
 
 impl<'a> ImageViewMut<'a> {
@@ -478,6 +486,17 @@ impl<'a> ImageViewMut<'a> {
             buf: self.sub_image.to_image(),
         }
     }
+
+    /// Overwrites the data in `self` with a `src` image, stretching or shrinking `src` as
+    /// necessary.
+    ///
+    /// Note that this always blends the *entire* `src` with the *entire* destination. A smaller
+    /// source/destination area can be selected by creating a sub-view first.
+    ///
+    /// By default, this performs alpha blending.
+    pub fn blend_from<'b, V: AsImageView>(&'b mut self, src: &'b V) -> Blend<'b> {
+        Blend::new(self.as_view_mut(), src.as_view())
+    }
 }
 
 impl fmt::Debug for ImageViewMut<'_> {
@@ -486,7 +505,9 @@ impl fmt::Debug for ImageViewMut<'_> {
     }
 }
 
-/// An RGB color.
+/// An 8-bit RGBA color.
+///
+/// Colors are always in the sRGB color space and use non-premultiplied alpha.
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct Color(pub(crate) [u8; 4]);
 
@@ -518,9 +539,13 @@ impl Color {
     pub fn b(&self) -> u8 {
         self.0[2]
     }
+
+    #[inline]
+    pub fn a(&self) -> u8 {
+        self.0[3]
+    }
 }
 
-// FIXME allows accessing alpha
 impl Index<usize> for Color {
     type Output = u8;
 
