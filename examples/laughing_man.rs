@@ -1,9 +1,17 @@
 use std::time::Instant;
 
-use mizaru::{anim::Animation, detector::Detector, gui, webcam::Webcam};
+use mizaru::{
+    anim::{Animation, AnimationFormat},
+    detector::Detector,
+    gui,
+    webcam::Webcam,
+};
 
 fn main() -> Result<(), mizaru::Error> {
-    let animation = Animation::from_gif_data(include_bytes!("../3rdparty/image/laughing_man.gif"))?;
+    let animation = Animation::from_data(
+        include_bytes!("../3rdparty/image/laughing_man.gif"),
+        AnimationFormat::Gif,
+    )?;
     let mut detector = Detector::new();
 
     let webcam = Webcam::open()?;

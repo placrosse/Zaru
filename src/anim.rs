@@ -8,9 +8,19 @@ use std::{
     time::Duration,
 };
 
-use image::{codecs::gif::GifDecoder, AnimationDecoder, Frame, SubImage};
+use image::{
+    codecs::{gif::GifDecoder, png::PngDecoder},
+    AnimationDecoder, Frame, SubImage,
+};
 
 use crate::image::ImageView;
+
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum AnimationFormat {
+    Gif,
+    Apng,
+}
 
 /// A timed sequence of images.
 pub struct Animation {
@@ -18,27 +28,53 @@ pub struct Animation {
 }
 
 impl Animation {
-    /// Loads a gif animation from a filesystem path.
+    /// Loads an animation from the filesystem.
     ///
-    /// The path must have a `.gif` extension.
+    /// The path must have a supported extension.
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, crate::Error> {
         let path = path.as_ref();
         match path.extension() {
-            Some(ext) if ext == "gif" => {}
-            _ => return Err(format!("animation path must have `.gif` extension").into()),
+            Some(ext) => {
+                let format = if ext == "gif" {
+                    AnimationFormat::Gif
+                } else if ext == "apng" || ext == "png" {
+                    AnimationFormat::Apng
+                } else {
+                    return Err(format!(
+                        "file extension `{}` is not supported for animations",
+                        ext.to_string_lossy()
+                    )
+                    .into());
+                };
+
+                Self::from_reader(BufReader::new(File::open(path)?), format)
+            }
+            _ => Err(format!("animation path must have a supported extension").into()),
         }
-
-        Self::from_gif_reader(BufReader::new(File::open(path)?))
     }
 
-    /// Loads a gif animation from an in-memory byte slice.
-    pub fn from_gif_data(data: &[u8]) -> Result<Self, crate::Error> {
-        Self::from_gif_reader(data)
+    /// Loads a animation from an in-memory byte slice.
+    pub fn from_data(data: &[u8], format: AnimationFormat) -> Result<Self, crate::Error> {
+        Self::from_reader(data, format)
     }
 
-    /// Loads a gif animation from a [`BufRead`] implementor.
-    pub fn from_gif_reader<R: BufRead>(reader: R) -> Result<Self, crate::Error> {
-        let frames = GifDecoder::new(reader)?.into_frames().collect_frames()?;
+    /// Loads a animation from a [`BufRead`] implementor.
+    pub fn from_reader<R: BufRead>(
+        reader: R,
+        format: AnimationFormat,
+    ) -> Result<Self, crate::Error> {
+        let frames = match format {
+            AnimationFormat::Gif => GifDecoder::new(reader)?.into_frames().collect_frames()?,
+            AnimationFormat::Apng => {
+                let dec = PngDecoder::new(reader)?;
+                if !dec.is_apng() {
+                    return Err(
+                        format!("attempted to load APNG animation from still image PNG").into(),
+                    );
+                }
+                dec.apng().into_frames().collect_frames()?
+            }
+        };
 
         Ok(Self { frames })
     }
@@ -77,7 +113,13 @@ impl<'a> Iterator for FrameIter<'a> {
             duration: frame.delay().into(),
         })
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.frames.size_hint()
+    }
 }
+
+impl<'a> ExactSizeIterator for FrameIter<'a> {}
 
 /// A frame of an animation, consisting of image data and a duration.
 pub struct AnimationFrame<'a> {
