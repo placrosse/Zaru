@@ -10,7 +10,7 @@ use std::{
 
 use image::{
     codecs::{gif::GifDecoder, png::PngDecoder},
-    AnimationDecoder, Frame, SubImage,
+    AnimationDecoder, Delay, Frame, SubImage,
 };
 
 use crate::image::ImageView;
@@ -79,6 +79,26 @@ impl Animation {
         Ok(Self { frames })
     }
 
+    /// Creates an animation from a sequence of frames.
+    pub fn from_frames<'a, I>(frames: I) -> Self
+    where
+        I: IntoIterator<Item = AnimationFrame<'a>>,
+    {
+        Self {
+            frames: frames
+                .into_iter()
+                .map(|fr| {
+                    Frame::from_parts(
+                        fr.image.to_image().buf,
+                        0,
+                        0,
+                        Delay::from_saturating_duration(fr.duration),
+                    )
+                })
+                .collect(),
+        }
+    }
+
     /// Returns an iterator over the frames of this animation.
     ///
     /// Note that every frame is only yielded *once* (ie. the iterator does not loop, even if the
@@ -129,6 +149,11 @@ pub struct AnimationFrame<'a> {
 }
 
 impl<'a> AnimationFrame<'a> {
+    /// Creates a new [`AnimationFrame`] that will display `image` for `duration`.
+    pub fn new(image: ImageView<'a>, duration: Duration) -> Self {
+        Self { image, duration }
+    }
+
     /// Returns an [`ImageView`] of the image data for this frame.
     pub fn image_view(&self) -> &ImageView<'a> {
         &self.image
