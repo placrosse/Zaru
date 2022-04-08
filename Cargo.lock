@@ -1352,6 +1352,7 @@ dependencies = [
  "nalgebra",
  "once_cell",
  "pollster",
+ "serde",
  "tract-onnx",
  "wgpu",
  "winit",

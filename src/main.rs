@@ -1,3 +1,5 @@
+mod facetracking;
+
 use log::LevelFilter;
 use mizaru::detector::Detector;
 use mizaru::eye::EyeLandmarker;
