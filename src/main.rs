@@ -88,8 +88,14 @@ fn main() -> Result<(), Error> {
 
                 let face_img_sender = face_img_sender.activate();
 
+                let input_ratio = detector.input_resolution().aspect_ratio();
                 for mut image in img_recv.activate() {
-                    let detections = detector.detect(&image);
+                    // Zoom into the camera image and perform detection there. This makes outer
+                    // edges of the camera view unusable, but significantly improves the tracking
+                    // distance.
+                    let view_rect = image.resolution().fit_aspect_ratio(input_ratio);
+                    let mut view = image.view_mut(&view_rect);
+                    let detections = detector.detect(&view);
                     log::trace!("{:?}", detections);
 
                     if let Some(target) = detections
@@ -98,9 +104,9 @@ fn main() -> Result<(), Error> {
                     {
                         // TODO: rotate to align the eyes
                         if let Some(crop_rect) =
-                            image.rect().intersection(&target.bounding_rect_loose())
+                            view.rect().intersection(&target.bounding_rect_loose())
                         {
-                            let face = image.view(&crop_rect).to_image();
+                            let face = view.view(&crop_rect).to_image();
                             if face_img_sender.send(face).is_err() {
                                 break;
                             }
@@ -108,7 +114,7 @@ fn main() -> Result<(), Error> {
                     }
 
                     for det in detections {
-                        det.draw(&mut image);
+                        det.draw(&mut view);
 
                         #[allow(illegal_floating_point_literal_pattern)] // let me have fun
                         let color = match det.confidence() {
@@ -117,7 +123,7 @@ fn main() -> Result<(), Error> {
                             _ => Color::RED,
                         };
                         image::draw_text(
-                            &mut image,
+                            &mut view,
                             det.bounding_rect_loose().x()
                                 + (det.bounding_rect_loose().width() / 2) as i32,
                             det.bounding_rect_loose().y(),
@@ -129,9 +135,9 @@ fn main() -> Result<(), Error> {
                         let alignment_color = Color::from_rgb8(180, 180, 180);
                         let (x0, y0) = det.left_eye();
                         let (x1, y1) = det.right_eye();
-                        image::draw_line(&mut image, x0, y0, x1, y1).color(alignment_color);
+                        image::draw_line(&mut view, x0, y0, x1, y1).color(alignment_color);
                         let rot = format!("{:.01}°", det.rotation_radians().to_degrees());
-                        image::draw_text(&mut image, (x0 + x1) / 2, (y0 + y1) / 2 - 10, &rot)
+                        image::draw_text(&mut view, (x0 + x1) / 2, (y0 + y1) / 2 - 10, &rot)
                             .color(alignment_color);
                     }
                     gui::show_image("face_detect", &image);

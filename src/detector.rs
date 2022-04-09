@@ -103,6 +103,11 @@ impl Detector {
         }
     }
 
+    /// Returns the expected input resolution of the internal neural network.
+    pub fn input_resolution(&self) -> Resolution {
+        self.model.input_resolution()
+    }
+
     /// Runs face detections on an input image, returning the filtered detections.
     ///
     /// The image will be scaled to the input size expected by the neural network, and detections

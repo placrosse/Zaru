@@ -51,6 +51,8 @@ impl Resolution {
     /// This can be used to perform an aspect ratio aware resize operation that automatically leaves
     /// black bars around the image.
     pub fn fit_aspect_ratio(&self, ratio: AspectRatio) -> Rect {
+        // FIXME: should this be a method on `Rect` instead (or in addition)?
+
         let to_ratio = self.aspect_ratio();
 
         let from_ratio = ratio.as_f32();
