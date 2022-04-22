@@ -9,7 +9,7 @@ use mizaru::num::TotalF32;
 use mizaru::procrustes::ProcrustesAnalyzer;
 use mizaru::timer::{FpsCounter, Timer};
 use mizaru::webcam::Webcam;
-use mizaru::{gui, image, on_drop, pipeline, Error};
+use mizaru::{defer::defer, gui, image, pipeline, Error};
 
 fn main() -> Result<(), Error> {
     let log_level = if cfg!(debug_assertions) {
@@ -61,7 +61,7 @@ fn main() -> Result<(), Error> {
             .spawn(|_| {
                 let img_sender = img_sender.activate();
 
-                let _guard = on_drop(|| log::info!("webcam thread exiting"));
+                let _guard = defer(|| log::info!("webcam thread exiting"));
                 let mut fps = FpsCounter::new("webcam");
                 loop {
                     let image = match webcam.read() {
@@ -83,7 +83,7 @@ fn main() -> Result<(), Error> {
             .builder()
             .name("Face Detector".into())
             .spawn(|_| {
-                let _guard = on_drop(|| log::info!("detector thread exiting"));
+                let _guard = defer(|| log::info!("detector thread exiting"));
                 let mut fps = FpsCounter::new("detector");
 
                 let face_img_sender = face_img_sender.activate();
@@ -151,7 +151,7 @@ fn main() -> Result<(), Error> {
             .builder()
             .name("Landmarker".into())
             .spawn(|_| {
-                let _guard = on_drop(|| log::info!("landmarking thread exiting"));
+                let _guard = defer(|| log::info!("landmarking thread exiting"));
                 let mut fps = FpsCounter::new("landmarker");
                 let mut t_total = Timer::new("total");
                 let mut t_procrustes = Timer::new("procrustes");
@@ -271,7 +271,7 @@ fn main() -> Result<(), Error> {
             .builder()
             .name("Left Iris".into())
             .spawn(|_| {
-                let _guard = on_drop(|| log::info!("left iris tracking thread exiting"));
+                let _guard = defer(|| log::info!("left iris tracking thread exiting"));
                 let mut fps = FpsCounter::new("left iris");
 
                 let landmark_sender = left_eye_landmark_sender.activate();
@@ -295,7 +295,7 @@ fn main() -> Result<(), Error> {
             .builder()
             .name("Right Iris".into())
             .spawn(|_| {
-                let _guard = on_drop(|| log::info!("right iris tracking thread exiting"));
+                let _guard = defer(|| log::info!("right iris tracking thread exiting"));
                 let mut fps = FpsCounter::new("right iris");
 
                 let landmark_sender = right_eye_landmark_sender.activate();
@@ -320,7 +320,7 @@ fn main() -> Result<(), Error> {
             .builder()
             .name("Assembler".into())
             .spawn(|_| {
-                let _guard = on_drop(|| log::info!("assembler thread exiting"));
+                let _guard = defer(|| log::info!("assembler thread exiting"));
                 let mut fps = FpsCounter::new("assembler");
 
                 let left_eye = left_eye_landmark_recv.activate();
