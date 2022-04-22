@@ -1,9 +1,15 @@
 //! Mizaru's public face tracking data format.
 //!
 //! The face tracking data is transmitted as a unidirectional stream of [`TrackerMessage`]s over a
-//! TCP port. The messages are encoded as newline-delimited JSON objects (["JSON Lines"]).
+//! TCP port. The messages are encoded as newline-delimited JSON objects (["JSON Lines"]) which in
+//! turn are transmitted as UTF-8 encoded strings.
 //!
-//! Tracking service discovery happens via DNS-SD over mDNS. (TODO: to be specified later)
+//! Tracking service discovery happens via DNS Service Discovery (DNS-SD) over mDNS.
+//! TODO: specify service name etc.
+//!
+//! Tracking servers must send the current tracking state (as a [`TrackerMessage`]) to a client
+//! when it establishes a connection, and whenever the tracking state changes. It is recommended
+//! that trackers update their state at least 60 times per second in order to capture subtle motion.
 //!
 //! # Goals of the format
 //!

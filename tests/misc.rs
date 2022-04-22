@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use std::{
     collections::HashSet,
     fs,
@@ -8,7 +6,7 @@ use std::{
 
 #[test]
 fn thirdparty_attribution() {
-    let thirdparty_dir = "../3rdparty";
+    let thirdparty_dir = "3rdparty";
 
     let file = std::fs::read_to_string(format!("{}/README.md", thirdparty_dir)).unwrap();
 
@@ -45,7 +43,11 @@ fn thirdparty_attribution() {
         }
     }
 
-    assert!(present.is_empty(), "3rdparty readme contains non-existent files: {:?}", present);
+    assert!(
+        present.is_empty(),
+        "3rdparty readme contains non-existent files: {:?}",
+        present
+    );
 }
 
 fn walkdir(dir: &Path) -> Vec<PathBuf> {

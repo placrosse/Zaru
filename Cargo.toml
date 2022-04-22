@@ -27,9 +27,5 @@ nalgebra = "0.30.1"
 
 livid = { path = "../LiVid" }
 
-[workspace]
-members = [".", "xtask"]
-default-members = [".", "xtask"]
-
 [profile.release]
 incremental = true
