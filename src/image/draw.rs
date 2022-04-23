@@ -396,7 +396,7 @@ pub fn draw_circle<'a, I: AsImageViewMut>(
     }
 }
 
-/// Visualizes a rotation in 3D space by drawing XYZ coordinates rotated accordingly.
+/// Visualizes a rotation in 3D space by drawing XYZ coordinate axes rotated accordingly.
 ///
 /// This assumes that the quaternion describes a rotation in Mizaru's 3D coordinate reference frame
 /// (X points right, Y points up, Z points into the screen).

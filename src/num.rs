@@ -3,24 +3,25 @@
 use std::cmp::Ordering;
 
 /// An `f32` that implements [`Ord`] according to the IEEE 754 totalOrder predicate.
+#[derive(Clone, Copy)]
 pub struct TotalF32(pub f32);
 
 impl PartialEq for TotalF32 {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        f32_total_cmp(self.0, other.0) == Ordering::Equal
     }
 }
 
 impl Eq for TotalF32 {}
 
 impl PartialOrd for TotalF32 {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.0.partial_cmp(&other.0)
     }
 }
 
 impl Ord for TotalF32 {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         f32_total_cmp(self.0, other.0)
     }
 }
