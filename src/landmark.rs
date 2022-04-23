@@ -11,7 +11,7 @@ use std::ops::Index;
 use crate::{
     image::{AsImageView, ImageView},
     iter::zip_exact,
-    nn::{unadjust_aspect_ratio, Cnn, CnnInputFormat, NeuralNetwork},
+    nn::{unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
     resolution::{AspectRatio, Resolution},
     timer::Timer,
 };
@@ -32,7 +32,7 @@ impl Landmarker {
     pub fn new() -> Self {
         let model = Cnn::new(
             NeuralNetwork::from_onnx(MODEL).unwrap(),
-            CnnInputFormat::NHWC,
+            CnnInputShape::NHWC,
         )
         .unwrap();
         Self {

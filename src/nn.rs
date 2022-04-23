@@ -29,15 +29,16 @@ type Model = SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn Ty
 /// input.
 pub struct Cnn {
     nn: NeuralNetwork,
-    fmt: CnnInputFormat,
+    shape: CnnInputShape,
     input_res: Resolution,
+    color_map: fn(u8) -> f32,
 }
 
 impl Cnn {
     /// Creates a CNN wrapper from a [`NeuralNetwork`].
     ///
     /// The network must have exactly one input with a shape that matches `fmt`.
-    pub fn new(nn: NeuralNetwork, fmt: CnnInputFormat) -> Result<Self, Error> {
+    pub fn new(nn: NeuralNetwork, shape: CnnInputShape) -> Result<Self, Error> {
         if nn.num_inputs() != 1 {
             return Err(format!(
                 "CNN network has to take 1 input, this one takes {}",
@@ -47,21 +48,32 @@ impl Cnn {
         }
 
         let input_info = nn.inputs().next().unwrap();
-        let shape = input_info.shape();
+        let tensor_shape = input_info.shape();
 
-        let (w, h) = match (fmt, shape) {
-            (CnnInputFormat::NCHW, [1, 3, h, w]) | (CnnInputFormat::NHWC, [1, h, w, 3]) => (*w, *h),
+        let (w, h) = match (shape, tensor_shape) {
+            (CnnInputShape::NCHW, [1, 3, h, w]) | (CnnInputShape::NHWC, [1, h, w, 3]) => (*w, *h),
             _ => {
-                return Err(
-                    format!("invalid model input shape for {:?} CNN: {:?}", fmt, shape).into(),
-                );
+                return Err(format!(
+                    "invalid model input shape for {:?} CNN: {:?}",
+                    shape, tensor_shape
+                )
+                .into());
             }
         };
 
         let (w, h): (u32, u32) = (w.try_into()?, h.try_into()?);
         let input_res = Resolution::new(w, h);
 
-        Ok(Self { nn, fmt, input_res })
+        Ok(Self {
+            nn,
+            shape,
+            input_res,
+            color_map: map_color,
+        })
+    }
+
+    pub fn set_color_map(&mut self, map: fn(u8) -> f32) {
+        self.color_map = map;
     }
 
     /// Returns the expected input image size.
@@ -89,12 +101,12 @@ impl Cnn {
             self.input_res.height() as usize,
             self.input_res.width() as usize,
         );
-        let tensor = match self.fmt {
-            CnnInputFormat::NCHW => Array4::from_shape_fn((1, 3, h, w), |(_, c, y, x)| {
-                map_color(image.get(x as _, y as _)[c])
+        let tensor = match self.shape {
+            CnnInputShape::NCHW => Array4::from_shape_fn((1, 3, h, w), |(_, c, y, x)| {
+                (self.color_map)(image.get(x as _, y as _)[c])
             }),
-            CnnInputFormat::NHWC => Array4::from_shape_fn((1, h, w, 3), |(_, y, x, c)| {
-                map_color(image.get(x as _, y as _)[c])
+            CnnInputShape::NHWC => Array4::from_shape_fn((1, h, w, 3), |(_, y, x, c)| {
+                (self.color_map)(image.get(x as _, y as _)[c])
             }),
         };
 
@@ -151,7 +163,7 @@ pub(crate) fn point_to_img(x: f32, y: f32, full_res: &Resolution) -> (i32, i32) 
 /// - `C` is the number of color channels, often 3 for RGB inputs.
 /// - `H` and `W` are the height and width of the input, respectively.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CnnInputFormat {
+pub enum CnnInputShape {
     /// Shape is `(N, C, H, W)`.
     NCHW,
     /// Shape is `(N, H, W, C)`.

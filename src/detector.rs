@@ -10,7 +10,7 @@ use nalgebra::{Rotation2, Vector2};
 use crate::{
     filter::{AlphaBetaFilter, Ema, Filter},
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
-    nn::{point_to_img, Cnn, CnnInputFormat, NeuralNetwork},
+    nn::{point_to_img, Cnn, CnnInputShape, NeuralNetwork},
     num::TotalF32,
     resolution::Resolution,
     timer::Timer,
@@ -90,7 +90,7 @@ impl Detector {
             // FIXME share model globally
             model: Cnn::new(
                 NeuralNetwork::from_onnx(MODEL).unwrap(),
-                CnnInputFormat::NHWC,
+                CnnInputShape::NHWC,
             )
             .unwrap(),
             t_resize: Timer::new("resize"),

@@ -9,7 +9,7 @@ use nalgebra::Point2;
 use crate::{
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut},
     iter::zip_exact,
-    nn::{unadjust_aspect_ratio, Cnn, CnnInputFormat, NeuralNetwork},
+    nn::{unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
     resolution::Resolution,
     timer::Timer,
 };
@@ -30,7 +30,7 @@ impl EyeLandmarker {
         Self {
             model: Cnn::new(
                 NeuralNetwork::from_onnx(MODEL).unwrap(),
-                CnnInputFormat::NHWC,
+                CnnInputShape::NHWC,
             )
             .unwrap(),
             t_resize: Timer::new("resize"),
