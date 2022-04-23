@@ -12,6 +12,8 @@ Note that files may have been converted from other formats.
 | `onnx/face_detection_short_range.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/face_landmark.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/iris_landmark.onnx` | [MediaPipe] | Apache-2.0
+| `onnx/mobilefacenet.onnx` | [InsightFace_PyTorch] | MIT
 | `image/laughing_man.gif` | Ghost in the Shell / Tumblr | Unknown
 
 [MediaPipe]: https://github.com/google/mediapipe
+[InsightFace_Pytorch]: https://github.com/TreB1eN/InsightFace_Pytorch
