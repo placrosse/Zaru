@@ -22,14 +22,12 @@ fn main() -> Result<(), mizaru::Error> {
         let mut image = result?;
 
         for detection in detector.detect(&image) {
-            let dest_rect = detection.bounding_rect_raw().grow_rel(0.4, 0.4, 0.4, 0.4);
-
-            if let Some(rect) = image.rect().intersection(&dest_rect) {
-                let rect =
-                    rect.grow_to_fit_aspect(current_frame.image_view().resolution().aspect_ratio());
-                let mut dest = image.view_mut(&rect);
-                dest.blend_from(current_frame.image_view());
-            }
+            let dest_rect = detection
+                .bounding_rect_raw()
+                .grow_rel(0.4, 0.4, 0.4, 0.4)
+                .grow_to_fit_aspect(current_frame.image_view().resolution().aspect_ratio());
+            let mut dest = image.view_mut(&dest_rect);
+            dest.blend_from(current_frame.image_view());
         }
 
         gui::show_image("laughing man", &image);

@@ -123,22 +123,19 @@ impl Image {
 
     /// Creates an immutable view into an area of this image, specified by `rect`.
     ///
-    /// # Panics
-    ///
-    /// This will panic if `rect` is not fully contained in the bounds of `self`.
+    /// If `rect` lies partially outside of `self`, the resulting view is first clipped to `self`
+    /// and will be smaller than `rect`. If `rect` lies fully outside of `self`, the resulting view
+    /// will be empty.
     pub fn view(&self, rect: &Rect) -> ImageView<'_> {
-        assert!(
-            self.rect().contains_rect(rect),
-            "attempted to create out-of-bounds view of {}x{} image at {:?}",
-            self.width(),
-            self.height(),
-            rect
-        );
-
-        ImageView {
-            sub_image: self
-                .buf
-                .view(rect.x() as _, rect.y() as _, rect.width(), rect.height()),
+        match self.rect().intersection(rect) {
+            Some(rect) => ImageView {
+                sub_image: self
+                    .buf
+                    .view(rect.x() as _, rect.y() as _, rect.width(), rect.height()),
+            },
+            None => ImageView {
+                sub_image: self.buf.view(0, 0, 0, 0),
+            },
         }
     }
 
@@ -264,25 +261,22 @@ impl<'a> ImageView<'a> {
 
     /// Creates an immutable subview into an area of this view, specified by `rect`.
     ///
-    /// # Panics
-    ///
-    /// This will panic if `rect` is not fully contained in the bounds of `self`.
+    /// If `rect` lies partially outside of `self`, the resulting view is first clipped to `self`
+    /// and will be smaller than `rect`. If `rect` lies fully outside of `self`, the resulting view
+    /// will be empty.
     pub fn view(&self, rect: &Rect) -> ImageView<'_> {
-        assert!(
-            self.rect().contains_rect(rect),
-            "attempted to create out-of-bounds view of {}x{} view at {:?}",
-            self.width(),
-            self.height(),
-            rect
-        );
-
-        ImageView {
-            sub_image: self.sub_image.view(
-                rect.x() as _,
-                rect.y() as _,
-                rect.width(),
-                rect.height(),
-            ),
+        match self.rect().intersection(rect) {
+            Some(rect) => ImageView {
+                sub_image: self.sub_image.view(
+                    rect.x() as _,
+                    rect.y() as _,
+                    rect.width(),
+                    rect.height(),
+                ),
+            },
+            None => ImageView {
+                sub_image: self.sub_image.view(0, 0, 0, 0),
+            },
         }
     }
 
@@ -414,25 +408,22 @@ impl<'a> ImageViewMut<'a> {
 
     /// Creates an immutable subview into an area of this view, specified by `rect`.
     ///
-    /// # Panics
-    ///
-    /// This will panic if `rect` is not fully contained in the bounds of `self`.
+    /// If `rect` lies partially outside of `self`, the resulting view is first clipped to `self`
+    /// and will be smaller than `rect`. If `rect` lies fully outside of `self`, the resulting view
+    /// will be empty.
     pub fn view(&self, rect: &Rect) -> ImageView<'_> {
-        assert!(
-            self.rect().contains_rect(rect),
-            "attempted to create out-of-bounds view of {}x{} view at {:?}",
-            self.width(),
-            self.height(),
-            rect
-        );
-
-        ImageView {
-            sub_image: self.sub_image.view(
-                rect.x() as _,
-                rect.y() as _,
-                rect.width(),
-                rect.height(),
-            ),
+        match self.rect().intersection(rect) {
+            Some(rect) => ImageView {
+                sub_image: self.sub_image.view(
+                    rect.x() as _,
+                    rect.y() as _,
+                    rect.width(),
+                    rect.height(),
+                ),
+            },
+            None => ImageView {
+                sub_image: self.sub_image.view(0, 0, 0, 0),
+            },
         }
     }
 

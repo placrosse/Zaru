@@ -8,6 +8,8 @@
 
 use std::ops::Index;
 
+use once_cell::sync::Lazy;
+
 use crate::{
     image::{AsImageView, ImageView},
     iter::zip_exact,
@@ -16,11 +18,19 @@ use crate::{
     timer::Timer,
 };
 
-const MODEL: &[u8] = include_bytes!("../3rdparty/onnx/face_landmark.onnx");
+const MODEL_DATA: &[u8] = include_bytes!("../3rdparty/onnx/face_landmark.onnx");
+
+static MODEL: Lazy<Cnn> = Lazy::new(|| {
+    Cnn::new(
+        NeuralNetwork::from_onnx(MODEL_DATA).unwrap(),
+        CnnInputShape::NHWC,
+    )
+    .unwrap()
+});
 
 /// A neural network based facial landmark predictor.
 pub struct Landmarker {
-    model: Cnn,
+    model: &'static Cnn,
     t_resize: Timer,
     t_infer: Timer,
     /// Large, so keep one around and return by ref.
@@ -30,11 +40,6 @@ pub struct Landmarker {
 impl Landmarker {
     /// Creates a new facial landmark calculator.
     pub fn new() -> Self {
-        let model = Cnn::new(
-            NeuralNetwork::from_onnx(MODEL).unwrap(),
-            CnnInputShape::NHWC,
-        )
-        .unwrap();
         Self {
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
@@ -45,9 +50,9 @@ impl Landmarker {
                 face_flag: 0.0,
                 orig_res: Resolution::new(1, 1),
                 orig_aspect: AspectRatio::SQUARE,
-                input_res: model.input_resolution(),
+                input_res: MODEL.input_resolution(),
             },
-            model,
+            model: &MODEL,
         }
     }
 

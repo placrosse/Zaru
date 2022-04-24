@@ -5,6 +5,7 @@
 //! [Iris]: https://google.github.io/mediapipe/solutions/iris
 
 use nalgebra::Point2;
+use once_cell::sync::Lazy;
 
 use crate::{
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut},
@@ -14,11 +15,19 @@ use crate::{
     timer::Timer,
 };
 
-const MODEL: &[u8] = include_bytes!("../3rdparty/onnx/iris_landmark.onnx");
+const MODEL_DATA: &[u8] = include_bytes!("../3rdparty/onnx/iris_landmark.onnx");
+
+static MODEL: Lazy<Cnn> = Lazy::new(|| {
+    Cnn::new(
+        NeuralNetwork::from_onnx(MODEL_DATA).unwrap(),
+        CnnInputShape::NHWC,
+    )
+    .unwrap()
+});
 
 /// An eye and iris landmark predictor.
 pub struct EyeLandmarker {
-    model: Cnn,
+    model: &'static Cnn,
     t_resize: Timer,
     t_infer: Timer,
     result_buf: EyeLandmarks,
@@ -28,11 +37,7 @@ impl EyeLandmarker {
     /// Creates a new eye landmarker.
     pub fn new() -> Self {
         Self {
-            model: Cnn::new(
-                NeuralNetwork::from_onnx(MODEL).unwrap(),
-                CnnInputShape::NHWC,
-            )
-            .unwrap(),
+            model: &MODEL,
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             result_buf: EyeLandmarks {

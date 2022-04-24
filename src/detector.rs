@@ -6,6 +6,7 @@
 //! [Face Detection]: https://google.github.io/mediapipe/solutions/face_detection
 
 use nalgebra::{Rotation2, Vector2};
+use once_cell::sync::Lazy;
 
 use crate::{
     filter::{AlphaBetaFilter, Ema, Filter},
@@ -54,12 +55,20 @@ const AB_FILTER_ALPHA: f32 = 0.2;
 /// Beta parameter of the alpha beta filter.
 const AB_FILTER_BETA: f32 = 0.03;
 
-const MODEL: &[u8] = include_bytes!("../3rdparty/onnx/face_detection_short_range.onnx");
+const MODEL_DATA: &[u8] = include_bytes!("../3rdparty/onnx/face_detection_short_range.onnx");
+
+static MODEL: Lazy<Cnn> = Lazy::new(|| {
+    Cnn::new(
+        NeuralNetwork::from_onnx(MODEL_DATA).unwrap(),
+        CnnInputShape::NHWC,
+    )
+    .unwrap()
+});
 
 /// Neural-Network based face detector.
 pub struct Detector {
+    model: &'static Cnn,
     anchors: Anchors,
-    model: Cnn,
     t_resize: Timer,
     t_infer: Timer,
     t_filter: Timer,
@@ -86,13 +95,8 @@ impl Detector {
         };
 
         Self {
+            model: &MODEL,
             anchors,
-            // FIXME share model globally
-            model: Cnn::new(
-                NeuralNetwork::from_onnx(MODEL).unwrap(),
-                CnnInputShape::NHWC,
-            )
-            .unwrap(),
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             t_filter: Timer::new("filter"),
@@ -124,7 +128,7 @@ impl Detector {
 
         let mut image = image.reborrow();
         let resized;
-        if image.resolution() != self.model.input_resolution() {
+        if image.resolution() != self.input_resolution() {
             resized = self
                 .t_resize
                 .time(|| image.aspect_aware_resize(self.model.input_resolution()));

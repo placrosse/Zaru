@@ -13,6 +13,7 @@ use crate::iter::zip_exact;
 /// This type is created with a set of reference points passed to [`ProcrustesAnalyzer::new`], and
 /// can then compute the linear transformation needed to turn these reference points into a new set
 /// of points passed to [`ProcrustesAnalyzer::analyze`].
+#[derive(Clone)]
 pub struct ProcrustesAnalyzer {
     /// Transform to apply to the reference data to remove its translation and scaling, yielding
     /// "base" data.

@@ -103,13 +103,9 @@ fn main() -> Result<(), Error> {
                         .max_by_key(|det| TotalF32(det.confidence()))
                     {
                         // TODO: rotate to align the eyes
-                        if let Some(crop_rect) =
-                            view.rect().intersection(&target.bounding_rect_loose())
-                        {
-                            let face = view.view(&crop_rect).to_image();
-                            if face_img_sender.send(face).is_err() {
-                                break;
-                            }
+                        let face = view.view(&target.bounding_rect_loose()).to_image();
+                        if face_img_sender.send(face).is_err() {
+                            break;
                         }
                     }
 
@@ -203,17 +199,13 @@ fn main() -> Result<(), Error> {
                             .grow_rel(MARGIN, MARGIN, MARGIN, MARGIN)
                             .grow_to_fit_aspect(landmark_input_aspect);
 
-                        let left = image.rect().intersection(&left);
-                        let right = image.rect().intersection(&right);
-                        if let (Some(left), Some(right)) = (left, right) {
-                            let left = image.view(&left).to_image();
-                            let right = image.view(&right).to_image();
-                            if left_eye_img_sender.send(left).is_err() {
-                                break;
-                            }
-                            if right_eye_img_sender.send(right).is_err() {
-                                break;
-                            }
+                        let left = image.view(&left).to_image();
+                        let right = image.view(&right).to_image();
+                        if left_eye_img_sender.send(left).is_err() {
+                            break;
+                        }
+                        if right_eye_img_sender.send(right).is_err() {
+                            break;
                         }
                     }
 
