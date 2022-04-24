@@ -27,5 +27,8 @@ nalgebra = "0.30.1"
 
 livid = { path = "../LiVid" }
 
+[dev-dependencies]
+rayon = "1.5.1"
+
 [profile.release]
 incremental = true
