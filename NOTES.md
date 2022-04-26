@@ -1,3 +1,6 @@
+- according to Wikipedia a blink takes over 100ms. does that mean that we can even track *blinking*
+  accurately with this?
+
 ## oddities, subtleties, limitations, bugs, TODOs
 
 - insufficient lighting makes the framerate drop (because of auto-exposure)

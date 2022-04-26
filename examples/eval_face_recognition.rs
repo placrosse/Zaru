@@ -1,6 +1,14 @@
 //! Face recognition testbed and evaluation.
 //!
 //! To be added to the main library once I understand it better.
+//!
+//! With uncorrected images:
+//! ```text
+//! diff=26.585608 in /home/sludge/Downloads/lfw/Hugo_Chavez
+//! diff=24.186064 in /home/sludge/Downloads/lfw/George_W_Bush
+//! diff=24.090973 in /home/sludge/Downloads/lfw/Yoriko_Kawaguchi
+//! diff=23.725494 in /home/sludge/Downloads/lfw/Gerhard_Schroeder
+//! ```
 
 use std::{collections::HashMap, fs, time::Instant};
 
