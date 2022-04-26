@@ -3,10 +3,27 @@ use super::{Color, ImageView, ImageViewMut};
 /// Describes how to blend pixels together in a [`Blend`] operation.
 pub enum BlendMode {
     /// All destination pixels will be overwritten with the corresponding source pixel.
+    ///
+    /// ```text
+    /// dest.rgba = src.rgba;
+    /// ```
     Overwrite,
+
+    /// Multiplies all color channels, taking alpha into account.
+    ///
+    /// ```text
+    /// out.a = src.a + dest.a * (1.0 - src.a);
+    /// out.rgb = src.rgb * dest.rgb * src.a + (dest.rgb * (1.0 - src.a));
+    /// ```
+    Multiply,
 
     /// Performs alpha blending between source and destination pixels to make the source image
     /// appear in front of the destination image.
+    ///
+    /// ```text
+    /// out.a = src.a + dest.a * (1.0 - src.a);
+    /// out.rgb = (src.rgb * src.a + dest.rgb * dest.a * (1.0 - src.a)) / out.a;
+    /// ```
     Alpha,
 }
 
@@ -48,6 +65,7 @@ impl Drop for Blend<'_> {
                 let dest_pix = self.dest.get(dest_x, dest_y);
                 let result = match self.mode {
                     BlendMode::Overwrite => blend_overwrite(dest_pix, src_pix),
+                    BlendMode::Multiply => blend_multiply(dest_pix, src_pix),
                     BlendMode::Alpha => blend_alpha(dest_pix, src_pix),
                 };
                 self.dest.set(dest_x, dest_y, result);
@@ -58,6 +76,19 @@ impl Drop for Blend<'_> {
 
 fn blend_overwrite(_dest: Color, src: Color) -> Color {
     src
+}
+
+fn blend_multiply(dest: Color, src: Color) -> Color {
+    let dest = LinearColor::new(dest);
+    let src = LinearColor::new(src);
+
+    let result_alpha = src.a() + dest.a() * (1.0 - src.a());
+    let r = src.r() * dest.r() * src.a() + dest.r() * (1.0 - src.a());
+    let g = src.g() * dest.g() * src.a() + dest.g() * (1.0 - src.a());
+    let b = src.b() * dest.b() * src.a() + dest.b() * (1.0 - src.a());
+
+    let result = LinearColor([r, g, b, result_alpha]);
+    result.to_color()
 }
 
 fn blend_alpha(dest: Color, src: Color) -> Color {
