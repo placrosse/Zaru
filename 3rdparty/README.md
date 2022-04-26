@@ -14,6 +14,10 @@ Note that files may have been converted from other formats.
 | `onnx/iris_landmark.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/mobilefacenet.onnx` | [InsightFace_PyTorch] | MIT
 | `image/laughing_man.gif` | Ghost in the Shell / Tumblr | Unknown
+| `image/plead-base.png` | [Twemoji] | CC BY 4.0 | Twitter
+| `image/plead-eye.png` | [Twemoji] | CC BY 4.0 | Twitter
+| `image/plead-mask.png` | [Twemoji] | CC BY 4.0 | Twitter
 
 [MediaPipe]: https://github.com/google/mediapipe
 [InsightFace_Pytorch]: https://github.com/TreB1eN/InsightFace_Pytorch
+[Twemoji]: https://twemoji.twitter.com/
