@@ -26,8 +26,23 @@ pub struct Shader {
 impl Shaders {
     pub fn load(device: &Device) -> anyhow::Result<Self> {
         let loader = &mut Loader::new()?;
+
+        macro_rules! shader {
+            ($vert:literal, $frag:literal) => {
+                if cfg!(debug_assertions) {
+                    Shader::load_path(device, loader, $vert, $frag)?
+                } else {
+                    static VERT: &str =
+                        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/shaders/", $vert));
+                    static FRAG: &str =
+                        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/shaders/", $frag));
+                    Shader::load_source(device, loader, $vert, $frag, VERT, FRAG)?
+                }
+            };
+        }
+
         Ok(Self {
-            textured_quad: Shader::load(device, loader, "quad.vert", "tex.frag")?,
+            textured_quad: shader!("quad.vert", "tex.frag"),
         })
     }
 }
@@ -55,53 +70,88 @@ impl Loader {
     fn load_glsl(
         &mut self,
         stage: ShaderStage,
-        file: &str,
+        source: &str,
+        path: &str,
         dest: &mut Vec<u32>,
     ) -> anyhow::Result<()> {
         assert!(dest.is_empty());
 
-        log::trace!("loading {:?} shader {}", stage, file);
-        let source = fs::read_to_string(format!("shaders/{}", file))
-            .with_context(|| format!("failed to load shader {}", file))?;
         let module = self
             .parser
             .parse(&stage.into(), &source)
             .map_err(|errs| anyhow::anyhow!("{}", errs.iter().format("\n")))
-            .with_context(|| format!("failed to parse shader {}", file))?;
+            .with_context(|| format!("failed to parse shader {}", path))?;
 
         let info = self
             .validator
             .validate(&module)
-            .with_context(|| format!("shader {} failed validation", file))?;
+            .with_context(|| format!("shader {} failed validation", path))?;
 
         self.writer.write(&module, &info, None, dest)?;
 
-        // Also dump the compiled SPIR-V to disk to allow inspection and debugging.
-        let spv_dest = format!("shaders/{}.spv", file);
-        let bytes = dest
-            .iter()
-            .flat_map(|word| word.to_ne_bytes())
-            .collect::<Vec<_>>();
-        fs::write(spv_dest, bytes)?;
+        if cfg!(debug_assertions) {
+            // Also dump the compiled SPIR-V to disk to allow inspection and debugging.
+            let spv_dest = format!("shaders/{}.spv", path);
+            let bytes = dest
+                .iter()
+                .flat_map(|word| word.to_ne_bytes())
+                .collect::<Vec<_>>();
+            fs::write(spv_dest, bytes)?;
+        }
 
         Ok(())
     }
 }
 
 impl Shader {
-    fn load(device: &Device, loader: &mut Loader, vert: &str, frag: &str) -> anyhow::Result<Self> {
+    fn load_path(
+        device: &Device,
+        loader: &mut Loader,
+        vert_name: &str,
+        frag_name: &str,
+    ) -> anyhow::Result<Self> {
+        log::trace!("loading vertex shader {}", vert_name);
+        let vert_source = fs::read_to_string(format!("shaders/{}", vert_name))
+            .with_context(|| format!("failed to load shader {}", vert_name))?;
+        log::trace!("loading fragment shader {}", frag_name);
+        let frag_source = fs::read_to_string(format!("shaders/{}", frag_name))
+            .with_context(|| format!("failed to load shader {}", frag_name))?;
+
+        Self::load_source(
+            device,
+            loader,
+            vert_name,
+            frag_name,
+            &vert_source,
+            &frag_source,
+        )
+    }
+
+    fn load_source(
+        device: &Device,
+        loader: &mut Loader,
+        vert_name: &str,
+        frag_name: &str,
+        vert_source: &str,
+        frag_source: &str,
+    ) -> anyhow::Result<Self> {
         let mut vert_spv = Vec::with_capacity(32);
         let mut frag_spv = Vec::with_capacity(32);
 
-        loader.load_glsl(ShaderStage::Vertex, vert, &mut vert_spv)?;
-        loader.load_glsl(ShaderStage::Fragment, frag, &mut frag_spv)?;
+        loader.load_glsl(ShaderStage::Vertex, &vert_source, vert_name, &mut vert_spv)?;
+        loader.load_glsl(
+            ShaderStage::Fragment,
+            &frag_source,
+            frag_name,
+            &mut frag_spv,
+        )?;
 
         let vert = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-            label: Some(vert),
+            label: Some(vert_name),
             source: wgpu::ShaderSource::SpirV(Cow::Borrowed(&vert_spv)),
         });
         let frag = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
-            label: Some(frag),
+            label: Some(frag_name),
             source: wgpu::ShaderSource::SpirV(Cow::Borrowed(&frag_spv)),
         });
 
