@@ -15,7 +15,8 @@ pub struct DetectionFilter<A> {
 
 impl<A: Filter<f32> + Clone> DetectionFilter<A> {
     /// Creates a new detection filter that uses a clone of `filter` for every coordinate.
-    pub fn new(filter: A) -> Self {
+    #[allow(unused)] // maybe later
+    fn new(filter: A) -> Self {
         Self {
             xc: filter.clone(),
             yc: filter.clone(),

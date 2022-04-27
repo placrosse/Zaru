@@ -9,16 +9,13 @@ use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
 use crate::{
-    filter::{AlphaBetaFilter, Ema, Filter},
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
     nn::{point_to_img, Cnn, CnnInputShape, NeuralNetwork},
-    num::TotalF32,
     resolution::Resolution,
     timer::Timer,
 };
 
 use self::{
-    avg::DetectionFilter,
     nma::NonMaxAvg,
     ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
 };
@@ -37,23 +34,9 @@ mod ssd;
 const SEED_THRESH: f32 = 0.6;
 /// Thresholds for detections to *contribute* to an NMS/NMA round started by another detection with
 /// at least `SEED_THRESH`.
-const CONTRIB_THRESH: f32 = 0.0;
+const CONTRIB_THRESH: f32 = 0.3;
 /// Minimum Intersection-over-Union value to consider two detections to overlap.
 const IOU_THRESH: f32 = 0.3;
-
-/// If this is `true`, an [`AlphaBetaFilter`] is used to smooth detections across frames. If it is
-/// `false` an exponentially-weighted moving average is used instead ([`Ema`]).
-///
-/// Typically, the exponential moving average performs well enough for face detection.
-const USE_AB_FILTER: bool = false;
-
-/// Alpha parameter of the exponentially-weighted moving average filter.
-const EMA_ALPHA: f32 = 0.25;
-
-/// Alpha parameter of the alpha beta filter.
-const AB_FILTER_ALPHA: f32 = 0.2;
-/// Beta parameter of the alpha beta filter.
-const AB_FILTER_BETA: f32 = 0.03;
 
 const MODEL_DATA: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -76,7 +59,6 @@ pub struct Detector {
     t_infer: Timer,
     t_filter: Timer,
     nma: NonMaxAvg,
-    avg: Box<dyn Filter<RawDetection> + Send>,
     raw_detections: Vec<RawDetection>,
     detections: Vec<Detection>,
 }
@@ -88,15 +70,6 @@ impl Detector {
             layers: &[LayerInfo::new(2, 16, 16), LayerInfo::new(6, 8, 8)],
         });
 
-        let avg: Box<dyn Filter<RawDetection> + Send> = if USE_AB_FILTER {
-            Box::new(DetectionFilter::new(AlphaBetaFilter::new(
-                AB_FILTER_ALPHA,
-                AB_FILTER_BETA,
-            )))
-        } else {
-            Box::new(DetectionFilter::new(Ema::new(EMA_ALPHA)))
-        };
-
         Self {
             model: &MODEL,
             anchors,
@@ -104,7 +77,6 @@ impl Detector {
             t_infer: Timer::new("infer"),
             t_filter: Timer::new("filter"),
             nma: NonMaxAvg::new(SEED_THRESH, IOU_THRESH),
-            avg,
             raw_detections: Vec::new(),
             detections: Vec::new(),
         }
@@ -159,13 +131,8 @@ impl Detector {
             }
 
             let detections = self.nma.average(&mut self.raw_detections);
-            // TODO >1
-            match detections.iter().max_by_key(|det| TotalF32(det.confidence)) {
-                Some(det) => {
-                    let raw = self.avg.push(*det);
-                    self.detections.push(Detection { raw, full_res });
-                }
-                None => self.avg.reset(),
+            for &raw in detections {
+                self.detections.push(Detection { raw, full_res });
             }
         });
 
