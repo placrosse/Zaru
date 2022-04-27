@@ -1,6 +1,6 @@
-use mizaru::{anim::Animation, gui};
+use zaru::{anim::Animation, gui};
 
-fn main() -> Result<(), mizaru::Error> {
+fn main() -> Result<(), zaru::Error> {
     let path = std::env::args()
         .skip(1)
         .next()

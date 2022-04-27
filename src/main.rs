@@ -1,15 +1,15 @@
 mod facetracking;
 
 use log::LevelFilter;
-use mizaru::detector::Detector;
-use mizaru::eye::EyeLandmarker;
-use mizaru::image::{Color, Rect};
-use mizaru::landmark::{self, Landmarker};
-use mizaru::num::TotalF32;
-use mizaru::procrustes::ProcrustesAnalyzer;
-use mizaru::timer::{FpsCounter, Timer};
-use mizaru::webcam::Webcam;
-use mizaru::{defer::defer, gui, image, pipeline, Error};
+use zaru::detector::Detector;
+use zaru::eye::EyeLandmarker;
+use zaru::image::{Color, Rect};
+use zaru::landmark::{self, Landmarker};
+use zaru::num::TotalF32;
+use zaru::procrustes::ProcrustesAnalyzer;
+use zaru::timer::{FpsCounter, Timer};
+use zaru::webcam::Webcam;
+use zaru::{defer::defer, gui, image, pipeline, Error};
 
 fn main() -> Result<(), Error> {
     let log_level = if cfg!(debug_assertions) {

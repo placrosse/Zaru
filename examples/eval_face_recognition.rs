@@ -13,7 +13,7 @@
 use std::{collections::HashMap, fs, time::Instant};
 
 use itertools::Itertools;
-use mizaru::{
+use zaru::{
     detector::Detector,
     image::Image,
     iter::zip_exact,
@@ -42,7 +42,7 @@ impl Embedding {
     }
 }
 
-fn main() -> Result<(), mizaru::Error> {
+fn main() -> Result<(), zaru::Error> {
     let face_dir = std::env::args_os().skip(1).next().unwrap();
 
     let nn = NeuralNetwork::load("3rdparty/onnx/mobilefacenet.onnx")?;

@@ -1,6 +1,6 @@
-# Mizaru sees no evil
+# Zaru
 
-Mizaru is a neural-network based face tracking solution that works with normal USB webcams.
+Zaru is a neural-network based face tracking solution that works with normal USB webcams.
 
 It is also, more or less by accident, a pretty usable computer vision library, which is a little bit terrifying.
 

@@ -1,13 +1,13 @@
 use std::time::Instant;
 
-use mizaru::{
+use zaru::{
     anim::{Animation, AnimationFormat},
     detector::Detector,
     gui,
     webcam::Webcam,
 };
 
-fn main() -> Result<(), mizaru::Error> {
+fn main() -> Result<(), zaru::Error> {
     let animation = Animation::from_data(
         include_bytes!("../3rdparty/image/laughing_man.gif"),
         AnimationFormat::Gif,

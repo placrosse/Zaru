@@ -2,7 +2,7 @@
 //!
 //! # 3D Coordinates
 //!
-//! For 3D coordinates, Mizaru uses the coordinate system from WebGPU, wgpu, Direct3D, and Metal
+//! For 3D coordinates, Zaru uses the coordinate system from WebGPU, wgpu, Direct3D, and Metal
 //! (unless otherwise noted): X points to the right, Y points up, Z points from the camera into the
 //! scene.
 //!

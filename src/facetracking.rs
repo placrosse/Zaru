@@ -1,4 +1,4 @@
-//! Mizaru's public face tracking data format.
+//! Zaru's public face tracking data format.
 //!
 //! The face tracking data is transmitted as a unidirectional stream of [`TrackerMessage`]s over a
 //! TCP port. The messages are encoded as newline-delimited JSON objects (["JSON Lines"]) which in
