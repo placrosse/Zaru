@@ -15,7 +15,10 @@ use crate::{
     timer::Timer,
 };
 
-const MODEL_DATA: &[u8] = include_bytes!("../3rdparty/onnx/iris_landmark.onnx");
+const MODEL_DATA: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/3rdparty/onnx/iris_landmark.onnx"
+));
 
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
     Cnn::new(

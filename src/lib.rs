@@ -1,4 +1,4 @@
-//! See no evil.
+//! Zaru Machine Perception library.
 //!
 //! # 3D Coordinates
 //!
@@ -11,13 +11,11 @@
 
 pub mod anim;
 pub mod defer;
-pub mod detector;
-pub mod eye;
+pub mod face;
 pub mod filter;
 pub mod gui;
 pub mod image;
 pub mod iter;
-pub mod landmark;
 pub mod nn;
 pub mod num;
 pub mod pipeline;

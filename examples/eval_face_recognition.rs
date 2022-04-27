@@ -13,15 +13,15 @@
 use std::{collections::HashMap, fs, time::Instant};
 
 use itertools::Itertools;
+use nalgebra::RealField;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use zaru::{
-    detector::Detector,
+    face::detector::Detector,
     image::Image,
     iter::zip_exact,
     nn::{Cnn, CnnInputShape, NeuralNetwork},
     num::TotalF32,
 };
-use nalgebra::RealField;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 pub struct Embedding {
     raw: [f32; 128],

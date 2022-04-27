@@ -18,7 +18,10 @@ use crate::{
     timer::Timer,
 };
 
-const MODEL_DATA: &[u8] = include_bytes!("../3rdparty/onnx/face_landmark.onnx");
+const MODEL_DATA: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/3rdparty/onnx/face_landmark.onnx"
+));
 
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
     Cnn::new(
@@ -45,7 +48,7 @@ impl Landmarker {
             t_infer: Timer::new("infer"),
             result_buffer: LandmarkResult {
                 landmarks: Landmarks {
-                    positions: [Pos(0.0, 0.0, 0.0); 468],
+                    positions: [(0.0, 0.0, 0.0); 468],
                 },
                 face_flag: 0.0,
                 orig_res: Resolution::new(1, 1),
@@ -63,13 +66,14 @@ impl Landmarker {
 
     /// Computes facial landmarks in `image`.
     ///
-    /// `image` must be a cropped image of a face. When using [`crate::detector::Detector`], the
+    /// `image` must be a cropped image of a face. When using [`Detector`], the
     /// rectangle returned by [`Detection::bounding_rect_loose`] produces good results.
     ///
     /// The image should depict a face that is mostly upright. Results will be poor if the face is
     /// rotated too much.
     ///
-    /// [`Detection::bounding_rect_loose`]: crate::detector::Detection::bounding_rect_loose
+    /// [`Detector`]: super::detector::Detector
+    /// [`Detection::bounding_rect_loose`]: super::detector::Detection::bounding_rect_loose
     pub fn compute<V: AsImageView>(&mut self, image: &V) -> &LandmarkResult {
         self.compute_impl(image.as_view())
     }
@@ -108,27 +112,6 @@ impl Landmarker {
     }
 }
 
-/// Landmark position in 3D space.
-#[derive(Debug, Clone, Copy)]
-pub struct Pos(f32, f32, f32);
-
-impl Pos {
-    #[inline]
-    pub fn x(&self) -> f32 {
-        self.0
-    }
-
-    #[inline]
-    pub fn y(&self) -> f32 {
-        self.1
-    }
-
-    #[inline]
-    pub fn z(&self) -> f32 {
-        self.2
-    }
-}
-
 /// Landmark results returned by [`Landmarker::compute`].
 #[derive(Clone)]
 pub struct LandmarkResult {
@@ -141,13 +124,13 @@ pub struct LandmarkResult {
 
 impl LandmarkResult {
     /// Returns the 3D landmark positions in the input image's coordinate system.
-    pub fn landmark_positions(&self) -> impl Iterator<Item = Pos> + '_ {
+    pub fn landmark_positions(&self) -> impl Iterator<Item = (f32, f32, f32)> + '_ {
         (0..self.landmark_count()).map(|index| self.landmark_position(index))
     }
 
     /// Returns a landmark's position in the input image's coordinate system.
-    pub fn landmark_position(&self, index: usize) -> Pos {
-        let Pos(x, y, z) = self.landmarks.positions[index];
+    pub fn landmark_position(&self, index: usize) -> (f32, f32, f32) {
+        let (x, y, z) = self.landmarks.positions[index];
         let (x, y) = unadjust_aspect_ratio(
             x / self.input_res.width() as f32,
             y / self.input_res.height() as f32,
@@ -157,7 +140,7 @@ impl LandmarkResult {
             x * self.orig_res.width() as f32,
             y * self.orig_res.height() as f32,
         );
-        Pos(x, y, z)
+        (x, y, z)
     }
 
     #[inline]
@@ -186,33 +169,36 @@ impl LandmarkResult {
 /// Raw face landmark positions.
 #[derive(Clone)]
 pub struct Landmarks {
-    positions: [Pos; 468],
+    positions: [(f32, f32, f32); 468],
 }
 
 impl Landmarks {
     /// Returns an iterator over the positions of all landmarks.
-    pub fn positions(&self) -> impl Iterator<Item = Pos> + '_ {
+    pub fn positions(&self) -> impl Iterator<Item = (f32, f32, f32)> + '_ {
         self.positions.iter().copied()
     }
 }
 
-impl Index<Idx> for Landmarks {
-    type Output = Pos;
+impl Index<LandmarkIdx> for Landmarks {
+    type Output = (f32, f32, f32);
 
-    fn index(&self, index: Idx) -> &Self::Output {
+    fn index(&self, index: LandmarkIdx) -> &Self::Output {
         &self.positions[index as usize]
     }
 }
 
 impl Index<usize> for Landmarks {
-    type Output = Pos;
+    type Output = (f32, f32, f32);
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.positions[index]
     }
 }
 
-include!("../3rdparty/3d/canonical_face_model.rs");
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/3rdparty/3d/canonical_face_model.rs"
+));
 
 /// Returns an iterator over the vertices of the reference face model.
 ///
@@ -221,7 +207,7 @@ include!("../3rdparty/3d/canonical_face_model.rs");
 /// returned by this function have Y pointing up, and X and Y are in a smaller range around `(0,0)`,
 /// while [`Landmarker`] yields points that have Y point down, and X and Y are in term of the input
 /// image's coordinates.
-pub fn reference_positions() -> impl Iterator<Item = Pos> {
+pub fn reference_positions() -> impl Iterator<Item = (f32, f32, f32)> {
     REFERENCE_POSITIONS.iter().copied()
 }
 
@@ -229,7 +215,7 @@ pub fn reference_positions() -> impl Iterator<Item = Pos> {
 ///
 /// "Left" and "Right" are relative to the input image, not from the PoV of the depicted person.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Idx {
+pub enum LandmarkIdx {
     MouthLeft = 78,
     MouthRight = 308,
     MouthTop = 13,
@@ -244,10 +230,9 @@ pub enum Idx {
     RightEyeBottom = 374,
     RightEyebrowLeftCorner = 295,
     LeftEyebrowRightCorner = 65,
-    // idle thought: you could use this data to render an AR unibrow :)
 }
 
-impl Into<usize> for Idx {
+impl Into<usize> for LandmarkIdx {
     #[inline]
     fn into(self) -> usize {
         self as usize

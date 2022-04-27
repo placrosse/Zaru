@@ -1,10 +1,10 @@
 mod facetracking;
 
 use log::LevelFilter;
-use zaru::detector::Detector;
-use zaru::eye::EyeLandmarker;
+use zaru::face::detector::Detector;
+use zaru::face::eye::EyeLandmarker;
+use zaru::face::landmark::{self, Landmarker};
 use zaru::image::{Color, Rect};
-use zaru::landmark::{self, Landmarker};
 use zaru::num::TotalF32;
 use zaru::procrustes::ProcrustesAnalyzer;
 use zaru::timer::{FpsCounter, Timer};
@@ -26,9 +26,7 @@ fn main() -> Result<(), Error> {
     let mut landmarker = Landmarker::new();
     let mut left_eye_landmarker = EyeLandmarker::new();
     let mut right_eye_landmarker = EyeLandmarker::new();
-    let mut procrustes_analyzer = ProcrustesAnalyzer::new(
-        landmark::reference_positions().map(|pos| (pos.x(), pos.y(), pos.z())),
-    );
+    let mut procrustes_analyzer = ProcrustesAnalyzer::new(landmark::reference_positions());
 
     let landmark_input_aspect = left_eye_landmarker.input_resolution().aspect_ratio();
 
@@ -165,7 +163,7 @@ fn main() -> Result<(), Error> {
                             break;
                         }
 
-                        use landmark::Idx::*;
+                        use landmark::LandmarkIdx::*;
 
                         let left = [
                             LeftEyeLeftCorner,
@@ -181,13 +179,13 @@ fn main() -> Result<(), Error> {
                         ];
 
                         let left = Rect::bounding(left.into_iter().map(|idx| {
-                            let pos = res.landmark_position(idx.into());
-                            (pos.x() as i32, pos.y() as i32)
+                            let (x, y, _z) = res.landmark_position(idx.into());
+                            (x as i32, y as i32)
                         }))
                         .unwrap();
                         let right = Rect::bounding(right.into_iter().map(|idx| {
-                            let pos = res.landmark_position(idx.into());
-                            (pos.x() as i32, pos.y() as i32)
+                            let (x, y, _z) = res.landmark_position(idx.into());
+                            (x as i32, y as i32)
                         }))
                         .unwrap();
 
@@ -210,16 +208,18 @@ fn main() -> Result<(), Error> {
                     }
 
                     let procrustes_result = t_procrustes.time(|| {
-                        procrustes_analyzer.analyze(res.raw_landmarks().positions().map(|pos| {
-                            // Flip Y to bring us to canonical 3D coordinates (where Y points up).
-                            // Only rotation matters, so we don't have to correct for the added
-                            // translation.
-                            (pos.x(), -pos.y(), pos.z())
-                        }))
+                        procrustes_analyzer.analyze(res.raw_landmarks().positions().map(
+                            |(x, y, z)| {
+                                // Flip Y to bring us to canonical 3D coordinates (where Y points up).
+                                // Only rotation matters, so we don't have to correct for the added
+                                // translation.
+                                (x, -y, z)
+                            },
+                        ))
                     });
 
-                    for pos in res.landmark_positions() {
-                        image::draw_marker(&mut image, pos.x() as _, pos.y() as _).size(3);
+                    for (x, y, _z) in res.landmark_positions() {
+                        image::draw_marker(&mut image, x as _, y as _).size(3);
                     }
 
                     #[allow(illegal_floating_point_literal_pattern)] // let me have fun

@@ -55,7 +55,10 @@ const AB_FILTER_ALPHA: f32 = 0.2;
 /// Beta parameter of the alpha beta filter.
 const AB_FILTER_BETA: f32 = 0.03;
 
-const MODEL_DATA: &[u8] = include_bytes!("../3rdparty/onnx/face_detection_short_range.onnx");
+const MODEL_DATA: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/3rdparty/onnx/face_detection_short_range.onnx"
+));
 
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
     Cnn::new(
@@ -208,7 +211,7 @@ impl Detection {
     /// Note that this value is quite imprecise. If you need a more accurate angle, use
     /// [`Landmarker`] instead and compute it from the returned landmarks.
     ///
-    /// [`Landmarker`]: crate::landmark::Landmarker
+    /// [`Landmarker`]: super::landmark::Landmarker
     pub fn rotation_radians(&self) -> f32 {
         let left_eye = self.left_eye();
         let right_eye = self.right_eye();
