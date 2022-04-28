@@ -10,7 +10,7 @@
 //! diff=23.725494 in /home/sludge/Downloads/lfw/Gerhard_Schroeder
 //! ```
 
-use std::{collections::HashMap, fs, time::Instant};
+use std::{collections::HashMap, convert::identity, fs, time::Instant};
 
 use itertools::Itertools;
 use nalgebra::RealField;
@@ -65,31 +65,33 @@ fn main() -> Result<(), zaru::Error> {
     let start = Instant::now();
     let embeddings = image_paths
         .par_iter()
-        .filter_map(|(path, class)| {
-            let image = Image::load(path).unwrap();
+        .map_init(
+            || Detector::new(),
+            |det, (path, class)| {
+                let image = Image::load(path).unwrap();
 
-            // FIXME: `Detector` filters between frames which we don't want here. It should probably not do that.
-            let mut det = Detector::new();
-            let dets = det.detect(&image);
-            if dets.is_empty() {
-                println!("No faces detected in '{}'", path.display());
-                return None;
-            }
-            let grow_by = 0.4;
-            let rect = dets[0]
-                .bounding_rect_raw()
-                .grow_rel(grow_by, grow_by, grow_by, grow_by)
-                .grow_to_fit_aspect(target_aspect);
-            let face = image
-                .view(&rect)
-                .aspect_aware_resize(cnn.input_resolution());
-            let out = cnn.infer(&face).unwrap();
-            let f = out[0].as_slice::<f32>().unwrap();
-            let emb = Embedding {
-                raw: f.try_into().unwrap(),
-            };
-            Some((emb, *class))
-        })
+                let dets = det.detect(&image);
+                if dets.is_empty() {
+                    println!("No faces detected in '{}'", path.display());
+                    return None;
+                }
+                let grow_by = 0.4;
+                let rect = dets[0]
+                    .bounding_rect_raw()
+                    .grow_rel(grow_by, grow_by, grow_by, grow_by)
+                    .grow_to_fit_aspect(target_aspect);
+                let face = image
+                    .view(&rect)
+                    .aspect_aware_resize(cnn.input_resolution());
+                let out = cnn.infer(&face).unwrap();
+                let f = out[0].as_slice::<f32>().unwrap();
+                let emb = Embedding {
+                    raw: f.try_into().unwrap(),
+                };
+                Some((emb, *class))
+            },
+        )
+        .filter_map(identity)
         .collect::<Vec<_>>();
 
     println!(
