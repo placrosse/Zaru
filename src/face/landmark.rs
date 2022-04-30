@@ -11,7 +11,7 @@ use std::ops::Index;
 use once_cell::sync::Lazy;
 
 use crate::{
-    image::{AsImageView, ImageView},
+    image::{AsImageView, ImageView, Rect},
     iter::zip_exact,
     nn::{unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
     resolution::{AspectRatio, Resolution},
@@ -236,5 +236,144 @@ impl Into<usize> for LandmarkIdx {
     #[inline]
     fn into(self) -> usize {
         self as usize
+    }
+}
+
+/// Uses a [`Landmarker`] to track the position of a face across frames.
+///
+/// This can be used to avoid the jitter from running a [`Detector`] on every frame of a video feed,
+/// in cases where the application would compute the landmarks anyways. If the landmarks aren't
+/// needed, smoothing the detections directly using a [`DetectionFilter`] is probably more efficient.
+///
+/// [`Detector`]: super::detector::Detector
+/// [`DetectionFilter`]: super::detector::DetectionFilter
+pub struct LandmarkTracker {
+    lm: Landmarker,
+    face: Option<TrackedFace>,
+    loss_thresh: f32,
+    input_aspect: AspectRatio,
+}
+
+impl LandmarkTracker {
+    const DEFAULT_TRACKING_LOSS_TRESHOLD: f32 = 10.0;
+
+    /// Creates a new landmark tracker which initially does not track a face.
+    pub fn new() -> Self {
+        let lm = Landmarker::new();
+        Self {
+            input_aspect: lm.input_resolution().aspect_ratio(),
+            lm,
+            face: None,
+            loss_thresh: Self::DEFAULT_TRACKING_LOSS_TRESHOLD,
+        }
+    }
+
+    /// Returns the currently tracked face rectangle and rotation.
+    pub fn tracked_face(&self) -> Option<&TrackedFace> {
+        self.face.as_ref()
+    }
+
+    /// Sets face rectangle and rotation to track.
+    pub fn set_tracked_face(&mut self, face: TrackedFace) {
+        self.face = Some(face);
+    }
+
+    /// Sets the confidence threshold below which a tracked face is considered "lost".
+    ///
+    /// This uses the confidence value returned by [`LandmarkResult::face_confidence`].
+    pub fn set_tracking_loss_threshold(&mut self, thresh: f32) {
+        self.loss_thresh = thresh;
+    }
+
+    pub fn landmarker(&self) -> &Landmarker {
+        &self.lm
+    }
+
+    /// Tracks the face across the next frame.
+    ///
+    /// If tracking succeeds, returns the updated [`TrackedFace`] as well as the computed facial
+    /// landmarks.
+    ///
+    /// If no face is currently tracked, or the newly computed landmarks have too low of a
+    /// confidence (as set by [`LandmarkTracker::set_tracking_loss_threshold`]), returns `None`.
+    pub fn track<V: AsImageView>(&mut self, image: &V) -> Option<TrackingResult<'_>> {
+        self.track_impl(image.as_view())
+    }
+
+    fn track_impl(&mut self, image: ImageView<'_>) -> Option<TrackingResult<'_>> {
+        // 1. Extract rotated face
+        // 2. Run landmarker
+        // 3. Update tracked rect and rotation
+
+        let mut face = self.face?;
+        let view_rect = face.rect.grow_to_fit_aspect(self.input_aspect);
+        let view = image.view(&view_rect); // TODO rotate
+        let res = self.lm.compute(&view);
+        log::trace!(
+            "LandmarkTracker: confidence {}, loss threshold {}",
+            res.face_confidence(),
+            self.loss_thresh
+        );
+        if res.face_confidence() < self.loss_thresh {
+            self.face = None;
+            return None;
+        }
+
+        let extra_area = 0.3;
+        let rect = Rect::bounding(res.landmark_positions().map(|(x, y, _z)| (x as _, y as _)))
+            .unwrap()
+            .grow_rel(extra_area, extra_area, extra_area, extra_area);
+        face.rect = rect.move_by(view_rect.x(), view_rect.y());
+        // TODO set rotation
+        let face = self.face.insert(face);
+
+        Some(TrackingResult {
+            updated_face: face,
+            landmarks: res,
+            view_rect,
+        })
+    }
+}
+
+pub struct TrackingResult<'a> {
+    updated_face: &'a TrackedFace,
+    landmarks: &'a LandmarkResult,
+    view_rect: Rect,
+}
+
+impl<'a> TrackingResult<'a> {
+    pub fn updated_face(&self) -> &TrackedFace {
+        self.updated_face
+    }
+
+    pub fn landmarks(&self) -> &LandmarkResult {
+        self.landmarks
+    }
+
+    pub fn view_rect(&self) -> Rect {
+        self.view_rect
+    }
+}
+
+/// Location info of a face tracked by a [`LandmarkTracker`].
+#[derive(Clone, Copy)]
+pub struct TrackedFace {
+    /// The rectangle where we last recorded this face. This will be used as the image view in which
+    /// we'll run the landmarker.
+    rect: Rect,
+    rotation: f32,
+}
+
+impl TrackedFace {
+    pub fn new(rect: Rect, rotation: f32) -> Self {
+        Self { rect, rotation }
+    }
+
+    pub fn rect(&self) -> &Rect {
+        &self.rect
+    }
+
+    pub fn rotation(&self) -> f32 {
+        self.rotation
     }
 }

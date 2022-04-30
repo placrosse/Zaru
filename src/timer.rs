@@ -97,15 +97,15 @@ impl Drop for TimerGuard<'_> {
 
 /// Logs frames per second with optional extra data.
 pub struct FpsCounter {
-    name: &'static str,
+    name: String,
     frames: u32,
     start: Instant,
 }
 
 impl FpsCounter {
-    pub fn new(name: &'static str) -> Self {
+    pub fn new<N: Into<String>>(name: N) -> Self {
         Self {
-            name,
+            name: name.into(),
             frames: 0,
             start: Instant::now(),
         }

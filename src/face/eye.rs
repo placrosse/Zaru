@@ -59,7 +59,8 @@ impl EyeLandmarker {
     /// Computes eye landmarks on a cropped image of a left eye.
     ///
     /// Landmarks of a right eye can be computed by flipping both the image and the returned
-    /// landmarks.
+    /// landmarks (via [`ImageViewMut::flip_horizontal_in_place`] and
+    /// [`EyeLandmarks::flip_horizontal_in_place`], respectively).
     pub fn compute<V: AsImageView>(&mut self, image: &V) -> &mut EyeLandmarks {
         self.compute_impl(image.as_view())
     }

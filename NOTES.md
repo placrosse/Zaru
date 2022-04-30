@@ -12,3 +12,6 @@
       (once https://github.com/onnx/tensorflow-onnx/issues/1877 is fixed)
     - long range non-sparse variant needs `Upsample` op, which tract doesn't implement yet
 - Y pointing up in 3D space but down in 2D space is annoying and requires flips – maybe it should always point up/down?
+- "inference" is a bad word for what a neural network does, it sounds too logical, they don't work like that
+    - "guess" sounds too informal and imprecise, but is closer to what they do
+    - "regress" or "estimate"?
