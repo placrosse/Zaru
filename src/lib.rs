@@ -11,7 +11,6 @@
 
 pub mod anim;
 pub mod defer;
-pub mod face;
 pub mod filter;
 pub mod gui;
 pub mod image;
@@ -25,3 +24,10 @@ pub mod timer;
 pub mod webcam;
 
 pub type Error = Box<dyn std::error::Error + Sync + Send>;
+
+/// Detection, registration and recognition of human faces.
+pub mod face {
+    pub mod detector;
+    pub mod eye;
+    pub mod landmark;
+}
