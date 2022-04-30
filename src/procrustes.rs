@@ -119,8 +119,6 @@ impl ProcrustesAnalyzer {
             col.z = pt.z;
         }
 
-        log::trace!("q = {}, p_t = {}", self.q, self.p_t);
-
         let covariance = &self.p_t * &self.q;
 
         let svd = covariance.svd(true, true);
