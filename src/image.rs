@@ -141,26 +141,22 @@ impl Image {
 
     /// Creates a mutable view into an area of this image, specified by `rect`.
     ///
-    /// # Panics
-    ///
-    /// This will panic if `rect` is not fully contained in the bounds of `self`.
+    /// If `rect` lies partially outside of `self`, the resulting view is first clipped to `self`
+    /// and will be smaller than `rect`. If `rect` lies fully outside of `self`, the resulting view
+    /// will be empty.
     pub fn view_mut(&mut self, rect: &Rect) -> ImageViewMut<'_> {
-        let my_rect = Rect::from_top_left(0, 0, self.width(), self.height());
-        assert!(
-            my_rect.contains_rect(rect),
-            "attempted to create out-of-bounds view of {}x{} image at {:?}",
-            self.width(),
-            self.height(),
-            rect
-        );
-
-        ImageViewMut {
-            sub_image: self.buf.sub_image(
-                rect.x() as _,
-                rect.y() as _,
-                rect.width(),
-                rect.height(),
-            ),
+        match self.rect().intersection(rect) {
+            Some(rect) => ImageViewMut {
+                sub_image: self.buf.sub_image(
+                    rect.x() as _,
+                    rect.y() as _,
+                    rect.width(),
+                    rect.height(),
+                ),
+            },
+            None => ImageViewMut {
+                sub_image: self.buf.sub_image(0, 0, 0, 0),
+            },
         }
     }
 
@@ -429,25 +425,22 @@ impl<'a> ImageViewMut<'a> {
 
     /// Creates a mutable view into an area of this view, specified by `rect`.
     ///
-    /// # Panics
-    ///
-    /// This will panic if `rect` is not fully contained in the bounds of `self`.
+    /// If `rect` lies partially outside of `self`, the resulting view is first clipped to `self`
+    /// and will be smaller than `rect`. If `rect` lies fully outside of `self`, the resulting view
+    /// will be empty.
     pub fn view_mut(&mut self, rect: &Rect) -> ImageViewMut<'_> {
-        assert!(
-            self.rect().contains_rect(rect),
-            "attempted to create out-of-bounds view of {}x{} view at {:?}",
-            self.width(),
-            self.height(),
-            rect
-        );
-
-        ImageViewMut {
-            sub_image: self.sub_image.sub_image(
-                rect.x() as _,
-                rect.y() as _,
-                rect.width(),
-                rect.height(),
-            ),
+        match self.rect().intersection(rect) {
+            Some(rect) => ImageViewMut {
+                sub_image: self.sub_image.sub_image(
+                    rect.x() as _,
+                    rect.y() as _,
+                    rect.width(),
+                    rect.height(),
+                ),
+            },
+            None => ImageViewMut {
+                sub_image: self.sub_image.sub_image(0, 0, 0, 0),
+            },
         }
     }
 
