@@ -149,8 +149,8 @@ impl Rect {
 
     /// Grows this rectangle by relative margins, returning the new rectangle.
     ///
-    /// `left` and `right` are fractions of the rectangle's width, `top` and
-    /// `bottom` are fractions of the rectangle's height.
+    /// `left` and `right` are fractions of the rectangle's width, `top` and `bottom` are fractions
+    /// of the rectangle's height.
     #[must_use]
     pub fn grow_rel(&self, left: f32, right: f32, top: f32, bottom: f32) -> Self {
         let left = self.rect.size.width as f32 * left;
@@ -159,6 +159,8 @@ impl Rect {
         let bottom = self.rect.size.height as f32 * bottom;
         self.grow(left as i32, right as i32, top as i32, bottom as i32)
     }
+
+    // FIXME: grow width and height by different amounts, grow width and height by the same amt
 
     /// Symmetrically extends one dimension of `self` so that the resulting rectangle has the given
     /// aspect ratio.
@@ -204,6 +206,17 @@ impl Rect {
     #[inline]
     pub fn height(&self) -> u32 {
         self.rect.size.height
+    }
+
+    pub fn center(&self) -> (i32, i32) {
+        (
+            self.x() + (self.width() / 2) as i32,
+            self.y() + (self.height() / 2) as i32,
+        )
+    }
+
+    pub fn move_by(&self, x: i32, y: i32) -> Rect {
+        Rect::from_top_left(self.x() + x, self.y() + y, self.width(), self.height())
     }
 
     /// Computes the intersection of `self` and `other`.
