@@ -23,7 +23,7 @@ wgpu = { version = "0.12.0", features = ["spirv"] }
 pollster = "0.2.5"
 naga = { version = "0.8.5", features = ["glsl-in"] }
 bytemuck = { version = "1.7.3", features = ["derive"] }
-nalgebra = "0.30.1"
+nalgebra = "0.31.0"
 
 livid = { path = "../LiVid" }
 
