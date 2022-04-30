@@ -7,7 +7,12 @@
 //! The written code is typically very close to single-threaded code, with channel transfers
 //! inserted when threads are crossed.
 
-use std::marker::PhantomData;
+use std::{
+    io,
+    marker::PhantomData,
+    panic::resume_unwind,
+    thread::{self, JoinHandle},
+};
 
 use crossbeam::channel::{RecvError, SendError};
 
@@ -167,5 +172,88 @@ impl<T> Iterator for IntoIter<T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
+    }
+}
+
+/// A handle to a worker thread that processes messages of type `I`.
+///
+/// When dropped, the channel to the thread will be dropped and the thread will be joined. If the
+/// thread has panicked, the panic will be forwarded to the thread dropping the `Worker`.
+pub struct Worker<I: Send + 'static> {
+    sender: Option<Sender<I>>,
+    handle: Option<JoinHandle<()>>,
+}
+
+impl<I: Send + 'static> Drop for Worker<I> {
+    fn drop(&mut self) {
+        // Close the channel to signal the thread to exit.
+        drop(self.sender.take());
+
+        self.wait_for_exit();
+    }
+}
+
+impl<I: Send + 'static> Worker<I> {
+    pub fn spawn<N, F>(name: N, handler: F) -> io::Result<Self>
+    where
+        N: Into<String>,
+        F: FnOnce(Receiver<I>) + Send + 'static,
+    {
+        let (sender, recv) = channel();
+        let handle = thread::Builder::new()
+            .name(name.into())
+            .spawn(|| handler(recv.activate()))?;
+
+        Ok(Self {
+            sender: Some(sender.activate()),
+            handle: Some(handle),
+        })
+    }
+
+    fn wait_for_exit(&mut self) {
+        // Wait for it to exit and propagate its panic if it panicked.
+        if let Some(handle) = self.handle.take() {
+            match handle.join() {
+                Ok(()) => {}
+                Err(payload) => {
+                    if !thread::panicking() {
+                        resume_unwind(payload);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Sends a message to the worker thread.
+    ///
+    /// This will block until the thread is available to accept the message.
+    pub fn send(&mut self, msg: I) -> Result<(), SendError<I>> {
+        self.sender.as_mut().unwrap().send(msg)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    use super::*;
+
+    fn silent_panic(payload: String) {
+        resume_unwind(Box::new(payload));
+    }
+
+    #[test]
+    fn worker_propagates_panic_on_drop() {
+        let worker = Worker::spawn("panic", |_: Receiver<()>| {
+            silent_panic("worker panic".into())
+        })
+        .unwrap();
+        catch_unwind(AssertUnwindSafe(|| drop(worker))).unwrap_err();
+    }
+
+    #[test]
+    fn worker_propagates_panic_on_send() {
+        let mut worker = Worker::spawn("panic", |_| silent_panic("worker panic".into())).unwrap();
+        catch_unwind(AssertUnwindSafe(|| worker.send(()))).unwrap_err();
     }
 }
