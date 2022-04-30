@@ -20,9 +20,11 @@ use self::{
     ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
 };
 
-mod avg;
+mod filter;
 mod nma;
 mod ssd;
+
+pub use filter::DetectionFilter;
 
 /// Detection confidence threshold.
 ///
@@ -91,6 +93,9 @@ impl Detector {
     ///
     /// The image will be scaled to the input size expected by the neural network, and detections
     /// will be back-mapped to input image coordinates.
+    ///
+    /// Note that the computed detections have a large amount of jitter when applying the detection
+    /// to subsequent frames of a video. To reduce jitter,
     pub fn detect<V: AsImageView>(&mut self, image: &V) -> &[Detection] {
         self.detect_impl(image.as_view())
     }

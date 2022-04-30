@@ -1,22 +1,21 @@
 use crate::filter::Filter;
 
-use super::{BoundingBox, RawDetection};
+use super::{BoundingBox, Detection, RawDetection};
 
-/// A [`Filter`] that operates on [`RawDetection`]s.
+/// A [`Filter`] that operates on [`Detection`]s.
 ///
 /// This applies the same (configurable) type of filter to all detection coordinates.
-pub struct DetectionFilter<A> {
-    xc: A,
-    yc: A,
-    w: A,
-    h: A,
-    landmarks: [(A, A); 6],
+pub struct DetectionFilter<F> {
+    xc: F,
+    yc: F,
+    w: F,
+    h: F,
+    landmarks: [(F, F); 6],
 }
 
-impl<A: Filter<f32> + Clone> DetectionFilter<A> {
-    /// Creates a new detection filter that uses a clone of `filter` for every coordinate.
-    #[allow(unused)] // maybe later
-    fn new(filter: A) -> Self {
+impl<F: Filter<f32> + Clone> DetectionFilter<F> {
+    /// Creates a new detection filter that uses a clone of `filter` to filter every coordinate.
+    pub fn new(filter: F) -> Self {
         Self {
             xc: filter.clone(),
             yc: filter.clone(),
@@ -34,23 +33,26 @@ impl<A: Filter<f32> + Clone> DetectionFilter<A> {
     }
 }
 
-impl<A: Filter<f32>> Filter<RawDetection> for DetectionFilter<A> {
-    fn push(&mut self, det: RawDetection) -> RawDetection {
-        let mut landmarks = det.landmarks;
+impl<F: Filter<f32>> Filter<Detection> for DetectionFilter<F> {
+    fn push(&mut self, det: Detection) -> Detection {
+        let mut landmarks = det.raw.landmarks;
         for (i, lm) in landmarks.iter_mut().enumerate() {
             lm.x = self.landmarks[i].0.push(lm.x);
             lm.y = self.landmarks[i].1.push(lm.y);
         }
 
-        RawDetection {
-            bounding_box: BoundingBox {
-                xc: self.xc.push(det.bounding_box.xc),
-                yc: self.yc.push(det.bounding_box.yc),
-                w: self.w.push(det.bounding_box.w),
-                h: self.h.push(det.bounding_box.h),
+        Detection {
+            full_res: det.full_res,
+            raw: RawDetection {
+                bounding_box: BoundingBox {
+                    xc: self.xc.push(det.raw.bounding_box.xc),
+                    yc: self.yc.push(det.raw.bounding_box.yc),
+                    w: self.w.push(det.raw.bounding_box.w),
+                    h: self.h.push(det.raw.bounding_box.h),
+                },
+                landmarks,
+                confidence: det.raw.confidence,
             },
-            landmarks,
-            confidence: det.confidence,
         }
     }
 
