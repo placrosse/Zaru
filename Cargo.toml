@@ -29,5 +29,9 @@ nalgebra = "0.31.0"
 [dev-dependencies]
 rayon = "1.5.1"
 
+[profile.dev]
+debug = 0
+
 [profile.release]
 incremental = true
+opt-level = 2
