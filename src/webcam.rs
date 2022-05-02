@@ -3,7 +3,7 @@
 //! Currently, only V4L2 `VIDEO_CAPTURE` devices yielding JFIF JPEG or Motion JPEG frames are
 //! supported.
 
-use livid::{
+use linuxvideo::{
     format::{PixFormat, Pixelformat},
     stream::ReadStream,
     CapabilityFlags, Device,
@@ -26,7 +26,7 @@ impl Webcam {
     /// This function can block for a significant amount of time while the webcam initializes (on
     /// the order of hundreds of milliseconds).
     pub fn open() -> Result<Self, crate::Error> {
-        for res in livid::list()? {
+        for res in linuxvideo::list()? {
             match res {
                 Ok(dev) => match Self::open_impl(dev) {
                     Ok(Some(webcam)) => return Ok(webcam),
@@ -67,7 +67,7 @@ impl Webcam {
 
         log::debug!("opened {}, format {:?}", path.display(), format);
 
-        let actual = capture.set_frame_interval(livid::Fract::new(1, 200))?;
+        let actual = capture.set_frame_interval(linuxvideo::Fract::new(1, 200))?;
         log::debug!("set frame interval to {}", actual);
         let stream = capture.into_stream(2)?;
 

@@ -1050,6 +1050,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "linuxvideo"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "log",
+ "nix 0.24.1",
+]
+
+[[package]]
 name = "liquid"
 version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1105,15 +1114,6 @@ dependencies = [
  "regex",
  "time",
  "unicode-segmentation",
-]
-
-[[package]]
-name = "livid"
-version = "0.1.0"
-dependencies = [
- "bitflags",
- "log",
- "nix 0.23.1",
 ]
 
 [[package]]
@@ -1425,12 +1425,11 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.23.1"
+version = "0.24.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f866317acbd3a240710c63f065ffb1e4fd466259045ccb504130b7f668f35c6"
+checksum = "8f17df307904acd05aa8e32e97bb20f2a0df1728bbc2d771ae8f9a90463441e9"
 dependencies = [
  "bitflags",
- "cc",
  "cfg-if 1.0.0",
  "libc",
  "memoffset",
@@ -2807,7 +2806,7 @@ dependencies = [
  "env_logger",
  "image",
  "itertools",
- "livid",
+ "linuxvideo",
  "log",
  "mozjpeg",
  "naga",

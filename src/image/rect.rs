@@ -215,6 +215,7 @@ impl Rect {
         )
     }
 
+    #[must_use]
     pub fn move_by(&self, x: i32, y: i32) -> Rect {
         Rect::from_top_left(self.x() + x, self.y() + y, self.width(), self.height())
     }

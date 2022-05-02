@@ -28,8 +28,6 @@ fn main() -> Result<(), Error> {
 
     let eye_landmark_input_aspect = left_eye_landmarker.input_resolution().aspect_ratio();
 
-    let mut webcam = Webcam::open()?;
-
     let (img_sender, img_recv) = pipeline::channel();
     let (left_eye_img_sender, left_eye_img_recv) = pipeline::channel();
     let (right_eye_img_sender, right_eye_img_recv) = pipeline::channel();
@@ -42,6 +40,14 @@ fn main() -> Result<(), Error> {
             .builder()
             .name("Webcam Decoder".into())
             .spawn(|_| {
+                let mut webcam = match Webcam::open() {
+                    Ok(webcam) => webcam,
+                    Err(e) => {
+                        log::error!("failed to open webcam: {}", e);
+                        return;
+                    }
+                };
+
                 let img_sender = img_sender.activate();
 
                 let _guard = defer(|| log::info!("webcam thread exiting"));

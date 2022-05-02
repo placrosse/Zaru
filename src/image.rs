@@ -22,14 +22,14 @@ const USE_MOZJPEG: bool = true;
 /// An 8-bit sRGB image with alpha channel.
 #[derive(Clone)]
 pub struct Image {
-    // Internal representation is meant to be compatible with wgpu's texture formats. The alpha
-    // channel is otherwise unused and not exposed to the user.
+    // Internal representation is meant to be compatible with wgpu's texture formats for easy GPU
+    // up/downloading.
     pub(crate) buf: RgbaImage,
 }
 
 impl Image {
     /// Loads an image from the filesystem.
-    pub fn load(path: impl AsRef<Path>) -> Result<Self, crate::Error> {
+    pub fn load<A: AsRef<Path>>(path: A) -> Result<Self, crate::Error> {
         let image = image::open(path)?;
         let buf = image.into_rgba8();
 
