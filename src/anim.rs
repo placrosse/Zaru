@@ -13,7 +13,7 @@ use image::{
     AnimationDecoder, Delay, Frame, SubImage,
 };
 
-use crate::image::ImageView;
+use crate::{image::ImageView, Result};
 
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
@@ -31,8 +31,11 @@ impl Animation {
     /// Loads an animation from the filesystem.
     ///
     /// The path must have a supported extension.
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, crate::Error> {
-        let path = path.as_ref();
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::from_path_impl(path.as_ref())
+    }
+
+    fn from_path_impl(path: &Path) -> Result<Self> {
         match path.extension() {
             Some(ext) => {
                 let format = if ext == "gif" {
@@ -54,15 +57,16 @@ impl Animation {
     }
 
     /// Loads a animation from an in-memory byte slice.
-    pub fn from_data(data: &[u8], format: AnimationFormat) -> Result<Self, crate::Error> {
+    pub fn from_data(data: &[u8], format: AnimationFormat) -> Result<Self> {
         Self::from_reader(data, format)
     }
 
     /// Loads a animation from a [`BufRead`] implementor.
-    pub fn from_reader<R: BufRead>(
-        reader: R,
-        format: AnimationFormat,
-    ) -> Result<Self, crate::Error> {
+    pub fn from_reader<R: BufRead>(mut reader: R, format: AnimationFormat) -> Result<Self> {
+        Self::from_reader_impl(&mut reader, format)
+    }
+
+    fn from_reader_impl(reader: &mut dyn BufRead, format: AnimationFormat) -> Result<Self> {
         let frames = match format {
             AnimationFormat::Gif => GifDecoder::new(reader)?.into_frames().collect_frames()?,
             AnimationFormat::Apng => {

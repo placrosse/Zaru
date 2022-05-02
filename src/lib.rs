@@ -24,6 +24,7 @@ pub mod timer;
 pub mod webcam;
 
 pub type Error = Box<dyn std::error::Error + Sync + Send>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Detection, registration and recognition of human faces.
 pub mod face {
