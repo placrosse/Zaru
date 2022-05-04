@@ -73,6 +73,7 @@ impl Cnn {
     }
 
     pub fn set_color_map(&mut self, map: fn(u8) -> f32) {
+        // FIXME: channels aren't always equal, so replace this with map from `Color` to `[f32; 3]`
         self.color_map = map;
     }
 
@@ -82,15 +83,15 @@ impl Cnn {
         self.input_res
     }
 
-    /// Runs network inference on the given input image.
+    /// Runs the network on an input image, returning the estimated outputs.
     ///
     /// The image's resolution must match the CNN's [`input_resolution`][Self::input_resolution],
     /// otherwise this method will panic.
-    pub fn infer<V: AsImageView>(&self, image: &V) -> Result<Outputs, Error> {
-        self.infer_impl(image.as_view())
+    pub fn estimate<V: AsImageView>(&self, image: &V) -> Result<Outputs, Error> {
+        self.estimate_impl(image.as_view())
     }
 
-    fn infer_impl(&self, image: ImageView<'_>) -> Result<Outputs, Error> {
+    fn estimate_impl(&self, image: ImageView<'_>) -> Result<Outputs, Error> {
         assert_eq!(
             image.resolution(),
             self.input_resolution(),
@@ -110,7 +111,7 @@ impl Cnn {
             }),
         };
 
-        self.nn.infer(Inputs::single(tensor.into()))
+        self.nn.estimate(Inputs::single(tensor.into()))
     }
 }
 
@@ -163,6 +164,7 @@ pub(crate) fn point_to_img(x: f32, y: f32, full_res: &Resolution) -> (i32, i32) 
 /// - `C` is the number of color channels, often 3 for RGB inputs.
 /// - `H` and `W` are the height and width of the input, respectively.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive] // shouldn't be matched on by user code
 pub enum CnnInputShape {
     /// Shape is `(N, C, H, W)`.
     NCHW,
@@ -218,8 +220,12 @@ impl NeuralNetwork {
         }
     }
 
-    /// Runs an inference pass on the given input tensors.
-    pub fn infer(&self, inputs: Inputs) -> Result<Outputs, Error> {
+    /// Runs the network on a set of inputs, returning the estimated outputs.
+    ///
+    /// Other libraries call this step "infer", but that is inaccurate as it sounds much too logical
+    /// for what neural networks are actually capable of, so Zaru calls it `estimate` instead.
+    #[doc(alias = "infer")]
+    pub fn estimate(&self, inputs: Inputs) -> Result<Outputs, Error> {
         let outputs = self.inner.run(inputs.inner)?;
 
         Ok(Outputs { inner: outputs })

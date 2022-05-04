@@ -76,7 +76,7 @@ impl EyeLandmarker {
             resized = self.t_resize.time(|| image.aspect_aware_resize(input_res));
             image = resized.as_view();
         }
-        let result = self.t_infer.time(|| self.model.infer(&image)).unwrap();
+        let result = self.t_infer.time(|| self.model.estimate(&image)).unwrap();
         log::trace!("inference result: {:?}", result);
 
         self.result_buf.full_res = full_res;

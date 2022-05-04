@@ -83,7 +83,7 @@ fn main() -> Result<(), zaru::Error> {
                 let face = image
                     .view(&rect)
                     .aspect_aware_resize(cnn.input_resolution());
-                let out = cnn.infer(&face).unwrap();
+                let out = cnn.estimate(&face).unwrap();
                 let f = out[0].as_slice::<f32>().unwrap();
                 let emb = Embedding {
                     raw: f.try_into().unwrap(),

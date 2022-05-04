@@ -26,6 +26,8 @@ fn main() -> Result<(), zaru::Error> {
                 .bounding_rect_raw()
                 .grow_rel(0.4, 0.4, 0.4, 0.4)
                 .grow_to_fit_aspect(current_frame.image_view().resolution().aspect_ratio());
+            // FIXME: because `view_mut` auto-crops `dest_rect`, the resulting view might have a
+            // different aspect ratio than `dest_rect` and stretch the overlay weirdly.
             let mut dest = image.view_mut(&dest_rect);
             dest.blend_from(current_frame.image_view());
         }

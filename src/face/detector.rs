@@ -114,7 +114,7 @@ impl Detector {
                 .time(|| image.aspect_aware_resize(self.model.input_resolution()));
             image = resized.as_view();
         }
-        let result = self.t_infer.time(|| self.model.infer(&image)).unwrap();
+        let result = self.t_infer.time(|| self.model.estimate(&image)).unwrap();
         log::trace!("inference result: {:?}", result);
 
         self.t_filter.time(|| {
