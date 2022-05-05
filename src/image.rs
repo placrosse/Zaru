@@ -1,8 +1,28 @@
 //! Image manipulation.
+//!
+//! # TODO
+//!
+//! ## View Clipping is problematic
+//!
+//! `view` and `view_mut` will clip the passed rectangle if it's partially outside the base view,
+//! and return a zero-size view if it's completely outside. This is a problem if the caller doesn't
+//! expect this. For example, the caller might then `blend` another image onto the view, or `blend`
+//! the view onto some other image, which will resize it if the view has an unexpected size.
+//! Alternative solutions:
+//!
+//! - Panic when the rectangle isn't completely inside the base view. This was the old behavior. It
+//!   didn't work well because detection boxes are *typically* within the image, but sometimes
+//!   aren't, and getting a panic only for edge cases you don't typically encounter is bad.
+//! - Return `Option<_>`. This leaves it to the caller to handle the clipping.
+//! - Always return a view of the requested size, but without backing data for any pixel outside
+//!   the base view (ie. have writes ignored and return 0 on read).
 
 mod blend;
 mod draw;
 mod rect;
+
+#[cfg(test)]
+mod tests;
 
 use std::{fmt, ops::Index, path::Path};
 
@@ -527,6 +547,24 @@ impl Color {
     #[inline]
     pub fn a(&self) -> u8 {
         self.0[3]
+    }
+
+    pub fn with_alpha(mut self, a: u8) -> Color {
+        self.0[3] = a;
+        self
+    }
+}
+
+impl fmt::Debug for Color {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "#{:02x}{:02x}{:02x}{:02x}",
+            self.r(),
+            self.g(),
+            self.b(),
+            self.a(),
+        )
     }
 }
 

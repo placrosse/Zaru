@@ -140,7 +140,7 @@ impl LinearColor {
 
         let (r, g, b, a) = (self.r(), self.g(), self.b(), self.a());
         let (r, g, b) = (to_srgb(r), to_srgb(g), to_srgb(b));
-        let (r, g, b, a) = (r * 255.0, g * 255.0, b * 255.0, a * 255.0);
+        let (r, g, b, a) = (r * 255.0 + 0.5, g * 255.0 + 0.5, b * 255.0 + 0.5, a * 255.0 + 0.5);
         let (r, g, b, a) = (r as u8, g as u8, b as u8, a as u8);
 
         Color([r, g, b, a])

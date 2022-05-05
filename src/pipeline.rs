@@ -252,8 +252,11 @@ mod tests {
     }
 
     #[test]
-    fn worker_propagates_panic_on_send() {
+    fn worker_does_not_propagate_panic_on_send() {
         let mut worker = Worker::spawn("panic", |_| silent_panic("worker panic".into())).unwrap();
-        catch_unwind(AssertUnwindSafe(|| worker.send(()))).unwrap_err();
+        catch_unwind(AssertUnwindSafe(|| worker.send(())))
+            .unwrap()
+            .unwrap_err();
+        catch_unwind(AssertUnwindSafe(|| drop(worker))).unwrap_err();
     }
 }
