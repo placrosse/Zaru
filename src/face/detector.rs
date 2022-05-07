@@ -119,15 +119,17 @@ impl Detector {
 
         self.t_filter.time(|| {
             let boxes = &result[0];
+            let confidences = &result[1];
 
-            let conf = result[1].as_slice::<f32>().unwrap();
-            for (index, &conf) in conf.iter().enumerate() {
+            assert_eq!(confidences.shape(), &[1, 896, 1]);
+            for (index, view) in confidences.index([0]).iter().enumerate() {
+                let conf = view.as_slice()[0];
                 if conf < CONTRIB_THRESH {
                     continue;
                 }
 
-                let tensor_view = boxes.view_at_prefix(&[0, index]).unwrap();
-                let box_params = &tensor_view.as_slice::<f32>().unwrap()[..16];
+                let tensor_view = boxes.index([0, index]);
+                let box_params = &tensor_view.as_slice()[..16];
                 self.raw_detections.push(RawDetection::extract(
                     &self.anchors[index],
                     box_params,

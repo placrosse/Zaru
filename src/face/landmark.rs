@@ -93,9 +93,9 @@ impl Landmarker {
         let result = self.t_infer.time(|| self.model.estimate(&image)).unwrap();
         log::trace!("inference result: {:?}", result);
 
-        self.result_buffer.face_flag = result[1].as_slice::<f32>().unwrap()[0];
+        self.result_buffer.face_flag = result[1].index([0, 0, 0, 0]).as_singular();
         for (coords, out) in zip_exact(
-            result[0].as_slice::<f32>().unwrap().chunks(3),
+            result[0].index([0, 0, 0]).as_slice().chunks(3),
             &mut self.result_buffer.landmarks.positions,
         ) {
             out.0 = coords[0];

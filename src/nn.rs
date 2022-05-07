@@ -1,16 +1,16 @@
 //! Neural Network inference.
 
+pub mod tensor;
+
+use tensor::Tensor;
+
 use std::{
     ops::{Index, Range},
     path::Path,
-    sync::Arc,
 };
 
-use tract_onnx::{
-    prelude::{
-        tvec, Framework, Graph, InferenceModelExt, SimplePlan, TVec, Tensor, TypedFact, TypedOp,
-    },
-    tract_hir::tract_ndarray::Array4,
+use tract_onnx::prelude::{
+    tvec, Framework, Graph, InferenceModelExt, SimplePlan, TVec, TypedFact, TypedOp,
 };
 
 use crate::{
@@ -103,15 +103,15 @@ impl Cnn {
             self.input_res.width() as usize,
         );
         let tensor = match self.shape {
-            CnnInputShape::NCHW => Array4::from_shape_fn((1, 3, h, w), |(_, c, y, x)| {
+            CnnInputShape::NCHW => Tensor::from_array_shape_fn([1, 3, h, w], |[_, c, y, x]| {
                 (self.color_map)(image.get(x as _, y as _)[c])
             }),
-            CnnInputShape::NHWC => Array4::from_shape_fn((1, h, w, 3), |(_, y, x, c)| {
+            CnnInputShape::NHWC => Tensor::from_array_shape_fn([1, h, w, 3], |[_, y, x, c]| {
                 (self.color_map)(image.get(x as _, y as _)[c])
             }),
         };
 
-        self.nn.estimate(Inputs::single(tensor.into()))
+        self.nn.estimate(Inputs::single(tensor))
     }
 }
 
@@ -226,7 +226,13 @@ impl NeuralNetwork {
     /// for what neural networks are actually capable of, so Zaru calls it `estimate` instead.
     #[doc(alias = "infer")]
     pub fn estimate(&self, inputs: Inputs) -> Result<Outputs, Error> {
-        let outputs = self.inner.run(inputs.inner)?;
+        let outputs = self
+            .inner
+            .run(inputs.inner.into_iter().map(|t| t.to_tract()).collect())?;
+        let outputs = outputs
+            .into_iter()
+            .map(|tract| Tensor::from_tract(&tract))
+            .collect();
 
         Ok(Outputs { inner: outputs })
     }
@@ -279,7 +285,7 @@ impl<'a> InputInfo<'a> {
 /// This is a list of tensors corresponding to the network's output nodes.
 #[derive(Debug)]
 pub struct Outputs {
-    inner: TVec<Arc<Tensor>>,
+    inner: TVec<Tensor>,
 }
 
 impl Outputs {
@@ -299,8 +305,8 @@ impl Outputs {
 impl Index<usize> for Outputs {
     type Output = Tensor;
 
-    fn index(&self, index: usize) -> &Self::Output {
-        &*self.inner[index]
+    fn index(&self, index: usize) -> &Tensor {
+        &self.inner[index]
     }
 }
 
@@ -315,14 +321,14 @@ impl<'a> IntoIterator for &'a Outputs {
 
 /// Iterator over a list of output tensors.
 pub struct OutputIter<'a> {
-    inner: std::slice::Iter<'a, Arc<Tensor>>,
+    inner: std::slice::Iter<'a, Tensor>,
 }
 
 impl<'a> Iterator for OutputIter<'a> {
     type Item = &'a Tensor;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|arc| &**arc)
+        self.inner.next()
     }
 }
 

@@ -78,10 +78,12 @@ impl EyeLandmarker {
         }
         let result = self.t_infer.time(|| self.model.estimate(&image)).unwrap();
         log::trace!("inference result: {:?}", result);
+        let eye_contour = &result[0];
+        let iris_contour = &result[1];
 
         self.result_buf.full_res = full_res;
         for (coords, (out_x, out_y)) in zip_exact(
-            result[0].as_slice::<f32>().unwrap().chunks(3), // x, y, and z coordinates
+            eye_contour.index([0]).as_slice().chunks(3), // x, y, and z coordinates
             &mut self.result_buf.eye_contour,
         ) {
             let (x, y) = (coords[0], coords[1]);
@@ -93,7 +95,7 @@ impl EyeLandmarker {
         }
 
         for (coords, (out_x, out_y)) in zip_exact(
-            result[1].as_slice::<f32>().unwrap().chunks(3), // x, y, and z coordinates
+            iris_contour.index([0]).as_slice().chunks(3), // x, y, and z coordinates
             &mut self.result_buf.iris_contour,
         ) {
             let (x, y) = (coords[0], coords[1]);

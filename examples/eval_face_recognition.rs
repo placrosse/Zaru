@@ -84,7 +84,8 @@ fn main() -> Result<(), zaru::Error> {
                     .view(&rect)
                     .aspect_aware_resize(cnn.input_resolution());
                 let out = cnn.estimate(&face).unwrap();
-                let f = out[0].as_slice::<f32>().unwrap();
+                let view = out[0].index([0]);
+                let f = view.as_slice();
                 let emb = Embedding {
                     raw: f.try_into().unwrap(),
                 };
