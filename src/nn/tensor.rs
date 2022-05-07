@@ -1,3 +1,12 @@
+//! Tensor API.
+//!
+//! Tensors are the inputs and outputs of neural networks. They can encode image data, text, or
+//! other inputs and outputs, though Zaru deals mainly with images at the moment.
+//!
+//! A Tensor is nothing more than an N-dimensional array. The term *Tensor* is mathematical and
+//! describes a generalization of scalars, vectors, and matrices with an arbitrary number of
+//! dimensions.
+
 use std::fmt;
 
 use tinyvec::TinyVec;
@@ -27,6 +36,10 @@ impl Layout {
 
     fn shape(&self) -> &[usize] {
         &self.0[..self.0.len() / 2]
+    }
+
+    fn elements(&self) -> usize {
+        self.shape().iter().product()
     }
 
     fn strides(&self) -> &[usize] {
@@ -108,10 +121,26 @@ impl<S: AsRef<[usize]>, B: AsMut<[usize]>> ShapeIndices<S, B> {
 
 /// A dynamically sized tensor.
 ///
+/// Currently, Zaru's tensors always use `f32` as the element type, since that is what the neural
+/// networks I'm interested in use.
+///
 /// # Construction
 ///
 /// A tensor can either be created via the provided `From` impls (from singular values and
-/// 1-dimensional arrays and slices), or by calling
+/// 1-dimensional arrays and slices), or by calling one of the `from_*` constructor methods.
+///
+/// # Data Access
+///
+/// Through [`Tensor::index`] it is possible to create a [`TensorView`] that refers to a specific
+/// suffix of a tensor. Additionally, the data in one-dimensional tensors and views can be accessed
+/// by calling [`Tensor::as_slice`] or [`TensorView::as_slice`], respectively, and the data in
+/// zero-dimentional tensors and views can be accessed by calling [`Tensor::as_singular`] and
+/// [`TensorView::as_singular`], respectively.
+///
+/// There is also a [`Tensor::iter`] / [`TensorView::iter`] method for iterating over the sub-views
+/// you get by indexing into the outermost dimension.
+///
+/// Together, these mechanisms allow you to access any data in a tensor.
 #[derive(Clone)]
 pub struct Tensor {
     layout: Layout,
@@ -145,14 +174,28 @@ impl Tensor {
 
     /// Creates a tensor with a dynamic number of dimensions.
     pub fn from_dyn_shape_fn<F: FnMut(&[usize]) -> f32>(shape: &[usize], mut f: F) -> Self {
+        let layout = Layout::from_shape(shape);
         let buf = vec![0; shape.len()];
         let indices = ShapeIndices::new(shape, buf);
-        let mut data = Vec::with_capacity(shape.iter().product());
+        let mut data = Vec::with_capacity(layout.elements());
         indices.fold((), |(), indices| data.push(f(indices)));
         Self {
-            layout: Layout::from_shape(shape),
+            layout,
             data: data.into_boxed_slice(),
         }
+    }
+
+    /// Creates a tensor of the given shape by pulling elements from an iterator.
+    ///
+    /// # Panics
+    ///
+    /// `iter` must yield exactly as many elements as specified by `shape` (by multiplying all of
+    /// its entries), otherwise this method will panic.
+    pub fn from_iter<I: IntoIterator<Item = f32>>(shape: &[usize], iter: I) -> Self {
+        let layout = Layout::from_shape(shape);
+        let data: Box<_> = iter.into_iter().collect();
+        assert_eq!(data.len(), layout.elements());
+        Self { layout, data }
     }
 
     pub(super) fn from_tract(tract: &tract_onnx::prelude::Tensor) -> Self {
@@ -512,8 +555,8 @@ mod tests {
 
     #[test]
     fn index_2d_elems() {
-        let mut iter = [[0.0, 1.0], [2.0, 3.0]].into_iter().flatten();
-        let tensor = Tensor::from_array_shape_fn([2, 2], |_| iter.next().unwrap());
+        let iter = [[0.0, 1.0], [2.0, 3.0]].into_iter().flatten();
+        let tensor = Tensor::from_iter(&[2, 2], iter);
         assert_eq!(tensor.shape(), [2, 2]);
 
         let row0 = tensor.index([0]);
