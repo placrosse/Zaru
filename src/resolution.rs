@@ -23,6 +23,7 @@ impl Resolution {
         height: 720,
     };
 
+    #[track_caller]
     pub fn new(width: u32, height: u32) -> Self {
         assert!(
             width != 0 && height != 0,

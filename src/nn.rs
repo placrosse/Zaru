@@ -3,6 +3,7 @@
 pub mod tensor;
 
 use tensor::Tensor;
+use wonnx::utils::{InputTensor, OutputTensor};
 
 use std::{
     ops::{Index, Range},
@@ -175,6 +176,7 @@ pub enum CnnInputShape {
 /// A neural network that can be used for inference.
 pub struct NeuralNetwork {
     inner: Model,
+    gpu: Option<wonnx::Session>,
 }
 
 impl NeuralNetwork {
@@ -191,18 +193,31 @@ impl NeuralNetwork {
             _ => return Err(format!("neural network path must have `.onnx` extension").into()),
         }
 
-        let graph = tract_onnx::onnx().model_for_path(path)?;
-        let model = graph.into_optimized()?.into_runnable()?;
-
-        Ok(Self { inner: model })
+        let model_data = std::fs::read(path)?;
+        Self::from_onnx(&model_data)
     }
 
     /// Loads a pre-trained model from an in-memory ONNX file.
-    pub fn from_onnx(mut raw: &[u8]) -> Result<Self, Error> {
-        let graph = tract_onnx::onnx().model_for_read(&mut raw)?;
+    pub fn from_onnx(raw: &[u8]) -> Result<Self, Error> {
+        let graph = tract_onnx::onnx().model_for_read(&mut &*raw)?;
         let model = graph.into_optimized()?.into_runnable()?;
 
-        Ok(Self { inner: model })
+        let gpu = match pollster::block_on(wonnx::Session::from_bytes(raw)) {
+            Ok(_gpu) => {
+                // FIXME: reenable GPU support once it's no longer broken
+                log::debug!(
+                    "no GPU support for this network; wonnx supports the model, but it has \
+                    been disabled as it produces incorrect results"
+                );
+                None
+            }
+            Err(e) => {
+                log::debug!("no GPU support for this network; reason: {}", e);
+                None
+            }
+        };
+
+        Ok(Self { inner: model, gpu })
     }
 
     /// Returns the number of input nodes of the network.
@@ -210,7 +225,12 @@ impl NeuralNetwork {
         self.inner.model().inputs.len()
     }
 
-    /// Returns an iterator over the network's inputs.
+    /// Returns the number of output nodes of the network.
+    pub fn num_outputs(&self) -> usize {
+        self.inner.model().outputs.len()
+    }
+
+    /// Returns an iterator over the network's input node information.
     ///
     /// To perform inference, a matching input tensor has to be provided for each input.
     pub fn inputs(&self) -> InputInfoIter<'_> {
@@ -220,21 +240,59 @@ impl NeuralNetwork {
         }
     }
 
+    /// Returns an iterator over the network's output node information.
+    pub fn outputs(&self) -> OutputInfoIter<'_> {
+        OutputInfoIter {
+            net: self,
+            ids: 0..self.num_outputs(),
+        }
+    }
+
     /// Runs the network on a set of inputs, returning the estimated outputs.
     ///
     /// Other libraries call this step "infer", but that is inaccurate as it sounds much too logical
     /// for what neural networks are actually capable of, so Zaru calls it `estimate` instead.
     #[doc(alias = "infer")]
     pub fn estimate(&self, inputs: Inputs) -> Result<Outputs, Error> {
-        let outputs = self
-            .inner
-            .run(inputs.inner.into_iter().map(|t| t.to_tract()).collect())?;
-        let outputs = outputs
-            .into_iter()
-            .map(|tract| Tensor::from_tract(&tract))
-            .collect();
+        let outputs = match &self.gpu {
+            Some(gpu) => {
+                let inputs = self
+                    .inputs()
+                    .zip(inputs.inner.iter())
+                    .map(|(info, tensor)| {
+                        let name = info.name().to_string();
+                        let input = InputTensor::F32(tensor.as_raw_data().into());
+                        (name, input)
+                    })
+                    .collect();
 
-        Ok(Outputs { inner: outputs })
+                let output_map = pollster::block_on(gpu.run(&inputs))?;
+                let mut outputs = TVec::new();
+                for info in self.outputs() {
+                    let tensor = &output_map[&*info.name()];
+                    match tensor {
+                        OutputTensor::F32(tensor) => {
+                            outputs.push(Tensor::from_iter(info.shape(), tensor.iter().copied()));
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+
+                Outputs { inner: outputs }
+            }
+            None => {
+                let outputs = self
+                    .inner
+                    .run(inputs.inner.into_iter().map(|t| t.to_tract()).collect())?;
+                let outputs = outputs
+                    .into_iter()
+                    .map(|tract| Tensor::from_tract(&tract))
+                    .collect();
+                Outputs { inner: outputs }
+            }
+        };
+
+        Ok(outputs)
     }
 }
 
@@ -250,18 +308,17 @@ impl<'a> Iterator for InputInfoIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let id = self.ids.next()?;
 
-        let fact = self
-            .net
-            .inner
-            .model()
-            .input_fact(id)
-            .expect("`input_fact` returned error");
+        let model = &self.net.inner.model();
+        let fact = model.input_fact(id).expect("`input_fact` returned error");
+
+        let node = model.input_outlets().unwrap()[id].node;
 
         Some(InputInfo {
             shape: fact.shape.as_concrete().expect(
                 "symbolic network input shape, this makes no \
                 sense, by which I mean I don't understand what this means",
             ),
+            name: &model.node(node).name,
         })
     }
 }
@@ -270,6 +327,7 @@ impl<'a> Iterator for InputInfoIter<'a> {
 #[derive(Debug)]
 pub struct InputInfo<'a> {
     shape: &'a [usize],
+    name: &'a str,
 }
 
 impl<'a> InputInfo<'a> {
@@ -277,6 +335,60 @@ impl<'a> InputInfo<'a> {
     #[inline]
     pub fn shape(&self) -> &[usize] {
         self.shape
+    }
+
+    /// Returns the name of this input.
+    #[inline]
+    pub fn name(&self) -> &str {
+        self.name
+    }
+}
+
+/// Iterator over a [`NeuralNetwork`]s output node information.
+pub struct OutputInfoIter<'a> {
+    net: &'a NeuralNetwork,
+    ids: Range<usize>,
+}
+
+impl<'a> Iterator for OutputInfoIter<'a> {
+    type Item = OutputInfo<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let id = self.ids.next()?;
+
+        let model = &self.net.inner.model();
+        let fact = model.output_fact(id).expect("`output_fact` returned error");
+
+        let node = model.output_outlets().unwrap()[id].node;
+
+        Some(OutputInfo {
+            shape: fact.shape.as_concrete().expect(
+                "symbolic network output shape, this makes no \
+                sense, by which I mean I don't understand what this means",
+            ),
+            name: &model.node(node).name,
+        })
+    }
+}
+
+/// Information about a neural network output node.
+#[derive(Debug)]
+pub struct OutputInfo<'a> {
+    shape: &'a [usize],
+    name: &'a str,
+}
+
+impl<'a> OutputInfo<'a> {
+    /// Returns the tensor shape for this output.
+    #[inline]
+    pub fn shape(&self) -> &[usize] {
+        self.shape
+    }
+
+    /// Returns the name of this output.
+    #[inline]
+    pub fn name(&self) -> &str {
+        self.name
     }
 }
 

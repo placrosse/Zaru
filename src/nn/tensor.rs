@@ -207,11 +207,15 @@ impl Tensor {
         tract_onnx::prelude::Tensor::from_shape(self.shape(), &self.data).unwrap()
     }
 
+    pub(super) fn as_raw_data(&self) -> &[f32] {
+        &self.data
+    }
+
     /// Returns the shape of this tensor.
     ///
     /// A tensor's shape is the number of entries in each dimension.
     pub fn shape(&self) -> &[usize] {
-        &self.layout.shape()
+        self.layout.shape()
     }
 
     /// Returns the number of dimensions of this tensor.
@@ -441,6 +445,9 @@ impl fmt::Debug for TensorView<'_> {
 mod tests {
     use super::*;
 
+    // `as &[usize]` casts courtesy of using `serde_json` as a transitive dependency and the fact
+    // that Rust has some utterly devastating design flaws that are nothing but embarrassing.
+
     #[test]
     fn from_shape_fn() {
         let indices = [
@@ -491,12 +498,12 @@ mod tests {
             1.0
         });
         assert_eq!(hits, 1);
-        assert_eq!(tensor.shape(), &[]);
+        assert_eq!(tensor.shape(), &[] as &[usize]);
         assert_eq!(tensor.rank(), 0);
         assert_eq!(tensor.as_singular(), 1.0);
 
         let view = tensor.index([]);
-        assert_eq!(view.shape(), &[]);
+        assert_eq!(view.shape(), &[] as &[usize]);
         assert_eq!(view.rank(), 0);
         assert_eq!(view.as_singular(), 1.0);
     }
@@ -517,7 +524,7 @@ mod tests {
         assert_eq!(view1d.as_slice(), &[1.0]);
 
         let view0d = view1d.index([0]);
-        assert_eq!(view0d.shape(), &[]);
+        assert_eq!(view0d.shape(), &[] as &[usize]);
         assert_eq!(view0d.rank(), 0);
         assert_eq!(view0d.as_singular(), 1.0);
 
@@ -528,7 +535,7 @@ mod tests {
         assert_eq!(view1d.as_slice(), &[1.0]);
 
         let view0d = view1d.index([0]);
-        assert_eq!(view0d.shape(), &[]);
+        assert_eq!(view0d.shape(), &[] as &[usize]);
         assert_eq!(view0d.rank(), 0);
         assert_eq!(view0d.as_singular(), 1.0);
     }
@@ -543,13 +550,13 @@ mod tests {
         assert_eq!(same_array.as_slice(), &[0.0, 1.0, 2.0]);
 
         let first = array.index([0]);
-        assert_eq!(first.shape(), &[]);
+        assert_eq!(first.shape(), &[] as &[usize]);
         assert_eq!(first.as_singular(), 0.0);
         let second = array.index([1]);
-        assert_eq!(second.shape(), &[]);
+        assert_eq!(second.shape(), &[] as &[usize]);
         assert_eq!(second.as_singular(), 1.0);
         let third = array.index([2]);
-        assert_eq!(third.shape(), &[]);
+        assert_eq!(third.shape(), &[] as &[usize]);
         assert_eq!(third.as_singular(), 2.0);
     }
 
