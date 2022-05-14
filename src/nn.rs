@@ -6,6 +6,7 @@ use tensor::Tensor;
 use wonnx::utils::{InputTensor, OutputTensor};
 
 use std::{
+    borrow::Cow,
     ops::{Index, Range},
     path::Path,
 };
@@ -173,6 +174,42 @@ pub enum CnnInputShape {
     NHWC,
 }
 
+/// ONNX network loader.
+pub struct Loader<'a> {
+    model_data: Cow<'a, [u8]>,
+    enable_gpu: bool,
+}
+
+impl<'a> Loader<'a> {
+    /// Instructs the neural network loader to enable GPU support for this network.
+    ///
+    /// If this method is called and the GPU backend does not support the network, [`Loader::load`]
+    /// will return an error.
+    pub fn with_gpu_support(mut self) -> Self {
+        self.enable_gpu = true;
+        self
+    }
+
+    /// Loads and optimizes the network.
+    ///
+    /// Returns an error if the network data is malformed, if the network data is incomplete, or if
+    /// the network uses unimplemented operations.
+    pub fn load(self) -> Result<NeuralNetwork, Error> {
+        let graph = tract_onnx::onnx().model_for_read(&mut &*self.model_data)?;
+        let model = graph.into_optimized()?.into_runnable()?;
+
+        let gpu = if self.enable_gpu {
+            Some(pollster::block_on(wonnx::Session::from_bytes(
+                &*self.model_data,
+            ))?)
+        } else {
+            None
+        };
+
+        Ok(NeuralNetwork { inner: model, gpu })
+    }
+}
+
 /// A neural network that can be used for inference.
 pub struct NeuralNetwork {
     inner: Model,
@@ -183,41 +220,29 @@ impl NeuralNetwork {
     /// Loads a pre-trained model from an ONNX file path.
     ///
     /// The path must have a `.onnx` extension. In the future, other model formats may be supported.
-    pub fn load(path: impl AsRef<Path>) -> Result<Self, Error> {
-        Self::load_impl(path.as_ref())
+    pub fn from_path<'a, P: AsRef<Path>>(path: P) -> Result<Loader<'a>, Error> {
+        Self::from_path_impl(path.as_ref())
     }
 
-    fn load_impl(path: &Path) -> Result<Self, Error> {
+    fn from_path_impl<'a>(path: &Path) -> Result<Loader<'a>, Error> {
         match path.extension() {
             Some(ext) if ext == "onnx" => {}
-            _ => return Err(format!("neural network path must have `.onnx` extension").into()),
+            _ => return Err(format!("neural network file must have `.onnx` extension").into()),
         }
 
         let model_data = std::fs::read(path)?;
-        Self::from_onnx(&model_data)
+        Ok(Loader {
+            model_data: model_data.into(),
+            enable_gpu: false,
+        })
     }
 
     /// Loads a pre-trained model from an in-memory ONNX file.
-    pub fn from_onnx(raw: &[u8]) -> Result<Self, Error> {
-        let graph = tract_onnx::onnx().model_for_read(&mut &*raw)?;
-        let model = graph.into_optimized()?.into_runnable()?;
-
-        let gpu = match pollster::block_on(wonnx::Session::from_bytes(raw)) {
-            Ok(_gpu) => {
-                // FIXME: reenable GPU support once it's no longer broken
-                log::debug!(
-                    "no GPU support for this network; wonnx supports the model, but it has \
-                    been disabled as it produces incorrect results"
-                );
-                None
-            }
-            Err(e) => {
-                log::debug!("no GPU support for this network; reason: {}", e);
-                None
-            }
-        };
-
-        Ok(Self { inner: model, gpu })
+    pub fn from_onnx(raw: &[u8]) -> Result<Loader<'_>, Error> {
+        Ok(Loader {
+            model_data: raw.into(),
+            enable_gpu: false,
+        })
     }
 
     /// Returns the number of input nodes of the network.

@@ -25,7 +25,10 @@ const MODEL_DATA: &[u8] = include_bytes!(concat!(
 
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
     Cnn::new(
-        NeuralNetwork::from_onnx(MODEL_DATA).unwrap(),
+        NeuralNetwork::from_onnx(MODEL_DATA)
+            .unwrap()
+            .load()
+            .unwrap(),
         CnnInputShape::NCHW,
     )
     .unwrap()

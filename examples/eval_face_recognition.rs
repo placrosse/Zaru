@@ -45,7 +45,7 @@ impl Embedding {
 fn main() -> Result<(), zaru::Error> {
     let face_dir = std::env::args_os().skip(1).next().unwrap();
 
-    let nn = NeuralNetwork::load("3rdparty/onnx/mobilefacenet.onnx")?;
+    let nn = NeuralNetwork::from_path("3rdparty/onnx/mobilefacenet.onnx")?.load()?;
     let cnn = Cnn::new(nn, CnnInputShape::NCHW)?;
     let target_aspect = cnn.input_resolution().aspect_ratio();
 
