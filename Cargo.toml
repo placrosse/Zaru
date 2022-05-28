@@ -36,6 +36,7 @@ bytemuck = { version = "1.7.3", features = ["derive"] }
 
 [dev-dependencies]
 rayon = "1.5.1"
+fastrand = "1.7.0"
 
 [profile.dev]
 debug = 0

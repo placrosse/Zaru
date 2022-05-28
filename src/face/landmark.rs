@@ -167,6 +167,42 @@ impl LandmarkResult {
     pub fn face_confidence(&self) -> f32 {
         self.face_flag
     }
+
+    /// Returns a [`Rect`] containing the left eye.
+    pub fn left_eye(&self) -> Rect {
+        Rect::bounding(
+            [
+                LandmarkIdx::LeftEyeBottom,
+                LandmarkIdx::LeftEyeLeftCorner,
+                LandmarkIdx::LeftEyeRightCorner,
+                LandmarkIdx::LeftEyeTop,
+            ]
+            .into_iter()
+            .map(|idx| {
+                let pos = self.landmark_position(idx as usize);
+                (pos.0 as i32, pos.1 as i32)
+            }),
+        )
+        .unwrap()
+    }
+
+    /// Returns a [`Rect`] containing the right eye.
+    pub fn right_eye(&self) -> Rect {
+        Rect::bounding(
+            [
+                LandmarkIdx::RightEyeBottom,
+                LandmarkIdx::RightEyeLeftCorner,
+                LandmarkIdx::RightEyeRightCorner,
+                LandmarkIdx::RightEyeTop,
+            ]
+            .into_iter()
+            .map(|idx| {
+                let pos = self.landmark_position(idx as usize);
+                (pos.0 as i32, pos.1 as i32)
+            }),
+        )
+        .unwrap()
+    }
 }
 
 /// Raw face landmark positions.
@@ -244,6 +280,10 @@ impl Into<usize> for LandmarkIdx {
 
 /// Uses a [`Landmarker`] to track the position of a face across frames.
 ///
+/// The last known position of the tracked face is remembered across frames, and used to locate it
+/// in the next frame. To start tracking a face, the user has to set the [`TrackedFace`] by calling
+/// [`LandmarkTracker::set_tracked_face`].
+///
 /// This can be used to avoid the jitter from running a [`Detector`] on every frame of a video feed,
 /// in cases where the application would compute the landmarks anyways. If the landmarks aren't
 /// needed, smoothing the detections directly using a [`DetectionFilter`] is probably more efficient.
@@ -258,7 +298,7 @@ pub struct LandmarkTracker {
 }
 
 impl LandmarkTracker {
-    const DEFAULT_TRACKING_LOSS_TRESHOLD: f32 = 10.0;
+    const DEFAULT_TRACKING_LOSS_THRESHOLD: f32 = 10.0;
 
     /// Creates a new landmark tracker which initially does not track a face.
     pub fn new() -> Self {
@@ -267,7 +307,7 @@ impl LandmarkTracker {
             input_aspect: lm.input_resolution().aspect_ratio(),
             lm,
             face: None,
-            loss_thresh: Self::DEFAULT_TRACKING_LOSS_TRESHOLD,
+            loss_thresh: Self::DEFAULT_TRACKING_LOSS_THRESHOLD,
         }
     }
 
@@ -349,10 +389,12 @@ impl<'a> TrackingResult<'a> {
         self.updated_face
     }
 
+    /// Returns the extracted landmarks, relative to `view_rect`.
     pub fn landmarks(&self) -> &LandmarkResult {
         self.landmarks
     }
 
+    /// Returns the rectangle inside the input image that was used to compute the landmarks.
     pub fn view_rect(&self) -> Rect {
         self.view_rect
     }

@@ -211,6 +211,11 @@ impl Image {
         Blend::new(self.as_view_mut(), src.as_view())
     }
 
+    /// Clears the image, setting every pixel value to `color`.
+    pub fn clear(&mut self, color: Color) {
+        self.buf.pixels_mut().for_each(|pix| pix.0 = color.0);
+    }
+
     #[inline]
     pub(crate) fn data(&self) -> &[u8] {
         self.buf.as_raw()

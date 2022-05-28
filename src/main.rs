@@ -4,7 +4,7 @@ use log::LevelFilter;
 use zaru::face::detector::{Detection, Detector};
 use zaru::face::eye::EyeLandmarker;
 use zaru::face::landmark::{self, LandmarkResult, LandmarkTracker, TrackedFace};
-use zaru::image::{AsImageView, Color, Image, ImageView, ImageViewMut, Rect};
+use zaru::image::{AsImageView, Color, Image, ImageView, ImageViewMut};
 use zaru::num::TotalF32;
 use zaru::procrustes::ProcrustesAnalyzer;
 use zaru::resolution::AspectRatio;
@@ -277,31 +277,8 @@ fn extract_eye_images(
     lm: &LandmarkResult,
     target_aspect: AspectRatio,
 ) -> (Image, Image) {
-    use landmark::LandmarkIdx::*;
-
-    let left = [
-        LeftEyeLeftCorner,
-        LeftEyeRightCorner,
-        LeftEyeBottom,
-        LeftEyeTop,
-    ];
-    let right = [
-        RightEyeLeftCorner,
-        RightEyeRightCorner,
-        RightEyeBottom,
-        RightEyeTop,
-    ];
-
-    let left = Rect::bounding(left.into_iter().map(|idx| {
-        let (x, y, _z) = lm.landmark_position(idx.into());
-        (x as i32, y as i32)
-    }))
-    .unwrap();
-    let right = Rect::bounding(right.into_iter().map(|idx| {
-        let (x, y, _z) = lm.landmark_position(idx.into());
-        (x as i32, y as i32)
-    }))
-    .unwrap();
+    let left = lm.left_eye();
+    let right = lm.right_eye();
 
     const MARGIN: f32 = 0.9;
     let left = left
