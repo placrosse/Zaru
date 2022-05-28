@@ -23,8 +23,8 @@ fn main() -> Result<(), zaru::Error> {
         LevelFilter::Debug
     };
     env_logger::Builder::new()
-    .filter(Some(env!("CARGO_CRATE_NAME")), log_level)
-    .filter(Some(env!("CARGO_PKG_NAME")), log_level)
+        .filter(Some(env!("CARGO_CRATE_NAME")), log_level)
+        .filter(Some(env!("CARGO_PKG_NAME")), log_level)
         .filter(Some("wgpu"), LevelFilter::Warn)
         .init();
 
@@ -44,9 +44,9 @@ fn main() -> Result<(), zaru::Error> {
 
     let mut fps = FpsCounter::new("FPS");
     let mut blit_timer = Timer::new("blit");
-    let webcam = Webcam::open()?;
-    for result in webcam {
-        let image = result?;
+    let mut webcam = Webcam::open()?;
+    loop {
+        let image = webcam.read()?;
 
         if tracker.tracked_face().is_none() {
             if let Some(det) = detector
@@ -91,14 +91,12 @@ fn main() -> Result<(), zaru::Error> {
             gui::show_image("biblical accuracy", &canvas);
 
             fps.tick_with(
-                tracker
-                    .landmarker()
+                webcam
                     .timers()
                     .into_iter()
+                    .chain(tracker.landmarker().timers())
                     .chain([&blit_timer]),
             );
         }
     }
-
-    Ok(())
 }

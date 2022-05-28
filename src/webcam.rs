@@ -46,13 +46,12 @@ impl Webcam {
 
     fn open_impl(dev: Device) -> Result<Option<Self>, crate::Error> {
         let caps = dev.capabilities()?.device_capabilities();
-        log::debug!("device capabilities: {:?}", caps);
+        let path = dev.path()?;
+        log::debug!("device {} capabilities: {:?}", path.display(), caps);
 
         if !caps.contains(CapabilityFlags::VIDEO_CAPTURE) {
             return Ok(None);
         }
-
-        let path = dev.path()?;
 
         // TODO do actual format negotiation
         let capture = dev.video_capture(PixFormat::new(1920, 1080, Pixelformat::MJPG))?;
@@ -65,10 +64,16 @@ impl Webcam {
             e => return Err(format!("unsupported pixel format {}", e).into()),
         }
 
-        log::debug!("opened {}, format {:?}", path.display(), format);
-
         let actual = capture.set_frame_interval(linuxvideo::Fract::new(1, 200))?;
-        log::debug!("set frame interval to {}", actual);
+
+        log::info!(
+            "opened {}, {}x{} @ {:.1}Hz",
+            path.display(),
+            format.width(),
+            format.height(),
+            1.0 / actual.as_f32(),
+        );
+
         let stream = capture.into_stream(2)?;
 
         Ok(Some(Self {
