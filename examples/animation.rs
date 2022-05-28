@@ -4,7 +4,7 @@ fn main() -> Result<(), zaru::Error> {
     let path = std::env::args()
         .skip(1)
         .next()
-        .ok_or_else(|| format!("usage: anim <path-to-animation>"))?;
+        .ok_or_else(|| format!("usage: animation <path-to-animation>"))?;
     let animation = Animation::from_path(&path)?;
 
     let time_per_frame = animation
