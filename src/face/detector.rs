@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 
 use crate::{
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
-    nn::{point_to_img, Cnn, CnnInputShape, NeuralNetwork},
+    nn::{create_linear_color_mapper, point_to_img, Cnn, CnnInputShape, NeuralNetwork},
     resolution::Resolution,
     timer::Timer,
 };
@@ -52,6 +52,7 @@ static MODEL: Lazy<Cnn> = Lazy::new(|| {
             .load()
             .unwrap(),
         CnnInputShape::NCHW,
+        create_linear_color_mapper(-1.0..=1.0),
     )
     .unwrap()
 });

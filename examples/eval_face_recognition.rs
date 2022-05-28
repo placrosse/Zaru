@@ -19,7 +19,7 @@ use zaru::{
     face::detector::Detector,
     image::Image,
     iter::zip_exact,
-    nn::{Cnn, CnnInputShape, NeuralNetwork},
+    nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork},
     num::TotalF32,
 };
 
@@ -46,7 +46,11 @@ fn main() -> Result<(), zaru::Error> {
     let face_dir = std::env::args_os().skip(1).next().unwrap();
 
     let nn = NeuralNetwork::from_path("3rdparty/onnx/mobilefacenet.onnx")?.load()?;
-    let cnn = Cnn::new(nn, CnnInputShape::NCHW)?;
+    let cnn = Cnn::new(
+        nn,
+        CnnInputShape::NCHW,
+        create_linear_color_mapper(-1.0..=1.0),
+    )?;
     let target_aspect = cnn.input_resolution().aspect_ratio();
 
     let mut classes = Vec::new();

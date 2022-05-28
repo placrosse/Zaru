@@ -13,7 +13,7 @@ use once_cell::sync::Lazy;
 use crate::{
     image::{AsImageView, ImageView, Rect},
     iter::zip_exact,
-    nn::{unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
+    nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
     resolution::{AspectRatio, Resolution},
     timer::Timer,
 };
@@ -30,6 +30,7 @@ static MODEL: Lazy<Cnn> = Lazy::new(|| {
             .load()
             .unwrap(),
         CnnInputShape::NCHW,
+        create_linear_color_mapper(-1.0..=1.0),
     )
     .unwrap()
 });

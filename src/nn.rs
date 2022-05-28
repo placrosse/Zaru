@@ -7,7 +7,7 @@ use wonnx::utils::{InputTensor, OutputTensor};
 
 use std::{
     borrow::Cow,
-    ops::{Index, Range},
+    ops::{Index, Range, RangeInclusive},
     path::Path,
 };
 
@@ -16,7 +16,7 @@ use tract_onnx::prelude::{
 };
 
 use crate::{
-    image::{AsImageView, ImageView},
+    image::{AsImageView, Color, ImageView},
     resolution::{AspectRatio, Resolution},
     Error,
 };
@@ -31,16 +31,46 @@ type Model = SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn Ty
 /// input.
 pub struct Cnn {
     nn: NeuralNetwork,
-    shape: CnnInputShape,
     input_res: Resolution,
-    color_map: fn(u8) -> f32,
+    image_map: Box<dyn Fn(ImageView<'_>) -> Tensor + Send + Sync>,
 }
 
 impl Cnn {
     /// Creates a CNN wrapper from a [`NeuralNetwork`].
     ///
-    /// The network must have exactly one input with a shape that matches `fmt`.
-    pub fn new(nn: NeuralNetwork, shape: CnnInputShape) -> Result<Self, Error> {
+    /// The network must have exactly one input with a shape that matches the given
+    /// [`CnnInputShape`].
+    pub fn new(
+        nn: NeuralNetwork,
+        shape: CnnInputShape,
+        color_map: impl Fn(Color) -> [f32; 3] + Send + Sync + 'static,
+    ) -> Result<Self, Error> {
+        let input_res = Self::get_input_res(&nn, shape)?;
+        let (h, w) = (input_res.height() as usize, input_res.width() as usize);
+
+        // Box a closure that maps the whole input image to a tensor. That way we avoid dynamic
+        // dispatch as much as possible.
+        let image_map: Box<dyn Fn(ImageView<'_>) -> _ + Send + Sync> = match shape {
+            CnnInputShape::NCHW => Box::new(move |view| {
+                Tensor::from_array_shape_fn([1, 3, h, w], |[_, c, y, x]| {
+                    color_map(view.get(x as _, y as _))[c]
+                })
+            }),
+            CnnInputShape::NHWC => Box::new(move |view| {
+                Tensor::from_array_shape_fn([1, h, w, 3], |[_, y, x, c]| {
+                    color_map(view.get(x as _, y as _))[c]
+                })
+            }),
+        };
+
+        Ok(Self {
+            nn,
+            input_res,
+            image_map,
+        })
+    }
+
+    fn get_input_res(nn: &NeuralNetwork, shape: CnnInputShape) -> Result<Resolution, Error> {
         if nn.num_inputs() != 1 {
             return Err(format!(
                 "CNN network has to take exactly 1 input, this one takes {}",
@@ -64,19 +94,7 @@ impl Cnn {
         };
 
         let (w, h): (u32, u32) = (w.try_into()?, h.try_into()?);
-        let input_res = Resolution::new(w, h);
-
-        Ok(Self {
-            nn,
-            shape,
-            input_res,
-            color_map: default_color_map,
-        })
-    }
-
-    pub fn set_color_map(&mut self, map: fn(u8) -> f32) {
-        // FIXME: channels aren't always equal, so replace this with map from `Color` to `[f32; 3]`
-        self.color_map = map;
+        Ok(Resolution::new(w, h))
     }
 
     /// Returns the expected input image size.
@@ -100,26 +118,29 @@ impl Cnn {
             "CNN input image does not have expected resolution"
         );
 
-        let (h, w) = (
-            self.input_res.height() as usize,
-            self.input_res.width() as usize,
-        );
-        let tensor = match self.shape {
-            CnnInputShape::NCHW => Tensor::from_array_shape_fn([1, 3, h, w], |[_, c, y, x]| {
-                (self.color_map)(image.get(x as _, y as _)[c])
-            }),
-            CnnInputShape::NHWC => Tensor::from_array_shape_fn([1, h, w, 3], |[_, y, x, c]| {
-                (self.color_map)(image.get(x as _, y as _)[c])
-            }),
-        };
+        let tensor = (self.image_map)(image);
 
         self.nn.estimate(&Inputs::from(tensor))
     }
 }
 
-fn default_color_map(value: u8) -> f32 {
-    // Output range: -1.0 ... 1.0
-    (value as f32 / 255.0 - 0.5) * 2.0
+/// Creates a simple color mapper that uniformly maps sRGB values to `target_range`.
+///
+/// The returned object can be passed directly to [`Cnn::new`] as its color map.
+///
+/// Note that this operates on *non-linear* sRGB colors, but maps them linearly to the target range.
+/// The assumption is that sRGB is the color space most (all?) CNNs expect their inputs to be in,
+/// but in practice none of them document this.
+pub fn create_linear_color_mapper(target_range: RangeInclusive<f32>) -> impl Fn(Color) -> [f32; 3] {
+    let start = *target_range.start();
+    let end = *target_range.end();
+    assert!(end > start);
+
+    let adjust_range = (end - start) / 255.0;
+    move |color| {
+        let rgb = [color.r(), color.g(), color.b()];
+        rgb.map(|col| col as f32 * adjust_range + start)
+    }
 }
 
 /// Adjusts `f32` coordinates from a 1:1 aspect ratio back to `orig_ratio`.
@@ -511,5 +532,21 @@ impl FromIterator<Tensor> for Inputs {
 impl Extend<Tensor> for Inputs {
     fn extend<T: IntoIterator<Item = Tensor>>(&mut self, iter: T) {
         self.inner.extend(iter);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn color_mapper() {
+        let mapper = create_linear_color_mapper(-1.0..=1.0);
+        assert_eq!(mapper(Color::BLACK), [-1.0, -1.0, -1.0]);
+        assert_eq!(mapper(Color::WHITE), [1.0, 1.0, 1.0]);
+
+        let mapper = create_linear_color_mapper(1.0..=2.0);
+        assert_eq!(mapper(Color::BLACK), [1.0, 1.0, 1.0]);
+        assert_eq!(mapper(Color::WHITE), [2.0, 2.0, 2.0]);
     }
 }
