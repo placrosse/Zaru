@@ -1,6 +1,5 @@
 mod facetracking;
 
-use log::LevelFilter;
 use zaru::face::detector::{Detection, Detector};
 use zaru::face::eye::EyeLandmarker;
 use zaru::face::landmark::{self, LandmarkResult, LandmarkTracker, TrackedFace};
@@ -13,15 +12,7 @@ use zaru::webcam::Webcam;
 use zaru::{defer::defer, gui, image, pipeline, Error};
 
 fn main() -> Result<(), Error> {
-    let log_level = if cfg!(debug_assertions) {
-        LevelFilter::Trace
-    } else {
-        LevelFilter::Debug
-    };
-    env_logger::Builder::new()
-        .filter(Some(env!("CARGO_CRATE_NAME")), log_level)
-        .filter(Some("wgpu"), LevelFilter::Warn)
-        .init();
+    zaru::init_logger!();
 
     let mut left_eye_landmarker = EyeLandmarker::new();
     let mut right_eye_landmarker = EyeLandmarker::new();

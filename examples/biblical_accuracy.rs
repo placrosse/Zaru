@@ -1,6 +1,5 @@
 //! Biblically accurate texture blitting benchmark.
 
-use log::LevelFilter;
 use zaru::{
     face::{
         detector::Detector,
@@ -17,16 +16,7 @@ const W: u32 = 512;
 const H: u32 = 512;
 
 fn main() -> Result<(), zaru::Error> {
-    let log_level = if cfg!(debug_assertions) {
-        LevelFilter::Trace
-    } else {
-        LevelFilter::Debug
-    };
-    env_logger::Builder::new()
-        .filter(Some(env!("CARGO_CRATE_NAME")), log_level)
-        .filter(Some(env!("CARGO_PKG_NAME")), log_level)
-        .filter(Some("wgpu"), LevelFilter::Warn)
-        .init();
+    zaru::init_logger!();
 
     let mut detector = Detector::new();
     let mut tracker = LandmarkTracker::new();

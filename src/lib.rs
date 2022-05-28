@@ -9,6 +9,8 @@
 //! One notable exceptions to this are neural networks outputting 3D coordinates – depending on the
 //! network, they might use X and Y coordinates from the input image, so Y will point *down*.
 
+use log::LevelFilter;
+
 pub mod anim;
 pub mod defer;
 pub mod filter;
@@ -31,4 +33,35 @@ pub mod face {
     pub mod detector;
     pub mod eye;
     pub mod landmark;
+}
+
+/// macro-use only, not part of public API.
+#[doc(hidden)]
+pub fn init_logger(calling_crate: &'static str) {
+    let log_level = if cfg!(debug_assertions) {
+        LevelFilter::Trace
+    } else {
+        LevelFilter::Debug
+    };
+    env_logger::Builder::new()
+        .filter(Some(calling_crate), log_level)
+        .filter(Some(env!("CARGO_PKG_NAME")), log_level)
+        .filter(Some("wgpu"), LevelFilter::Warn)
+        .try_init()
+        .ok();
+}
+
+/// Initializes logging to *stderr*.
+///
+/// If `cfg!(debug_assertions)` is enabled, the calling crate and Zaru will log at *trace* level.
+/// Otherwise, they will log at *debug* level.
+///
+/// `wgpu` will always log at *warn* level.
+///
+/// If a global logger is already registered, this macro will do nothing.
+#[macro_export]
+macro_rules! init_logger {
+    () => {
+        $crate::init_logger(env!("CARGO_CRATE_NAME"))
+    };
 }
