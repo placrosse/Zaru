@@ -43,7 +43,7 @@ impl Cnn {
     pub fn new(nn: NeuralNetwork, shape: CnnInputShape) -> Result<Self, Error> {
         if nn.num_inputs() != 1 {
             return Err(format!(
-                "CNN network has to take 1 input, this one takes {}",
+                "CNN network has to take exactly 1 input, this one takes {}",
                 nn.num_inputs()
             )
             .into());
@@ -70,7 +70,7 @@ impl Cnn {
             nn,
             shape,
             input_res,
-            color_map: map_color,
+            color_map: default_color_map,
         })
     }
 
@@ -113,11 +113,11 @@ impl Cnn {
             }),
         };
 
-        self.nn.estimate(Inputs::single(tensor))
+        self.nn.estimate(&Inputs::from(tensor))
     }
 }
 
-fn map_color(value: u8) -> f32 {
+fn default_color_map(value: u8) -> f32 {
     // Output range: -1.0 ... 1.0
     (value as f32 / 255.0 - 0.5) * 2.0
 }
@@ -168,9 +168,9 @@ pub(crate) fn point_to_img(x: f32, y: f32, full_res: &Resolution) -> (i32, i32) 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[non_exhaustive] // shouldn't be matched on by user code
 pub enum CnnInputShape {
-    /// Shape is `(N, C, H, W)`.
+    /// Shape is `[N, C, H, W]`.
     NCHW,
-    /// Shape is `(N, H, W, C)`.
+    /// Shape is `[N, H, W, C]`.
     NHWC,
 }
 
@@ -278,12 +278,12 @@ impl NeuralNetwork {
     /// Other libraries call this step "infer", but that is inaccurate as it sounds much too logical
     /// for what neural networks are actually capable of, so Zaru calls it `estimate` instead.
     #[doc(alias = "infer")]
-    pub fn estimate(&self, inputs: Inputs) -> Result<Outputs, Error> {
+    pub fn estimate(&self, inputs: &Inputs) -> Result<Outputs, Error> {
         let outputs = match &self.gpu {
             Some(gpu) => {
                 let inputs = self
                     .inputs()
-                    .zip(inputs.inner.iter())
+                    .zip(inputs.iter())
                     .map(|(info, tensor)| {
                         let name = info.name().to_string();
                         let input = InputTensor::F32(tensor.as_raw_data().into());
@@ -308,7 +308,7 @@ impl NeuralNetwork {
             None => {
                 let outputs = self
                     .inner
-                    .run(inputs.inner.into_iter().map(|t| t.to_tract()).collect())?;
+                    .run(inputs.iter().map(|t| t.to_tract()).collect())?;
                 let outputs = outputs
                     .into_iter()
                     .map(|tract| Tensor::from_tract(&tract))
@@ -476,22 +476,40 @@ pub struct Inputs {
 }
 
 impl Inputs {
-    /// Creates a network input from a single input tensor.
-    pub fn single(tensor: Tensor) -> Self {
-        Self {
-            inner: tvec![tensor],
-        }
+    /// Returns the number of input tensors stored in `self`.
+    pub fn len(&self) -> usize {
+        self.inner.len()
     }
 
-    /// Creates a network input from an array of tensors.
-    pub fn from_array<const N: usize>(tensors: [Tensor; N]) -> Self {
+    fn iter(&self) -> impl Iterator<Item = &Tensor> {
+        self.inner.iter()
+    }
+}
+
+impl From<Tensor> for Inputs {
+    fn from(t: Tensor) -> Self {
+        Self { inner: tvec![t] }
+    }
+}
+
+impl<const N: usize> From<[Tensor; N]> for Inputs {
+    fn from(tensors: [Tensor; N]) -> Self {
         Self {
             inner: tensors.into_iter().collect(),
         }
     }
+}
 
-    /// Returns the number of input tensors stored in `self`.
-    pub fn len(&self) -> usize {
-        self.inner.len()
+impl FromIterator<Tensor> for Inputs {
+    fn from_iter<T: IntoIterator<Item = Tensor>>(iter: T) -> Self {
+        Self {
+            inner: iter.into_iter().collect(),
+        }
+    }
+}
+
+impl Extend<Tensor> for Inputs {
+    fn extend<T: IntoIterator<Item = Tensor>>(&mut self, iter: T) {
+        self.inner.extend(iter);
     }
 }
