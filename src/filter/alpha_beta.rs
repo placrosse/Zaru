@@ -10,9 +10,10 @@ use super::Filter;
 /// Alpha beta filters perform well when the measured value has an expected rate of change that is
 /// constant over short periods (ie. it isn't subject to large accelerations).
 ///
-/// Note that this implementation does not allow adjusting for uneven measurement intervals, so it
+/// FIXME: this implementation does not allow adjusting for uneven measurement intervals, so it
 /// expects that `push` is called roughly in constant intervals. This also means that using a
 /// different interval might require a change to the `alpha` or `beta` parameters to perform well.
+/// This should be fixed by introducing the concept of time-dependent filters.
 ///
 /// [alpha beta filter]: https://en.wikipedia.org/wiki/Alpha_beta_filter
 #[derive(Clone, Debug)]

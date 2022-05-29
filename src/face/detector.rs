@@ -52,8 +52,8 @@ pub struct Detector {
     anchors: Anchors,
     t_resize: Timer,
     t_infer: Timer,
-    t_filter: Timer,
-    nma: NonMaxSuppression,
+    t_nms: Timer,
+    nms: NonMaxSuppression,
     raw_detections: Vec<RawDetection>,
     detections: Vec<Detection>,
 }
@@ -70,8 +70,8 @@ impl Detector {
             anchors,
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
-            t_filter: Timer::new("filter"),
-            nma: NonMaxSuppression::new(SEED_THRESH),
+            t_nms: Timer::new("NMS"),
+            nms: NonMaxSuppression::new(SEED_THRESH),
             raw_detections: Vec::new(),
             detections: Vec::new(),
         }
@@ -110,7 +110,7 @@ impl Detector {
         let result = self.t_infer.time(|| self.model.estimate(&image)).unwrap();
         log::trace!("inference result: {:?}", result);
 
-        self.t_filter.time(|| {
+        self.t_nms.time(|| {
             let boxes = &result[0];
             let confidences = &result[1];
 
@@ -130,7 +130,7 @@ impl Detector {
                     .push(extract_detection(&self.anchors[index], box_params, conf));
             }
 
-            let detections = self.nma.process(&mut self.raw_detections);
+            let detections = self.nms.process(&mut self.raw_detections);
             for raw in detections {
                 self.detections.push(Detection { raw, full_res });
             }
@@ -141,7 +141,7 @@ impl Detector {
 
     /// Returns profiling timers for image resizing, neural inference, and detection filtering.
     pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
-        [&self.t_resize, &self.t_infer, &self.t_filter]
+        [&self.t_resize, &self.t_infer, &self.t_nms]
     }
 }
 

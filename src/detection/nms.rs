@@ -1,9 +1,15 @@
 //! Non-Maximum Suppression and Averaging.
 //!
-//! NMS removes overlapping detections and filters detections by confidence, leaving only the
-//! detection with the highest confidence in that area.
+//! Typical Single-Short MultiBox Detectors (SSD) produce duplicate detections for individual
+//! objects. Non-Maximum Suppression (NMS) is an algorithm that filters these duplicates out,
+//! leaving only a single detection with high confidence for each object.
 //!
-//! NMA averages overlapping detections instead of simply removing detections.
+//! This module implements 2 variants of NMS, selected with [`SuppressionMode`]: The classic
+//! Non-Maximum Suppression algorithm that removes any less confident detections
+//! ([`SuppressionMode::Remove`]), and the slightly smarter Non-Maximum Averaging
+//! ([`SuppressionMode::Average`]) which instead computes a weighted average of overlapping
+//! detections. Since the latter reduces jitter between frames, and does not seem to have any
+//! appreciable drawbacks, it is used by default.
 
 use crate::{iter::zip_exact, num::TotalF32};
 
@@ -29,7 +35,7 @@ impl NonMaxSuppression {
     ///
     /// # Parameters
     ///
-    /// - `seed_thresh`: required detection confidence to "seed" an NMA round with a detection.
+    /// - `seed_thresh`: required detection confidence to "seed" an NMS round with a detection.
     pub fn new(seed_thresh: f32) -> Self {
         Self {
             seed_thresh,
@@ -38,6 +44,11 @@ impl NonMaxSuppression {
             out_buf: Vec::new(),
             mode: SuppressionMode::Average,
         }
+    }
+
+    /// Sets the seed threshold, at which detections can "seed" an NMS round.
+    pub fn set_seed_thresh(&mut self, seed_thresh: f32) {
+        self.seed_thresh = seed_thresh;
     }
 
     /// Sets the intersection-over-union threshold to consider two detections as overlapping.
