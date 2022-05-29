@@ -1,6 +1,6 @@
 use crate::filter::Filter;
 
-use super::{BoundingBox, Detection, RawDetection};
+use super::Detection;
 
 /// A [`Filter`] that operates on [`Detection`]s.
 ///
@@ -10,6 +10,7 @@ pub struct DetectionFilter<F> {
     yc: F,
     w: F,
     h: F,
+    conf: F,
     landmarks: [(F, F); 6],
 }
 
@@ -21,6 +22,7 @@ impl<F: Filter<f32> + Clone> DetectionFilter<F> {
             yc: filter.clone(),
             w: filter.clone(),
             h: filter.clone(),
+            conf: filter.clone(),
             landmarks: [
                 (filter.clone(), filter.clone()),
                 (filter.clone(), filter.clone()),
@@ -34,26 +36,24 @@ impl<F: Filter<f32> + Clone> DetectionFilter<F> {
 }
 
 impl<F: Filter<f32>> Filter<Detection> for DetectionFilter<F> {
-    fn push(&mut self, det: Detection) -> Detection {
-        let mut landmarks = det.raw.landmarks;
+    fn push(&mut self, mut det: Detection) -> Detection {
+        let landmarks = det.landmarks_mut();
         for (i, lm) in landmarks.iter_mut().enumerate() {
             lm.x = self.landmarks[i].0.push(lm.x);
             lm.y = self.landmarks[i].1.push(lm.y);
         }
 
-        Detection {
-            full_res: det.full_res,
-            raw: RawDetection {
-                bounding_box: BoundingBox {
-                    xc: self.xc.push(det.raw.bounding_box.xc),
-                    yc: self.yc.push(det.raw.bounding_box.yc),
-                    w: self.w.push(det.raw.bounding_box.w),
-                    h: self.h.push(det.raw.bounding_box.h),
-                },
-                landmarks,
-                confidence: det.raw.confidence,
-            },
-        }
+        let conf = self.conf.push(det.confidence());
+        det.set_confidence(conf);
+
+        let mut rect = det.bounding_rect();
+        rect.xc = self.xc.push(rect.xc);
+        rect.yc = self.xc.push(rect.yc);
+        rect.w = self.xc.push(rect.w);
+        rect.h = self.xc.push(rect.h);
+        det.set_bounding_rect(rect);
+
+        det
     }
 
     fn reset(&mut self) {
@@ -61,6 +61,7 @@ impl<F: Filter<f32>> Filter<Detection> for DetectionFilter<F> {
         self.yc.reset();
         self.w.reset();
         self.h.reset();
+        self.conf.reset();
         for (x, y) in &mut self.landmarks {
             x.reset();
             y.reset();

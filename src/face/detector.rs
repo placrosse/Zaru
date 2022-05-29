@@ -9,22 +9,16 @@ use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
 use crate::{
+    detection::{
+        nms::NonMaxSuppression,
+        ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
+        BoundingRect,
+    },
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
     nn::{create_linear_color_mapper, point_to_img, Cnn, CnnInputShape, NeuralNetwork},
     resolution::Resolution,
     timer::Timer,
 };
-
-use self::{
-    nma::NonMaxAvg,
-    ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
-};
-
-mod filter;
-mod nma;
-mod ssd;
-
-pub use filter::DetectionFilter;
 
 /// Detection confidence threshold.
 ///
@@ -34,11 +28,6 @@ pub use filter::DetectionFilter;
 /// Tested thresholds for short-range model:
 /// - 0.5 creates false positives when blocking the camera with my hand.
 const SEED_THRESH: f32 = 0.6;
-/// Thresholds for detections to *contribute* to an NMS/NMA round started by another detection with
-/// at least `SEED_THRESH`.
-const CONTRIB_THRESH: f32 = 0.3;
-/// Minimum Intersection-over-Union value to consider two detections to overlap.
-const IOU_THRESH: f32 = 0.3;
 
 const MODEL_DATA: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -64,8 +53,8 @@ pub struct Detector {
     t_resize: Timer,
     t_infer: Timer,
     t_filter: Timer,
-    nma: NonMaxAvg,
-    raw_detections: Vec<RawDetection>,
+    nma: NonMaxSuppression,
+    raw_detections: Vec<crate::detection::Detection>,
     detections: Vec<Detection>,
 }
 
@@ -82,7 +71,7 @@ impl Detector {
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             t_filter: Timer::new("filter"),
-            nma: NonMaxAvg::new(SEED_THRESH, IOU_THRESH),
+            nma: NonMaxSuppression::new(SEED_THRESH),
             raw_detections: Vec::new(),
             detections: Vec::new(),
         }
@@ -128,21 +117,21 @@ impl Detector {
             assert_eq!(confidences.shape(), &[1, 896, 1]);
             for (index, view) in confidences.index([0]).iter().enumerate() {
                 let conf = view.as_slice()[0];
-                if conf < CONTRIB_THRESH {
+
+                // The confidence can be negative, in which case we don't want to contribute
+                // negative weights to the NMA average.
+                if conf <= 0.0 {
                     continue;
                 }
 
                 let tensor_view = boxes.index([0, index]);
                 let box_params = &tensor_view.as_slice()[..16];
-                self.raw_detections.push(RawDetection::extract(
-                    &self.anchors[index],
-                    box_params,
-                    conf,
-                ));
+                self.raw_detections
+                    .push(extract_detection(&self.anchors[index], box_params, conf));
             }
 
-            let detections = self.nma.average(&mut self.raw_detections);
-            for &raw in detections {
+            let detections = self.nma.process(&mut self.raw_detections);
+            for raw in detections {
                 self.detections.push(Detection { raw, full_res });
             }
         });
@@ -159,7 +148,7 @@ impl Detector {
 /// A detected face, consisting of a bounding box and landmarks.
 #[derive(Debug)]
 pub struct Detection {
-    raw: RawDetection,
+    raw: crate::detection::Detection,
     full_res: Resolution,
 }
 
@@ -168,12 +157,20 @@ impl Detection {
     ///
     /// This box is *very* tight and does not include the head boundary or much of the forehead.
     pub fn bounding_rect_raw(&self) -> Rect {
-        self.raw.bounding_box_raw().to_rect(&self.full_res)
+        self.raw.bounding_rect().to_rect(&self.full_res)
     }
 
     /// Returns the bounding box of the detected face, adjusted to include the whole head boundary.
     pub fn bounding_rect_loose(&self) -> Rect {
-        self.raw.bounding_box_loose().to_rect(&self.full_res)
+        const LOOSEN_LEFT: f32 = 0.08;
+        const LOOSEN_RIGHT: f32 = 0.08;
+        const LOOSEN_TOP: f32 = 0.55;
+        const LOOSEN_BOTTOM: f32 = 0.2;
+
+        self.raw
+            .bounding_rect()
+            .grow_rel(LOOSEN_LEFT, LOOSEN_RIGHT, LOOSEN_TOP, LOOSEN_BOTTOM)
+            .to_rect(&self.full_res)
     }
 
     /// Returns the confidence of this detection.
@@ -181,7 +178,7 @@ impl Detection {
     /// Typically, values >1.5 indicate a decent detection, values >0.5 indicate a partially
     /// occluded face, and anything below that is unlikely to be a valid detection at all.
     pub fn confidence(&self) -> f32 {
-        self.raw.confidence
+        self.raw.confidence()
     }
 
     /// Estimated clockwise rotation of the face.
@@ -203,13 +200,15 @@ impl Detection {
     /// Returns the coordinates of the left eye's landmark (from the perspective of the input image,
     /// not the depicted person).
     pub fn left_eye(&self) -> (i32, i32) {
-        self.raw.landmarks[0].to_img_coord(&self.full_res)
+        let lm = &self.raw.landmarks()[0];
+        point_to_img(lm.x(), lm.y(), &self.full_res)
     }
 
     /// Returns the coordinates of the right eye's landmark (from the perspective of the input image,
     /// not the depicted person).
     pub fn right_eye(&self) -> (i32, i32) {
-        self.raw.landmarks[1].to_img_coord(&self.full_res)
+        let lm = self.raw.landmarks()[1];
+        point_to_img(lm.x(), lm.y(), &self.full_res)
     }
 
     /// Draws the bounding box and landmarks of this detection onto an image.
@@ -230,8 +229,8 @@ impl Detection {
         );
 
         image::draw_rect(image, self.bounding_rect_raw());
-        for mark in &self.raw.landmarks {
-            let (x, y) = mark.to_img_coord(&self.full_res);
+        for lm in self.raw.landmarks() {
+            let (x, y) = point_to_img(lm.x(), lm.y(), &self.full_res);
             image::draw_marker(image, x, y);
         }
 
@@ -239,149 +238,34 @@ impl Detection {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct RawDetection {
-    bounding_box: BoundingBox,
-    landmarks: [Landmark; 6],
+fn extract_detection(
+    anchor: &Anchor,
+    box_params: &[f32],
     confidence: f32,
-}
+) -> crate::detection::Detection {
+    assert_eq!(box_params.len(), 16);
 
-impl RawDetection {
-    fn extract(anchor: &Anchor, box_params: &[f32], confidence: f32) -> Self {
-        assert_eq!(box_params.len(), 16);
+    let xc = box_params[0] / 128.0 + anchor.x_center();
+    let yc = box_params[1] / 128.0 + anchor.y_center();
+    let w = box_params[2] / 128.0;
+    let h = box_params[3] / 128.0;
+    let lm = |x, y| {
+        crate::detection::Landmark::new(
+            x / 128.0 + anchor.x_center(),
+            y / 128.0 + anchor.y_center(),
+        )
+    };
 
-        let xc = box_params[0] / 128.0 + anchor.x_center();
-        let yc = box_params[1] / 128.0 + anchor.y_center();
-        let w = box_params[2] / 128.0;
-        let h = box_params[3] / 128.0;
-        let pt = |x, y| Landmark {
-            x: x / 128.0 + anchor.x_center(),
-            y: y / 128.0 + anchor.y_center(),
-        };
-
-        RawDetection {
-            bounding_box: BoundingBox { xc, yc, w, h },
-            landmarks: [
-                pt(box_params[4], box_params[5]),
-                pt(box_params[6], box_params[7]),
-                pt(box_params[8], box_params[9]),
-                pt(box_params[10], box_params[11]),
-                pt(box_params[12], box_params[13]),
-                pt(box_params[14], box_params[15]),
-            ],
-            confidence,
-        }
-    }
-
-    /// Returns the raw bounding box of the face as output by the network.
-    ///
-    /// This box is *very* tight and does not include the head boundary or much of the forehead.
-    fn bounding_box_raw(&self) -> BoundingBox {
-        self.bounding_box
-    }
-
-    fn bounding_box_loose(&self) -> BoundingBox {
-        // apply "forehead adjustment"
-
-        const LOOSEN_LEFT: f32 = 0.08;
-        const LOOSEN_RIGHT: f32 = 0.08;
-        const LOOSEN_TOP: f32 = 0.55;
-        const LOOSEN_BOTTOM: f32 = 0.2;
-
-        self.bounding_box
-            .grow_rel(LOOSEN_LEFT, LOOSEN_RIGHT, LOOSEN_TOP, LOOSEN_BOTTOM)
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct Landmark {
-    x: f32,
-    y: f32,
-}
-
-impl Landmark {
-    fn to_img_coord(&self, full_res: &Resolution) -> (i32, i32) {
-        point_to_img(self.x, self.y, full_res)
-    }
-}
-
-/// An axis-aligned rectangle in a `[0.0, 1.0]` coordinate space.
-#[derive(Debug, Clone, Copy)]
-struct BoundingBox {
-    xc: f32,
-    yc: f32,
-    w: f32,
-    h: f32,
-}
-
-impl BoundingBox {
-    fn grow_rel(&self, left: f32, right: f32, top: f32, bottom: f32) -> Self {
-        let left = left * self.w;
-        let right = right * self.w;
-        let top = top * self.h;
-        let bottom = bottom * self.h;
-        Self {
-            xc: self.xc + (right - left) * 0.5,
-            yc: self.yc + (bottom - top) * 0.5,
-            w: self.w + left + right,
-            h: self.h + top + bottom,
-        }
-    }
-
-    fn to_rect(&self, full_res: &Resolution) -> Rect {
-        let top_left = (self.xc - self.w / 2.0, self.yc - self.h / 2.0);
-        let bottom_right = (self.xc + self.w / 2.0, self.yc + self.h / 2.0);
-
-        let top_left = point_to_img(top_left.0, top_left.1, full_res);
-        let bottom_right = point_to_img(bottom_right.0, bottom_right.1, full_res);
-
-        Rect::from_corners(top_left, bottom_right)
-    }
-
-    fn top_left(&self) -> (f32, f32) {
-        (self.xc - self.w / 2.0, self.yc - self.h / 2.0)
-    }
-
-    fn bottom_right(&self) -> (f32, f32) {
-        (self.xc + self.w / 2.0, self.yc + self.h / 2.0)
-    }
-
-    fn area(&self) -> f32 {
-        self.w * self.h
-    }
-
-    fn intersection(&self, other: &BoundingBox) -> BoundingBox {
-        let top_left_1 = self.top_left();
-        let top_left_2 = other.top_left();
-        let top_left = (
-            top_left_1.0.max(top_left_2.0),
-            top_left_1.1.max(top_left_2.1),
-        );
-
-        let bot_right_1 = self.bottom_right();
-        let bot_right_2 = other.bottom_right();
-        let bot_right = (
-            bot_right_1.0.max(bot_right_2.0),
-            bot_right_1.1.max(bot_right_2.1),
-        );
-
-        BoundingBox {
-            xc: (top_left.0 + bot_right.0) / 2.0,
-            yc: (top_left.1 + bot_right.1) / 2.0,
-            w: bot_right.0 - top_left.0,
-            h: bot_right.1 - top_left.1,
-        }
-    }
-
-    fn intersection_area(&self, other: &BoundingBox) -> f32 {
-        self.intersection(other).area()
-    }
-
-    fn union_area(&self, other: &BoundingBox) -> f32 {
-        self.area() + other.area() - self.intersection_area(other)
-    }
-
-    fn iou(&self, other: &BoundingBox) -> f32 {
-        self.intersection_area(other) / self.union_area(other)
-    }
+    crate::detection::Detection::with_landmarks(
+        confidence,
+        BoundingRect::from_center(xc, yc, w, h),
+        vec![
+            lm(box_params[4], box_params[5]),
+            lm(box_params[6], box_params[7]),
+            lm(box_params[8], box_params[9]),
+            lm(box_params[10], box_params[11]),
+            lm(box_params[12], box_params[13]),
+            lm(box_params[14], box_params[15]),
+        ],
+    )
 }

@@ -1,12 +1,13 @@
 //! Anchor/Prior generation for Single Shot MultiBox Detectors (SSDs).
 //!
 //! Note that the implementation in this module is extremely limited and is only meant to work for
-//! our specific face detection network, not more general networks.
+//! our specific networks, not more general networks.
 
 use std::ops::Index;
 
 use crate::resolution::Resolution;
 
+/// An anchor of an SSD network.
 pub struct Anchor {
     // values range from 0 to 1
     x_center: f32,
@@ -33,6 +34,7 @@ pub struct LayerInfo {
 
 impl LayerInfo {
     pub fn new(boxes_per_cell: u32, width: u32, height: u32) -> Self {
+        assert_ne!(boxes_per_cell, 0);
         Self {
             boxes_per_cell,
             resolution: Resolution::new(width, height),
