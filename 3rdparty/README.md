@@ -18,9 +18,9 @@ Note that files may have been converted from other formats.
 | `onnx/palm_detection_full.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/palm_detection_lite.onnx` | [MediaPipe] | Apache-2.0
 | `image/laughing_man.gif` | Ghost in the Shell / Tumblr | Unknown
-| `image/plead-base.png` | [Twemoji] | CC BY 4.0 | Twitter
-| `image/plead-eye.png` | [Twemoji] | CC BY 4.0 | Twitter
-| `image/plead-mask.png` | [Twemoji] | CC BY 4.0 | Twitter
+| `image/plead-base.png` | [Twemoji] | CC BY 4.0
+| `image/plead-eye.png` | [Twemoji] | CC BY 4.0
+| `image/plead-mask.png` | [Twemoji] | CC BY 4.0
 
 [MediaPipe]: https://github.com/google/mediapipe
 [InsightFace_Pytorch]: https://github.com/TreB1eN/InsightFace_Pytorch
