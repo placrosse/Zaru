@@ -1,8 +1,8 @@
 use crate::filter::Filter;
 
-use super::Detection;
+use super::RawDetection;
 
-/// A [`Filter`] that operates on [`Detection`]s.
+/// A [`Filter`] that operates on [`RawDetection`]s.
 ///
 /// This applies the same (configurable) type of filter to all detection coordinates.
 pub struct DetectionFilter<F> {
@@ -35,8 +35,8 @@ impl<F: Filter<f32> + Clone> DetectionFilter<F> {
     }
 }
 
-impl<F: Filter<f32>> Filter<Detection> for DetectionFilter<F> {
-    fn push(&mut self, mut det: Detection) -> Detection {
+impl<F: Filter<f32>> Filter<RawDetection> for DetectionFilter<F> {
+    fn push(&mut self, mut det: RawDetection) -> RawDetection {
         let landmarks = det.landmarks_mut();
         for (i, lm) in landmarks.iter_mut().enumerate() {
             lm.x = self.landmarks[i].0.push(lm.x);

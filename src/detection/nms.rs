@@ -7,14 +7,14 @@
 
 use crate::{iter::zip_exact, num::TotalF32};
 
-use super::{BoundingRect, Detection, Landmark};
+use super::{BoundingRect, Landmark, RawDetection};
 
 /// A non-maximum suppression algorithm.
 pub struct NonMaxSuppression {
     seed_thresh: f32,
     iou_thresh: f32,
-    avg_buf: Vec<Detection>,
-    out_buf: Vec<Detection>,
+    avg_buf: Vec<RawDetection>,
+    out_buf: Vec<RawDetection>,
     mode: SuppressionMode,
 }
 
@@ -54,8 +54,8 @@ impl NonMaxSuppression {
 
     pub fn process(
         &mut self,
-        detections: &mut Vec<Detection>,
-    ) -> impl Iterator<Item = Detection> + '_ {
+        detections: &mut Vec<RawDetection>,
+    ) -> impl Iterator<Item = RawDetection> + '_ {
         self.out_buf.clear();
 
         // Sort by ascending confidence, process highest confidence first by starting at the back.
@@ -95,7 +95,7 @@ impl NonMaxSuppression {
 
                     // compute confidence-weighted average of the overlapping detections
                     let mut acc_rect = BoundingRect::from_center(0.0, 0.0, 0.0, 0.0);
-                    let mut acc = Detection::new(seed.confidence(), acc_rect);
+                    let mut acc = RawDetection::new(seed.confidence(), acc_rect);
                     let mut divisor = 0.0;
                     for det in &self.avg_buf {
                         if acc.landmarks().is_empty() && !det.landmarks().is_empty() {
@@ -163,8 +163,8 @@ mod tests {
         nms.set_mode(SuppressionMode::Remove);
 
         let rect = BoundingRect::from_center(0.0, 0.0, 1.0, 1.0);
-        let a = Detection::new(0.6, rect);
-        let b = Detection::new(0.55, rect.scale(1.5));
+        let a = RawDetection::new(0.6, rect);
+        let b = RawDetection::new(0.55, rect.scale(1.5));
         let detections = nms.process(&mut vec![a, b]).collect::<Vec<_>>();
         assert_eq!(detections.len(), 1);
 
@@ -182,8 +182,8 @@ mod tests {
         let mut nms = NonMaxSuppression::new(0.5);
         nms.set_mode(SuppressionMode::Remove);
 
-        let a = Detection::new(1.0, BoundingRect::from_center(0.0, 0.0, 1.0, 1.0));
-        let b = Detection::new(1.0, BoundingRect::from_center(5.0, 0.0, 1.0, 1.0));
+        let a = RawDetection::new(1.0, BoundingRect::from_center(0.0, 0.0, 1.0, 1.0));
+        let b = RawDetection::new(1.0, BoundingRect::from_center(5.0, 0.0, 1.0, 1.0));
 
         let detections = nms.process(&mut vec![a, b]).collect::<Vec<_>>();
         assert_eq!(detections.len(), 2);
@@ -196,8 +196,8 @@ mod tests {
         nms.set_iou_thresh(0.0);
 
         let rect = BoundingRect::from_center(-1.0, 3.0, 1.0, 1.0);
-        let a = Detection::new(1.0, rect);
-        let b = Detection::new(0.5, rect.scale(4.0));
+        let a = RawDetection::new(1.0, rect);
+        let b = RawDetection::new(0.5, rect.scale(4.0));
         let detections = nms.process(&mut vec![a, b]).collect::<Vec<_>>();
         assert_eq!(detections.len(), 1);
 

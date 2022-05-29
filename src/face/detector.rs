@@ -12,7 +12,7 @@ use crate::{
     detection::{
         nms::NonMaxSuppression,
         ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
-        BoundingRect,
+        BoundingRect, RawDetection,
     },
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
     nn::{create_linear_color_mapper, point_to_img, Cnn, CnnInputShape, NeuralNetwork},
@@ -54,7 +54,7 @@ pub struct Detector {
     t_infer: Timer,
     t_filter: Timer,
     nma: NonMaxSuppression,
-    raw_detections: Vec<crate::detection::Detection>,
+    raw_detections: Vec<RawDetection>,
     detections: Vec<Detection>,
 }
 
@@ -148,7 +148,7 @@ impl Detector {
 /// A detected face, consisting of a bounding box and landmarks.
 #[derive(Debug)]
 pub struct Detection {
-    raw: crate::detection::Detection,
+    raw: RawDetection,
     full_res: Resolution,
 }
 
@@ -238,11 +238,7 @@ impl Detection {
     }
 }
 
-fn extract_detection(
-    anchor: &Anchor,
-    box_params: &[f32],
-    confidence: f32,
-) -> crate::detection::Detection {
+fn extract_detection(anchor: &Anchor, box_params: &[f32], confidence: f32) -> RawDetection {
     assert_eq!(box_params.len(), 16);
 
     let xc = box_params[0] / 128.0 + anchor.x_center();
@@ -256,7 +252,7 @@ fn extract_detection(
         )
     };
 
-    crate::detection::Detection::with_landmarks(
+    RawDetection::with_landmarks(
         confidence,
         BoundingRect::from_center(xc, yc, w, h),
         vec![

@@ -290,7 +290,7 @@ impl Into<usize> for LandmarkIdx {
 /// needed, smoothing the detections directly using a [`DetectionFilter`] is probably more efficient.
 ///
 /// [`Detector`]: super::detector::Detector
-/// [`DetectionFilter`]: super::detector::DetectionFilter
+/// [`DetectionFilter`]: crate::detection::DetectionFilter
 pub struct LandmarkTracker {
     lm: Landmarker,
     face: Option<TrackedFace>,

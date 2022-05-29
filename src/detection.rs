@@ -13,16 +13,20 @@ use crate::{image::Rect, nn::point_to_img, resolution::Resolution};
 
 /// A detected object.
 ///
-/// A [`Detection`] consists of a [`BoundingRect`] enclosing the detected object, a confidence
+/// A [`RawDetection`] consists of a [`BoundingRect`] enclosing the detected object, a confidence
 /// value, and an optional set of landmarks.
+///
+/// Called "raw" because it does not reside in any defined coordinate system. Detector
+/// implementations typically provide a wrapper around this type that allows accessing the detection
+/// as a [`Rect`] in input image coordinates.
 #[derive(Debug, Clone)]
-pub struct Detection {
+pub struct RawDetection {
     confidence: f32,
     rect: BoundingRect,
     landmarks: Vec<Landmark>,
 }
 
-impl Detection {
+impl RawDetection {
     pub fn new(confidence: f32, rect: BoundingRect) -> Self {
         Self {
             confidence,
