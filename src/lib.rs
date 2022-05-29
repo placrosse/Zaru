@@ -16,6 +16,7 @@ pub mod defer;
 pub mod detection;
 pub mod filter;
 pub mod gui;
+pub mod hand;
 pub mod image;
 pub mod iter;
 pub mod nn;
