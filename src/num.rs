@@ -58,3 +58,8 @@ fn f32_total_cmp(a: f32, b: f32) -> Ordering {
 
     left.cmp(&right)
 }
+
+/// Applies the standard sigmoid/logistic function to the input.
+pub fn sigmoid(v: f32) -> f32 {
+    1.0 / (1.0 + (-v).exp())
+}

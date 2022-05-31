@@ -37,6 +37,11 @@ pub mod face {
     pub mod landmark;
 }
 
+/// Human body detection and pose estimation.
+pub mod body {
+    pub mod detector;
+}
+
 /// macro-use only, not part of public API.
 #[doc(hidden)]
 pub fn init_logger(calling_crate: &'static str) {

@@ -7,7 +7,7 @@ use crate::{
     detection::RawDetection,
     image::{self, AsImageView, AsImageViewMut, ImageView, ImageViewMut, Rect},
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork},
-    num::TotalF32,
+    num::{sigmoid, TotalF32},
     resolution::Resolution,
     timer::Timer,
 };
@@ -69,14 +69,10 @@ impl PalmDetector {
             let max = confidences
                 .index([0])
                 .iter()
-                .map(|view| {
-                    let raw = view.as_slice()[0];
-                    //1.0 / (1.0 + (-raw).exp())
-                    raw
-                })
+                .map(|view| sigmoid(view.as_slice()[0]))
                 .min_by_key(|conf| TotalF32(*conf))
                 .unwrap();
-            // Bug: the score is very negative, and actually gets more negative if a hand is in view
+            // Bug: the score is lower than expected, and actually gets lower if a hand is in view
 
             eprintln!("{}", max);
 

@@ -16,18 +16,10 @@ use crate::{
     },
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
     nn::{create_linear_color_mapper, point_to_img, Cnn, CnnInputShape, NeuralNetwork},
+    num::sigmoid,
     resolution::Resolution,
     timer::Timer,
 };
-
-/// Detection confidence threshold.
-///
-/// Minimum confidence at which a detection is used as the "seed" of a non-maximum suppression round
-/// (or in this case, non-maximum averaging).
-///
-/// Tested thresholds for short-range model:
-/// - 0.5 creates false positives when blocking the camera with my hand.
-const SEED_THRESH: f32 = 0.6;
 
 const MODEL_DATA: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -53,12 +45,15 @@ pub struct Detector {
     t_resize: Timer,
     t_infer: Timer,
     t_nms: Timer,
+    thresh: f32,
     nms: NonMaxSuppression,
     raw_detections: Vec<RawDetection>,
     detections: Vec<Detection>,
 }
 
 impl Detector {
+    const DEFAULT_THRESH: f32 = 0.5;
+
     /// Creates a new face detector.
     pub fn new() -> Self {
         let anchors = Anchors::calculate(&AnchorParams {
@@ -71,7 +66,8 @@ impl Detector {
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             t_nms: Timer::new("NMS"),
-            nms: NonMaxSuppression::new(SEED_THRESH),
+            thresh: Self::DEFAULT_THRESH,
+            nms: NonMaxSuppression::new(),
             raw_detections: Vec::new(),
             detections: Vec::new(),
         }
@@ -114,18 +110,16 @@ impl Detector {
             let boxes = &result[0];
             let confidences = &result[1];
 
+            assert_eq!(boxes.shape(), &[1, 896, 16]);
             assert_eq!(confidences.shape(), &[1, 896, 1]);
             for (index, view) in confidences.index([0]).iter().enumerate() {
-                let conf = view.as_slice()[0];
-
-                // The confidence can be negative, in which case we don't want to contribute
-                // negative weights to the NMA average.
-                if conf <= 0.0 {
+                let conf = sigmoid(view.as_slice()[0]);
+                if conf <= self.thresh {
                     continue;
                 }
 
                 let tensor_view = boxes.index([0, index]);
-                let box_params = &tensor_view.as_slice()[..16];
+                let box_params = tensor_view.as_slice();
                 self.raw_detections
                     .push(extract_detection(&self.anchors[index], box_params, conf));
             }

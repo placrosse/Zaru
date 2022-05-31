@@ -17,7 +17,6 @@ use super::{BoundingRect, Landmark, RawDetection};
 
 /// A non-maximum suppression algorithm.
 pub struct NonMaxSuppression {
-    seed_thresh: f32,
     iou_thresh: f32,
     avg_buf: Vec<RawDetection>,
     out_buf: Vec<RawDetection>,
@@ -32,23 +31,13 @@ impl NonMaxSuppression {
     ///
     /// The returned suppression algorithm will use [`SuppressionMode::Average`] and a default IOU
     /// threshold.
-    ///
-    /// # Parameters
-    ///
-    /// - `seed_thresh`: required detection confidence to "seed" an NMS round with a detection.
-    pub fn new(seed_thresh: f32) -> Self {
+    pub fn new() -> Self {
         Self {
-            seed_thresh,
             iou_thresh: Self::DEFAULT_IOU_THRESH,
             avg_buf: Vec::new(),
             out_buf: Vec::new(),
             mode: SuppressionMode::Average,
         }
-    }
-
-    /// Sets the seed threshold, at which detections can "seed" an NMS round.
-    pub fn set_seed_thresh(&mut self, seed_thresh: f32) {
-        self.seed_thresh = seed_thresh;
     }
 
     /// Sets the intersection-over-union threshold to consider two detections as overlapping.
@@ -73,11 +62,6 @@ impl NonMaxSuppression {
         detections.sort_unstable_by_key(|det| TotalF32(det.confidence));
 
         while let Some(seed) = detections.pop() {
-            if seed.confidence < self.seed_thresh {
-                // no more significant detections left
-                break;
-            }
-
             match self.mode {
                 SuppressionMode::Remove => {
                     detections.retain(|other| {
@@ -170,7 +154,7 @@ mod tests {
 
     #[test]
     fn nms_suppresses_non_maximum() {
-        let mut nms = NonMaxSuppression::new(0.5);
+        let mut nms = NonMaxSuppression::new();
         nms.set_mode(SuppressionMode::Remove);
 
         let rect = BoundingRect::from_center(0.0, 0.0, 1.0, 1.0);
@@ -190,7 +174,7 @@ mod tests {
 
     #[test]
     fn nms_ignores_nonoverlapping() {
-        let mut nms = NonMaxSuppression::new(0.5);
+        let mut nms = NonMaxSuppression::new();
         nms.set_mode(SuppressionMode::Remove);
 
         let a = RawDetection::new(1.0, BoundingRect::from_center(0.0, 0.0, 1.0, 1.0));
@@ -202,7 +186,7 @@ mod tests {
 
     #[test]
     fn nma_averages_detections() {
-        let mut nms = NonMaxSuppression::new(0.75);
+        let mut nms = NonMaxSuppression::new();
         nms.set_mode(SuppressionMode::Average);
         nms.set_iou_thresh(0.0);
 

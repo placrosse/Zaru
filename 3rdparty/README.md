@@ -17,6 +17,7 @@ Note that files may have been converted from other formats.
 | `onnx/mobilefacenet.onnx` | [InsightFace_PyTorch] | MIT
 | `onnx/palm_detection_full.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/palm_detection_lite.onnx` | [MediaPipe] | Apache-2.0
+| `onnx/pose_detection.onnx` | [MediaPipe] | Apache-2.0
 | `image/laughing_man.gif` | Ghost in the Shell / Tumblr | Unknown
 | `image/plead-base.png` | [Twemoji] | CC BY 4.0
 | `image/plead-eye.png` | [Twemoji] | CC BY 4.0
@@ -35,3 +36,8 @@ The deep learning tooling situation is a nightmare. Here's some random and unhel
   "Resize" instead.
 - `tf2onnx` by default will use the TensorFlow CNN format, which introduces an unnecessary
   "Transpose" node at the input. Pass `--inputs-as-nchw input_1` to it to avoid this.
+- Attempting to convert sparse TFLite models with `tf2onnx` might fail due to a segfault. In that
+  case, [`tflite2tensorflow`] can be used to convert the model to a regular, dense TensorFlow
+  `saved_model`, which can then be converted to an ONNX model.
+
+[`tflite2tensorflow`]: https://github.com/PINTO0309/tflite2tensorflow
