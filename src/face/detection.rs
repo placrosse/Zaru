@@ -16,27 +16,10 @@ use crate::{
     },
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
     nn::{create_linear_color_mapper, point_to_img, Cnn, CnnInputShape, NeuralNetwork},
-    num::sigmoid,
+    num::{sigmoid, TotalF32},
     resolution::Resolution,
     timer::Timer,
 };
-
-const MODEL_DATA: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/3rdparty/onnx/face_detection_short_range.onnx"
-));
-
-static MODEL: Lazy<Cnn> = Lazy::new(|| {
-    Cnn::new(
-        NeuralNetwork::from_onnx(MODEL_DATA)
-            .unwrap()
-            .load()
-            .unwrap(),
-        CnnInputShape::NCHW,
-        create_linear_color_mapper(-1.0..=1.0),
-    )
-    .unwrap()
-});
 
 /// Neural-Network based face detector.
 pub struct Detector {
@@ -51,18 +34,22 @@ pub struct Detector {
     detections: Vec<Detection>,
 }
 
+/// The default detector uses the short-range neural network.
+impl Default for Detector {
+    fn default() -> Self {
+        Self::new(ShortRangeNetwork)
+    }
+}
+
 impl Detector {
     const DEFAULT_THRESH: f32 = 0.5;
 
     /// Creates a new face detector.
-    pub fn new() -> Self {
-        let anchors = Anchors::calculate(&AnchorParams {
-            layers: &[LayerInfo::new(2, 16, 16), LayerInfo::new(6, 8, 8)],
-        });
-
+    pub fn new<N: DetectionNetwork>(network: N) -> Self {
+        drop(network);
         Self {
-            model: &MODEL,
-            anchors,
+            model: N::cnn(),
+            anchors: N::anchors(),
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             t_nms: Timer::new("NMS"),
@@ -106,12 +93,13 @@ impl Detector {
         let result = self.t_infer.time(|| self.model.estimate(&image)).unwrap();
         log::trace!("inference result: {:?}", result);
 
+        let num_anchors = self.anchors.anchor_count();
         self.t_nms.time(|| {
             let boxes = &result[0];
             let confidences = &result[1];
 
-            assert_eq!(boxes.shape(), &[1, 896, 16]);
-            assert_eq!(confidences.shape(), &[1, 896, 1]);
+            assert_eq!(boxes.shape(), &[1, num_anchors, 16]);
+            assert_eq!(confidences.shape(), &[1, num_anchors, 1]);
             for (index, view) in confidences.index([0]).iter().enumerate() {
                 let conf = sigmoid(view.as_slice()[0]);
                 if conf <= self.thresh {
@@ -122,6 +110,18 @@ impl Detector {
                 let box_params = tensor_view.as_slice();
                 self.raw_detections
                     .push(extract_detection(&self.anchors[index], box_params, conf));
+            }
+
+            if self.raw_detections.is_empty() {
+                log::trace!(
+                    "no detection above threshold; max confidence = {}",
+                    confidences
+                        .index([0])
+                        .iter()
+                        .map(|view| sigmoid(view.as_slice()[0]))
+                        .max_by_key(|f| TotalF32(*f))
+                        .unwrap()
+                );
             }
 
             let detections = self.nms.process(&mut self.raw_detections);
@@ -258,4 +258,73 @@ fn extract_detection(anchor: &Anchor, box_params: &[f32], confidence: f32) -> Ra
             lm(box_params[14], box_params[15]),
         ],
     )
+}
+
+pub trait DetectionNetwork {
+    fn cnn() -> &'static Cnn;
+    fn anchors() -> Anchors;
+}
+
+/// A small and efficient detection network, best for faces in <3m of the camera.
+pub struct ShortRangeNetwork;
+
+impl DetectionNetwork for ShortRangeNetwork {
+    fn cnn() -> &'static Cnn {
+        const MODEL_DATA: &[u8] = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/3rdparty/onnx/face_detection_short_range.onnx"
+        ));
+
+        static MODEL: Lazy<Cnn> = Lazy::new(|| {
+            Cnn::new(
+                NeuralNetwork::from_onnx(MODEL_DATA)
+                    .unwrap()
+                    .load()
+                    .unwrap(),
+                CnnInputShape::NCHW,
+                create_linear_color_mapper(-1.0..=1.0),
+            )
+            .unwrap()
+        });
+
+        &MODEL
+    }
+
+    fn anchors() -> Anchors {
+        Anchors::calculate(&AnchorParams {
+            layers: &[LayerInfo::new(2, 16, 16), LayerInfo::new(6, 8, 8)],
+        })
+    }
+}
+
+/// A larger detection network with a greater detection range. Does not currently work.
+pub struct FullRangeNetwork;
+
+impl DetectionNetwork for FullRangeNetwork {
+    fn cnn() -> &'static Cnn {
+        const MODEL_DATA: &[u8] = include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/3rdparty/onnx/face_detection_full_range.onnx"
+        ));
+
+        static MODEL: Lazy<Cnn> = Lazy::new(|| {
+            Cnn::new(
+                NeuralNetwork::from_onnx(MODEL_DATA)
+                    .unwrap()
+                    .load()
+                    .unwrap(),
+                CnnInputShape::NCHW,
+                create_linear_color_mapper(-1.0..=1.0),
+            )
+            .unwrap()
+        });
+
+        &MODEL
+    }
+
+    fn anchors() -> Anchors {
+        Anchors::calculate(&AnchorParams {
+            layers: &[LayerInfo::new(1, 48, 48)],
+        })
+    }
 }

@@ -33,6 +33,12 @@ pub struct LayerInfo {
 }
 
 impl LayerInfo {
+    /// Creates a new SSD layer description.
+    ///
+    /// # Parameters
+    ///
+    /// - `boxes_per_cell`: the number of boxes associated with each cell in this feature map.
+    /// - `width`/`height`: size of this layer's feature map, in output cells.
     pub fn new(boxes_per_cell: u32, width: u32, height: u32) -> Self {
         assert_ne!(boxes_per_cell, 0);
         Self {
@@ -73,6 +79,11 @@ impl Anchors {
         }
 
         Self { anchors }
+    }
+
+    /// Returns the total number of SSD anchors/priors.
+    pub fn anchor_count(&self) -> usize {
+        self.anchors.len()
     }
 }
 

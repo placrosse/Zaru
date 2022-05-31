@@ -70,7 +70,7 @@ fn main() -> Result<(), zaru::Error> {
     let embeddings = image_paths
         .par_iter()
         .map_init(
-            || Detector::new(),
+            || Detector::default(),
             |det, (path, class)| {
                 let image = Image::load(path).unwrap();
 

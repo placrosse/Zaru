@@ -1,7 +1,13 @@
-use zaru::{face::detection::Detector, gui, webcam::Webcam};
+use zaru::{
+    face::detection::{Detector, ShortRangeNetwork},
+    gui,
+    webcam::Webcam,
+};
 
 fn main() -> Result<(), zaru::Error> {
-    let mut detector = Detector::new();
+    zaru::init_logger!();
+
+    let mut detector = Detector::new(ShortRangeNetwork);
     let input_ratio = detector.input_resolution().aspect_ratio();
 
     let webcam = Webcam::open()?;

@@ -18,7 +18,7 @@ const H: u32 = 512;
 fn main() -> Result<(), zaru::Error> {
     zaru::init_logger!();
 
-    let mut detector = Detector::new();
+    let mut detector = Detector::default();
     let mut tracker = LandmarkTracker::new();
 
     let mut canvas = Image::new(W, H);

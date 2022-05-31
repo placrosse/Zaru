@@ -12,7 +12,7 @@ fn main() -> Result<(), zaru::Error> {
         include_bytes!("../3rdparty/image/laughing_man.gif"),
         AnimationFormat::Gif,
     )?;
-    let mut detector = Detector::new();
+    let mut detector = Detector::default();
 
     let webcam = Webcam::open()?;
     let mut frames = animation.frames().cycle();

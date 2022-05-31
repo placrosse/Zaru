@@ -70,7 +70,7 @@ fn main() -> Result<(), Error> {
 
                 let mut procrustes_analyzer =
                     ProcrustesAnalyzer::new(landmark::reference_positions());
-                let mut detector = Detector::new();
+                let mut detector = Detector::default();
                 let mut tracker = LandmarkTracker::new();
                 let input_ratio = detector.input_resolution().aspect_ratio();
 

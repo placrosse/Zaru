@@ -22,7 +22,7 @@ pub struct PalmDetector {
 }
 
 impl PalmDetector {
-    pub fn new<P: PalmDetectionModel>(model: P) -> Self {
+    pub fn new<P: PalmDetectionNetwork>(model: P) -> Self {
         drop(model);
         Self {
             model: P::cnn(),
@@ -132,13 +132,13 @@ impl Detection {
     }
 }
 
-pub trait PalmDetectionModel {
+pub trait PalmDetectionNetwork {
     fn cnn() -> &'static Cnn;
 }
 
 pub struct LiteModel;
 
-impl PalmDetectionModel for LiteModel {
+impl PalmDetectionNetwork for LiteModel {
     fn cnn() -> &'static Cnn {
         const MODEL_DATA: &[u8] = include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -163,7 +163,7 @@ impl PalmDetectionModel for LiteModel {
 
 pub struct FullModel;
 
-impl PalmDetectionModel for FullModel {
+impl PalmDetectionNetwork for FullModel {
     fn cnn() -> &'static Cnn {
         const MODEL_DATA: &[u8] = include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),

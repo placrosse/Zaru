@@ -9,6 +9,7 @@ Note that files may have been converted from other formats.
 |------|--------|---------|
 | `3d/canonical_face_model.obj` | [MediaPipe] | Apache-2.0
 | `3d/canonical_face_model.rs` | [MediaPipe] | Apache-2.0
+| `onnx/face_detection_full_range.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/face_detection_short_range.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/face_landmark.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/hand_landmark_full.onnx` | [MediaPipe] | Apache-2.0
