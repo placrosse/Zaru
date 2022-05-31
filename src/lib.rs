@@ -32,14 +32,14 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Detection, registration and recognition of human faces.
 pub mod face {
-    pub mod detector;
+    pub mod detection;
     pub mod eye;
     pub mod landmark;
 }
 
 /// Human body detection and pose estimation.
 pub mod body {
-    pub mod detector;
+    pub mod detection;
 }
 
 /// macro-use only, not part of public API.

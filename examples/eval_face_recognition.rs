@@ -16,7 +16,7 @@ use itertools::Itertools;
 use nalgebra::RealField;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use zaru::{
-    face::detector::Detector,
+    face::detection::Detector,
     image::Image,
     iter::zip_exact,
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork},

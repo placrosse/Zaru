@@ -1,4 +1,4 @@
-use zaru::{face::detector::Detector, gui, webcam::Webcam};
+use zaru::{face::detection::Detector, gui, webcam::Webcam};
 
 fn main() -> Result<(), zaru::Error> {
     let mut detector = Detector::new();

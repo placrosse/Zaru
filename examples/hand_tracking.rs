@@ -2,7 +2,7 @@
 
 use zaru::{
     gui,
-    hand::detector::{LiteModel, PalmDetector},
+    hand::detection::{LiteModel, PalmDetector},
     webcam::Webcam,
 };
 

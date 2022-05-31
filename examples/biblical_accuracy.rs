@@ -2,7 +2,7 @@
 
 use zaru::{
     face::{
-        detector::Detector,
+        detection::Detector,
         landmark::{LandmarkTracker, TrackedFace},
     },
     gui,

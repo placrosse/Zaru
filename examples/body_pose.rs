@@ -1,4 +1,4 @@
-use zaru::{body::detector::PoseDetector, gui, webcam::Webcam};
+use zaru::{body::detection::PoseDetector, gui, webcam::Webcam};
 
 fn main() -> Result<(), zaru::Error> {
     let mut detector = PoseDetector::new();

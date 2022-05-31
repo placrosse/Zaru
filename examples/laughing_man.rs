@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use zaru::{
     anim::{Animation, AnimationFormat},
-    face::detector::Detector,
+    face::detection::Detector,
     gui,
     webcam::Webcam,
 };

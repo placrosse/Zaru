@@ -1,6 +1,6 @@
 mod facetracking;
 
-use zaru::face::detector::{Detection, Detector};
+use zaru::face::detection::{Detection, Detector};
 use zaru::face::eye::EyeLandmarker;
 use zaru::face::landmark::{self, LandmarkResult, LandmarkTracker, TrackedFace};
 use zaru::image::{AsImageView, Color, Image, ImageView, ImageViewMut};

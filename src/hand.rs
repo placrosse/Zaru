@@ -1,6 +1,6 @@
 //! Detection and pose estimation of human hands.
 
-pub mod detector;
+pub mod detection;
 
 /// Names for the hand pose landmarks.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
