@@ -2,14 +2,20 @@
 
 use zaru::{
     gui,
-    hand::detection::{LiteModel, PalmDetector},
+    hand::detection::{FullModel, LiteModel, PalmDetector},
     webcam::Webcam,
 };
+
+const FULL_RANGE: bool = false;
 
 fn main() -> Result<(), zaru::Error> {
     zaru::init_logger!();
 
-    let mut detector = PalmDetector::new(LiteModel);
+    let mut detector = if FULL_RANGE {
+        PalmDetector::new(FullModel)
+    } else {
+        PalmDetector::new(LiteModel)
+    };
     let input_ratio = detector.input_resolution().aspect_ratio();
 
     let webcam = Webcam::open()?;

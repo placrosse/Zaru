@@ -81,10 +81,11 @@ impl Detector {
         self.detections.clear();
 
         let full_res = image.resolution();
+        let input_resolution = self.input_resolution();
 
         let mut image = image.reborrow();
         let resized;
-        if image.resolution() != self.input_resolution() {
+        if image.resolution() != input_resolution {
             resized = self
                 .t_resize
                 .time(|| image.aspect_aware_resize(self.model.input_resolution()));
@@ -108,8 +109,12 @@ impl Detector {
 
                 let tensor_view = boxes.index([0, index]);
                 let box_params = tensor_view.as_slice();
-                self.raw_detections
-                    .push(extract_detection(&self.anchors[index], box_params, conf));
+                self.raw_detections.push(extract_detection(
+                    &self.anchors[index],
+                    input_resolution,
+                    box_params,
+                    conf,
+                ));
             }
 
             if self.raw_detections.is_empty() {
@@ -232,17 +237,25 @@ impl Detection {
     }
 }
 
-fn extract_detection(anchor: &Anchor, box_params: &[f32], confidence: f32) -> RawDetection {
+fn extract_detection(
+    anchor: &Anchor,
+    input_res: Resolution,
+    box_params: &[f32],
+    confidence: f32,
+) -> RawDetection {
     assert_eq!(box_params.len(), 16);
 
-    let xc = box_params[0] / 128.0 + anchor.x_center();
-    let yc = box_params[1] / 128.0 + anchor.y_center();
-    let w = box_params[2] / 128.0;
-    let h = box_params[3] / 128.0;
+    let input_w = input_res.width() as f32;
+    let input_h = input_res.height() as f32;
+
+    let xc = box_params[0] / input_w + anchor.x_center();
+    let yc = box_params[1] / input_h + anchor.y_center();
+    let w = box_params[2] / input_w;
+    let h = box_params[3] / input_h;
     let lm = |x, y| {
         crate::detection::Landmark::new(
-            x / 128.0 + anchor.x_center(),
-            y / 128.0 + anchor.y_center(),
+            x / input_w + anchor.x_center(),
+            y / input_h + anchor.y_center(),
         )
     };
 
@@ -260,12 +273,19 @@ fn extract_detection(anchor: &Anchor, box_params: &[f32], confidence: f32) -> Ra
     )
 }
 
+/// Trait for supported face detection networks.
+///
+/// This is a trait instead of an enum to ensure that only the networks used by the application are
+/// included in the binary.
 pub trait DetectionNetwork {
     fn cnn() -> &'static Cnn;
     fn anchors() -> Anchors;
+
+    #[doc(hidden)]
+    fn __private_dont_implement();
 }
 
-/// A small and efficient detection network, best for faces in <3m of the camera.
+/// A small and efficient face detection network, best for faces in <3m of the camera.
 pub struct ShortRangeNetwork;
 
 impl DetectionNetwork for ShortRangeNetwork {
@@ -295,9 +315,12 @@ impl DetectionNetwork for ShortRangeNetwork {
             layers: &[LayerInfo::new(2, 16, 16), LayerInfo::new(6, 8, 8)],
         })
     }
+
+    fn __private_dont_implement() {}
 }
 
-/// A larger detection network with a greater detection range. Does not currently work.
+/// A larger detection network with a greater detection range, but slower inference speed (around 5
+/// times that of [`ShortRangeNetwork`]).
 pub struct FullRangeNetwork;
 
 impl DetectionNetwork for FullRangeNetwork {
@@ -327,4 +350,6 @@ impl DetectionNetwork for FullRangeNetwork {
             layers: &[LayerInfo::new(1, 48, 48)],
         })
     }
+
+    fn __private_dont_implement() {}
 }
