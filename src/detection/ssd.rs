@@ -50,6 +50,21 @@ impl LayerInfo {
 
 pub struct AnchorParams<'a> {
     /// List of output layers.
+    ///
+    /// The easiest way to figure out the right values is to use a tool like [Netron] to visualize
+    /// the network graph, and look at how the *confidence tensor* (not the actual box data) is
+    /// composed. Note that `Concat` nodes typically have their inputs displayed in reverse order,
+    /// and `Transpose`/`Reshape` nodes might be inserted before the output. The layer information
+    /// can be derived from the tensor shape *before* it goes through these nodes.
+    ///
+    /// Example: `face_detection_short_range` has a `1×6×8×8` and a `1×2×16×16` tensor produced by
+    /// `Conv` nodes, which then go through `Transpose`, `Reshape`, and `Concat` before being output
+    /// as confidence values. Since the `Concat` order is reversed, the `1×2×16×16` data comes
+    /// first, then the `1×6×8×8` data. Therefore, the anchors can be computed from two
+    /// [`LayerInfo`]s, the first with 2 boxes per cell and 16x16 cells, the second with 6 boxes per
+    /// cell and 8x8 cells.
+    ///
+    /// [Netron]: https://netron.app/
     pub layers: &'a [LayerInfo],
 }
 

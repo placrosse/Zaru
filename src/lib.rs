@@ -40,6 +40,7 @@ pub mod face {
 /// Human body detection and pose estimation.
 pub mod body {
     pub mod detection;
+    pub mod landmark;
 }
 
 /// macro-use only, not part of public API.
@@ -54,6 +55,7 @@ pub fn init_logger(calling_crate: &'static str) {
         .filter(Some(calling_crate), log_level)
         .filter(Some(env!("CARGO_PKG_NAME")), log_level)
         .filter(Some("wgpu"), LevelFilter::Warn)
+        .parse_default_env()
         .try_init()
         .ok();
 }

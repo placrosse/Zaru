@@ -64,8 +64,8 @@ impl PalmDetector {
             let boxes = &result[0];
             let confidences = &result[1];
 
-            assert_eq!(confidences.shape(), &[1, 2016, 1]);
             assert_eq!(boxes.shape(), &[1, 2016, 18]);
+            assert_eq!(confidences.shape(), &[1, 2016, 1]);
             let max = confidences
                 .index([0])
                 .iter()
@@ -136,9 +136,9 @@ pub trait PalmDetectionNetwork {
     fn cnn() -> &'static Cnn;
 }
 
-pub struct LiteModel;
+pub struct LiteNetwork;
 
-impl PalmDetectionNetwork for LiteModel {
+impl PalmDetectionNetwork for LiteNetwork {
     fn cnn() -> &'static Cnn {
         const MODEL_DATA: &[u8] = include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -161,9 +161,9 @@ impl PalmDetectionNetwork for LiteModel {
     }
 }
 
-pub struct FullModel;
+pub struct FullNetwork;
 
-impl PalmDetectionNetwork for FullModel {
+impl PalmDetectionNetwork for FullNetwork {
     fn cnn() -> &'static Cnn {
         const MODEL_DATA: &[u8] = include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),

@@ -84,6 +84,8 @@ impl Animation {
     }
 
     /// Creates an animation from a sequence of frames.
+    ///
+    /// This copies the image data from each frame into the returned [`Animation`].
     pub fn from_frames<'a, I>(frames: I) -> Self
     where
         I: IntoIterator<Item = AnimationFrame<'a>>,
