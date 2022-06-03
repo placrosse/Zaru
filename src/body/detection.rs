@@ -88,7 +88,7 @@ impl PoseDetector {
         if image.resolution() != input_resolution {
             resized = self
                 .t_resize
-                .time(|| image.aspect_aware_resize(self.cnn.input_resolution()));
+                .time(|| image.aspect_aware_resize(input_resolution));
             image = resized.as_view();
         }
         let result = self.t_infer.time(|| self.cnn.estimate(&image)).unwrap();
@@ -105,7 +105,7 @@ impl PoseDetector {
             for (index, view) in confidences.index([0]).iter().enumerate() {
                 let conf = sigmoid(view.as_slice()[0]);
 
-                if conf <= self.thresh {
+                if conf < self.thresh {
                     continue;
                 }
 

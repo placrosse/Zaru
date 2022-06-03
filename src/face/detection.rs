@@ -103,7 +103,7 @@ impl Detector {
             assert_eq!(confidences.shape(), &[1, num_anchors, 1]);
             for (index, view) in confidences.index([0]).iter().enumerate() {
                 let conf = sigmoid(view.as_slice()[0]);
-                if conf <= self.thresh {
+                if conf < self.thresh {
                     continue;
                 }
 

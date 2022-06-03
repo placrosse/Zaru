@@ -1,8 +1,7 @@
-//! This doesn't work yet.
-
 use zaru::{
     gui,
     hand::detection::{FullNetwork, LiteNetwork, PalmDetector},
+    timer::FpsCounter,
     webcam::Webcam,
 };
 
@@ -16,19 +15,18 @@ fn main() -> Result<(), zaru::Error> {
     } else {
         PalmDetector::new(LiteNetwork)
     };
-    let input_ratio = detector.input_resolution().aspect_ratio();
 
-    let webcam = Webcam::open()?;
-    for result in webcam {
-        let mut image = result?;
+    let mut fps = FpsCounter::new("hand tracker");
+    let mut webcam = Webcam::open()?;
+    loop {
+        let mut image = webcam.read()?;
 
-        let view_rect = image.resolution().fit_aspect_ratio(input_ratio);
-        for detection in detector.detect(image.view(&view_rect)) {
+        for detection in detector.detect(&image) {
             detection.draw(&mut image);
         }
 
         gui::show_image("hand tracking", &image);
-    }
 
-    Ok(())
+        fps.tick_with(webcam.timers().into_iter().chain(detector.timers()));
+    }
 }
