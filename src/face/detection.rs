@@ -233,7 +233,7 @@ impl Detection {
             image::draw_marker(image, x, y);
         }
 
-        image::draw_rect(image, self.bounding_rect_loose()).color(Color::from_rgb8(0, 255, 0));
+        image::draw_rect(image, self.bounding_rect_loose()).color(Color::GREEN);
     }
 }
 

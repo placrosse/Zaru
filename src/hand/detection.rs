@@ -8,7 +8,7 @@ use crate::{
         ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
         BoundingRect, RawDetection,
     },
-    image::{self, AsImageView, AsImageViewMut, ImageView, ImageViewMut, Rect},
+    image::{self, AsImageView, AsImageViewMut, ImageView, ImageViewMut, Rect, Color},
     nn::{create_linear_color_mapper, point_to_img, Cnn, CnnInputShape, NeuralNetwork},
     num::sigmoid,
     resolution::Resolution,
@@ -156,6 +156,10 @@ pub struct Detection {
 }
 
 impl Detection {
+    pub fn confidence(&self) -> f32 {
+        self.raw.confidence()
+    }
+
     pub fn bounding_rect(&self) -> Rect {
         self.raw.bounding_rect().to_rect(&self.full_res)
     }
@@ -177,11 +181,11 @@ impl Detection {
             "attempted to draw `Detection` onto canvas with mismatched size",
         );
 
-        image::draw_rect(image, self.bounding_rect());
+        image::draw_rect(image, self.bounding_rect()).color(Color::BLUE);
         for (i, lm) in self.raw.landmarks().iter().enumerate() {
             let (x, y) = point_to_img(lm.x(), lm.y(), &self.full_res);
-            image::draw_marker(image, x, y);
-            image::draw_text(image, x, y - 5, &i.to_string());
+            image::draw_marker(image, x, y).color(Color::BLUE);
+            image::draw_text(image, x, y - 5, &i.to_string()).color(Color::BLUE);
         }
     }
 }

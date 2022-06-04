@@ -42,16 +42,7 @@ impl Landmarker {
         self.cnn.input_resolution()
     }
 
-    /// Computes facial landmarks in `image`.
-    ///
-    /// `image` must be a cropped image of a face. When using [`Detector`], the
-    /// rectangle returned by [`Detection::bounding_rect_loose`] produces good results.
-    ///
-    /// The image should depict a face that is mostly upright. Results will be poor if the face is
-    /// rotated too much.
-    ///
-    /// [`Detector`]: super::detector::Detector
-    /// [`Detection::bounding_rect_loose`]: super::detector::Detection::bounding_rect_loose
+    /// Computes body landmarks in `image`.
     pub fn compute<V: AsImageView>(&mut self, image: &V) -> &LandmarkResult {
         self.compute_impl(image.as_view())
     }
