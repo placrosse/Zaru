@@ -114,8 +114,8 @@ impl EyeLandmarker {
     }
 
     /// Returns profiling timers for image resizing and neural inference.
-    pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
-        [&self.t_resize, &self.t_infer]
+    pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
+        [&self.t_resize, &self.t_infer].into_iter()
     }
 }
 

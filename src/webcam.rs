@@ -119,8 +119,8 @@ impl Webcam {
     }
 
     /// Returns profiling timers for webcam access and decoding.
-    pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
-        [&self.t_dequeue, &self.t_decode]
+    pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
+        [&self.t_dequeue, &self.t_decode].into_iter()
     }
 }
 

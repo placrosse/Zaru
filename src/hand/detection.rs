@@ -8,7 +8,7 @@ use crate::{
         ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
         BoundingRect, RawDetection,
     },
-    image::{self, AsImageView, AsImageViewMut, ImageView, ImageViewMut, Rect, Color},
+    image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
     nn::{create_linear_color_mapper, point_to_img, Cnn, CnnInputShape, NeuralNetwork},
     num::sigmoid,
     resolution::Resolution,
@@ -108,8 +108,8 @@ impl PalmDetector {
         &self.detections
     }
 
-    pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
-        [&self.t_resize, &self.t_infer, &self.t_nms]
+    pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
+        [&self.t_resize, &self.t_infer, &self.t_nms].into_iter()
     }
 }
 

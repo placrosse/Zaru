@@ -139,8 +139,8 @@ impl Detector {
     }
 
     /// Returns profiling timers for image resizing, neural inference, and detection filtering.
-    pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
-        [&self.t_resize, &self.t_infer, &self.t_nms]
+    pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
+        [&self.t_resize, &self.t_infer, &self.t_nms].into_iter()
     }
 }
 

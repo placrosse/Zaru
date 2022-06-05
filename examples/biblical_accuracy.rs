@@ -83,7 +83,6 @@ fn main() -> Result<(), zaru::Error> {
             fps.tick_with(
                 webcam
                     .timers()
-                    .into_iter()
                     .chain(tracker.landmarker().timers())
                     .chain([&blit_timer]),
             );

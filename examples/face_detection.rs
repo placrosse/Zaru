@@ -31,6 +31,6 @@ fn main() -> Result<(), zaru::Error> {
 
         gui::show_image("face detection", &image);
 
-        fps.tick_with(webcam.timers().into_iter().chain(detector.timers()));
+        fps.tick_with(webcam.timers().chain(detector.timers()));
     }
 }

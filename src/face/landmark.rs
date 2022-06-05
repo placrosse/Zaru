@@ -14,6 +14,7 @@ use crate::{
     image::{AsImageView, ImageView, Rect},
     iter::zip_exact,
     nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
+    num::sigmoid,
     resolution::{AspectRatio, Resolution},
     timer::Timer,
 };
@@ -97,7 +98,7 @@ impl Landmarker {
         let result = self.t_infer.time(|| self.model.estimate(&image)).unwrap();
         log::trace!("inference result: {:?}", result);
 
-        self.result_buffer.face_flag = result[1].index([0, 0, 0, 0]).as_singular();
+        self.result_buffer.face_flag = sigmoid(result[1].index([0, 0, 0, 0]).as_singular());
         for (coords, out) in zip_exact(
             result[0].index([0, 0, 0]).as_slice().chunks(3),
             &mut self.result_buffer.landmarks.positions,
@@ -111,8 +112,8 @@ impl Landmarker {
     }
 
     /// Returns profiling timers for image resizing and neural inference.
-    pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
-        [&self.t_resize, &self.t_infer]
+    pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
+        [&self.t_resize, &self.t_infer].into_iter()
     }
 }
 
@@ -160,13 +161,12 @@ impl LandmarkResult {
 
     /// Returns the confidence that the input image contains a proper face.
     ///
+    /// The returned value is in range 0.0 to 1.0.
+    ///
     /// This can be used to estimate the fit quality, or to re-run face detection if that isn't done
-    /// each frame. Typical values are >20.0 when a good landmark fit is produced, between 10 and 20
-    /// when the face is rotated a bit too far, and <10 when the face is rotated much too far or
-    /// there is no face in the input image.
+    /// each frame.
     #[inline]
     pub fn face_confidence(&self) -> f32 {
-        // TODO: sigmoid?
         self.face_flag
     }
 
@@ -298,7 +298,7 @@ pub struct LandmarkTracker {
 }
 
 impl LandmarkTracker {
-    const DEFAULT_TRACKING_LOSS_THRESHOLD: f32 = 10.0;
+    const DEFAULT_TRACKING_LOSS_THRESHOLD: f32 = 0.5;
 
     /// Creates a new landmark tracker which initially does not track a face.
     pub fn new() -> Self {

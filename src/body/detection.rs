@@ -128,8 +128,8 @@ impl PoseDetector {
         &self.detections
     }
 
-    pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
-        [&self.t_resize, &self.t_infer, &self.t_nms]
+    pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
+        [&self.t_resize, &self.t_infer, &self.t_nms].into_iter()
     }
 }
 
