@@ -76,8 +76,8 @@ impl Landmarker {
     /// The image should depict a face that is mostly upright. Results will be poor if the face is
     /// rotated too much.
     ///
-    /// [`Detector`]: super::detector::Detector
-    /// [`Detection::bounding_rect_loose`]: super::detector::Detection::bounding_rect_loose
+    /// [`Detector`]: super::detection::Detector
+    /// [`Detection::bounding_rect_loose`]: super::detection::Detection::bounding_rect_loose
     pub fn compute<V: AsImageView>(&mut self, image: &V) -> &LandmarkResult {
         self.compute_impl(image.as_view())
     }
@@ -289,7 +289,7 @@ impl Into<usize> for LandmarkIdx {
 /// in cases where the application would compute the landmarks anyways. If the landmarks aren't
 /// needed, smoothing the detections directly using a [`DetectionFilter`] is probably more efficient.
 ///
-/// [`Detector`]: super::detector::Detector
+/// [`Detector`]: super::detection::Detector
 /// [`DetectionFilter`]: crate::detection::DetectionFilter
 pub struct LandmarkTracker {
     lm: Landmarker,
