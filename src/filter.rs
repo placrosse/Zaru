@@ -2,11 +2,9 @@
 
 mod alpha_beta;
 mod moving;
-mod variance_aware;
 
 pub use alpha_beta::AlphaBetaFilter;
 pub use moving::{Ema, MovingAvg};
-pub use variance_aware::VarianceAwareAvg;
 
 /// A filter for values of type `V`.
 pub trait Filter<V> {
