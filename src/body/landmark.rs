@@ -1,12 +1,12 @@
 //! Body pose landmark prediction. Not yet fully implemented.
 
-#![allow(warnings)]
-
 use once_cell::sync::Lazy;
 
 use crate::{
-    image::{AsImageView, ImageView},
-    nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork},
+    image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut},
+    iter::zip_exact,
+    nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
+    num::sigmoid,
     resolution::{AspectRatio, Resolution},
     timer::Timer,
 };
@@ -26,13 +26,16 @@ impl Landmarker {
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             result_buffer: LandmarkResult {
-                landmarks: Landmarks {
-                    positions: [(0.0, 0.0, 0.0); 33],
-                },
-                face_flag: 0.0,
+                landmarks: [Landmark {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                    presence: 0.0,
+                    visibility: 0.0,
+                }; 39],
+                pose_presence: 0.0,
                 orig_res: Resolution::new(1, 1),
                 orig_aspect: AspectRatio::SQUARE,
-                input_res: N::cnn().input_resolution(),
             },
         }
     }
@@ -50,8 +53,9 @@ impl Landmarker {
     fn compute_impl(&mut self, image: ImageView<'_>) -> &LandmarkResult {
         let input_res = self.input_resolution();
         let full_res = image.resolution();
+        let orig_aspect = full_res.aspect_ratio();
         self.result_buffer.orig_res = full_res;
-        self.result_buffer.orig_aspect = full_res.aspect_ratio();
+        self.result_buffer.orig_aspect = orig_aspect;
 
         let mut image = image.reborrow();
         let resized;
@@ -59,27 +63,87 @@ impl Landmarker {
             resized = self.t_resize.time(|| image.aspect_aware_resize(input_res));
             image = resized.as_view();
         }
-        let result = self.t_infer.time(|| self.cnn.estimate(&image)).unwrap();
-        log::trace!("inference result: {:?}", result);
+        let outputs = self.t_infer.time(|| self.cnn.estimate(&image)).unwrap();
+        log::trace!("cnn outputs: {:?}", outputs);
 
-        todo!()
+        let screen_landmarks = &outputs[0];
+        let pose_flag = &outputs[1];
+        let segmentation = &outputs[2];
+        let heatmap = &outputs[3];
+        let world_landmarks = &outputs[4];
+
+        // 33 pose landmarks (`LandmarkIdx`), 6 auxiliary landmarks
+        assert_eq!(screen_landmarks.shape(), &[1, 195]); // 39 landmarks * 5 values
+        assert_eq!(pose_flag.shape(), &[1, 1]);
+        assert_eq!(segmentation.shape(), &[1, 256, 256, 1]);
+        assert_eq!(heatmap.shape(), &[1, 64, 64, 39]);
+        assert_eq!(world_landmarks.shape(), &[1, 117]); // 39 landmarks * 3 values
+
+        self.result_buffer.pose_presence = pose_flag.index([0, 0]).as_singular();
+
+        for (coords, out) in zip_exact(
+            screen_landmarks.index([0]).as_slice().chunks(5),
+            &mut self.result_buffer.landmarks,
+        ) {
+            let (x, y, z) = (coords[0], coords[1], coords[2]);
+
+            let (x, y) = unadjust_aspect_ratio(
+                x / input_res.width() as f32,
+                y / input_res.height() as f32,
+                orig_aspect,
+            );
+            let (x, y) = (x * full_res.width() as f32, y * full_res.height() as f32);
+
+            out.x = x;
+            out.y = y;
+            out.z = z;
+            out.visibility = coords[3];
+            out.presence = coords[4];
+        }
+
+        &self.result_buffer
+    }
+
+    pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
+        [&self.t_resize, &self.t_infer]
     }
 }
 
 /// Landmark results returned by [`Landmarker::compute`].
 #[derive(Clone)]
 pub struct LandmarkResult {
-    landmarks: Landmarks,
-    face_flag: f32,
     orig_res: Resolution,
     orig_aspect: AspectRatio,
-    input_res: Resolution,
+
+    pose_presence: f32,
+    landmarks: [Landmark; 39],
 }
 
-/// Raw landmark positions.
-#[derive(Clone)]
-pub struct Landmarks {
-    positions: [(f32, f32, f32); 33],
+impl LandmarkResult {
+    pub fn pose_landmarks(&self) -> &[Landmark] {
+        &self.landmarks[..33]
+    }
+
+    pub fn aux_landmarks(&self) -> &[Landmark] {
+        &self.landmarks[33..]
+    }
+
+    pub fn presence(&self) -> f32 {
+        self.pose_presence
+    }
+
+    pub fn draw<I: AsImageViewMut>(&self, target: &mut I) {
+        self.draw_impl(&mut target.as_view_mut());
+    }
+
+    fn draw_impl(&self, target: &mut ImageViewMut<'_>) {
+        for lm in self.pose_landmarks() {
+            image::draw_marker(target, lm.x() as _, lm.y() as _);
+        }
+        for lm in self.aux_landmarks() {
+            image::draw_marker(target, lm.x() as _, lm.y() as _).color(Color::YELLOW);
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -117,6 +181,37 @@ pub enum LandmarkIdx {
     RightHeel = 30,
     LeftFootIndex = 31,
     RightFootIndex = 32,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Landmark {
+    x: f32,
+    y: f32,
+    z: f32,
+    visibility: f32,
+    presence: f32,
+}
+
+impl Landmark {
+    pub fn x(&self) -> f32 {
+        self.x
+    }
+
+    pub fn y(&self) -> f32 {
+        self.y
+    }
+
+    pub fn z(&self) -> f32 {
+        self.z
+    }
+
+    pub fn visibility(&self) -> f32 {
+        sigmoid(self.visibility)
+    }
+
+    pub fn presence(&self) -> f32 {
+        sigmoid(self.presence)
+    }
 }
 
 pub trait LandmarkNetwork {

@@ -59,13 +59,13 @@ impl Landmarker {
             resized = self.t_resize.time(|| image.aspect_aware_resize(input_res));
             image = resized.as_view();
         }
-        let result = self.t_infer.time(|| self.cnn.estimate(&image)).unwrap();
-        log::trace!("cnn outputs: {:?}", result);
+        let outputs = self.t_infer.time(|| self.cnn.estimate(&image)).unwrap();
+        log::trace!("cnn outputs: {:?}", outputs);
 
-        let screen_landmarks = &result[0];
-        let presence_flag = &result[1];
-        let handedness = &result[2];
-        let metric_landmarks = &result[3];
+        let screen_landmarks = &outputs[0];
+        let presence_flag = &outputs[1];
+        let handedness = &outputs[2];
+        let metric_landmarks = &outputs[3];
 
         assert_eq!(screen_landmarks.shape(), &[1, 63]);
         assert_eq!(presence_flag.shape(), &[1, 1]);
@@ -176,10 +176,10 @@ impl LandmarkResult {
     }
 
     pub fn draw<I: AsImageViewMut>(&self, target: &mut I) {
-        self.draw_impl(target.as_view_mut());
+        self.draw_impl(&mut target.as_view_mut());
     }
 
-    fn draw_impl(&self, mut target: ImageViewMut<'_>) {
+    fn draw_impl(&self, target: &mut ImageViewMut<'_>) {
         let hand = match self.handedness() {
             Handedness::Left => "L",
             Handedness::Right => "R",
@@ -188,9 +188,9 @@ impl LandmarkResult {
         let (palm_x, palm_y, _) = self.palm_center();
         let (palm_x, palm_y) = (palm_x as i32, palm_y as i32);
 
-        image::draw_text(&mut target, palm_x, palm_y - 5, hand);
+        image::draw_text(target, palm_x, palm_y - 5, hand);
         image::draw_text(
-            &mut target,
+            target,
             palm_x,
             palm_y + 5,
             &format!("presence={:.2}", self.presence()),
@@ -200,11 +200,10 @@ impl LandmarkResult {
             let (a_x, a_y, _) = self.landmark_position(*a as usize);
             let (b_x, b_y, _) = self.landmark_position(*b as usize);
 
-            image::draw_line(&mut target, a_x as _, a_y as _, b_x as _, b_y as _)
-                .color(Color::GREEN);
+            image::draw_line(target, a_x as _, a_y as _, b_x as _, b_y as _).color(Color::GREEN);
         }
         for (x, y, _) in self.landmark_positions() {
-            image::draw_marker(&mut target, x as i32, y as i32);
+            image::draw_marker(target, x as i32, y as i32);
         }
     }
 }
@@ -363,6 +362,3 @@ impl LandmarkNetwork for FullNetwork {
         &MODEL
     }
 }
-
-// NB: There's also a "heavy" network, but it's >25 MB, so we don't support it. The full network
-// should already perform pretty well.

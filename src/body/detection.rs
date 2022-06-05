@@ -127,6 +127,10 @@ impl PoseDetector {
 
         &self.detections
     }
+
+    pub fn timers(&self) -> impl IntoIterator<Item = &Timer> + '_ {
+        [&self.t_resize, &self.t_infer, &self.t_nms]
+    }
 }
 
 fn extract_detection(
@@ -177,6 +181,18 @@ impl Detection {
         self.raw.bounding_rect().to_rect(&self.full_res)
     }
 
+    pub fn keypoints(&self) -> impl Iterator<Item = (i32, i32)> + '_ {
+        self.raw
+            .landmarks()
+            .iter()
+            .map(|lm| point_to_img(lm.x(), lm.y(), &self.full_res))
+    }
+
+    pub fn keypoint_hips(&self) -> (i32, i32) {
+        let lm = self.raw.landmarks()[0];
+        point_to_img(lm.x(), lm.y(), &self.full_res)
+    }
+
     /// Draws the bounding box and keypoints of this detection onto an image.
     ///
     /// # Panics
@@ -200,17 +216,5 @@ impl Detection {
             image::draw_marker(image, x, y).color(Color::GREEN);
             image::draw_text(image, x, y - 5, &i.to_string()).color(Color::GREEN);
         }
-    }
-
-    pub fn keypoints(&self) -> impl Iterator<Item = (i32, i32)> + '_ {
-        self.raw
-            .landmarks()
-            .iter()
-            .map(|lm| point_to_img(lm.x(), lm.y(), &self.full_res))
-    }
-
-    pub fn keypoint_hips(&self) -> (i32, i32) {
-        let lm = self.raw.landmarks()[0];
-        point_to_img(lm.x(), lm.y(), &self.full_res)
     }
 }

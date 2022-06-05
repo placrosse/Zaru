@@ -13,7 +13,7 @@ use crate::resolution::AspectRatio;
 /// This rectangle type uses (signed) integer coordinates and is meant to be used with the
 /// [`crate::image`] module.
 ///
-/// Rectangles are allowed to be degenerate, ie. to have zero height and/or width.
+/// Rectangles are allowed to have zero height and/or width.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Rect {
     pub(crate) rect: embedded_graphics::primitives::Rectangle,
@@ -186,6 +186,24 @@ impl Rect {
         res
     }
 
+    pub fn grow_move_center(&self, x_center: i32, y_center: i32) -> Self {
+        let w = cmp::max(
+            (i64::from(x_center) - i64::from(self.x())).abs(),
+            (i64::from(x_center) - (i64::from(self.x()) + i64::from(self.width()))).abs(),
+        ) * 2;
+        let h = cmp::max(
+            (i64::from(y_center) - i64::from(self.y())).abs(),
+            (i64::from(y_center) - (i64::from(self.y()) + i64::from(self.height()))).abs(),
+        ) * 2;
+
+        Self::from_center(
+            x_center,
+            y_center,
+            w.try_into().unwrap(),
+            h.try_into().unwrap(),
+        )
+    }
+
     /// Returns the X coordinate of the left side of the rectangle.
     #[inline]
     pub fn x(&self) -> i32 {
@@ -356,5 +374,12 @@ mod tests {
             Rect::from_center(10, 10, 100, 98).grow_to_fit_aspect(AspectRatio::SQUARE),
             Rect::from_center(10, 10, 100, 100),
         );
+    }
+
+    #[test]
+    fn test_grow_move_center() {
+        let orig = Rect::from_top_left(0, 0, 0, 0);
+        assert_eq!(orig.grow_move_center(0, 0), orig);
+        assert_eq!(orig.grow_move_center(1, 0), Rect::from_top_left(0, 0, 2, 0));
     }
 }

@@ -10,19 +10,19 @@ use zaru::{
     webcam::Webcam,
 };
 
-const USE_FULL_DETECTION_MODEL: bool = false;
-const USE_FULL_LANDMARK_MODEL: bool = false;
+const USE_FULL_DETECTION_NETWORK: bool = false;
+const USE_FULL_LANDMARK_NETWORK: bool = false;
 
 fn main() -> Result<(), zaru::Error> {
     zaru::init_logger!();
 
-    let mut detector = if USE_FULL_DETECTION_MODEL {
+    let mut detector = if USE_FULL_DETECTION_NETWORK {
         PalmDetector::new(detection::FullNetwork)
     } else {
         PalmDetector::new(detection::LiteNetwork)
     };
 
-    let mut landmarker = if USE_FULL_LANDMARK_MODEL {
+    let mut landmarker = if USE_FULL_LANDMARK_NETWORK {
         Landmarker::new(landmark::FullNetwork)
     } else {
         Landmarker::new(landmark::LiteNetwork)

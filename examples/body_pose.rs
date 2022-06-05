@@ -7,8 +7,9 @@ use zaru::{
         landmark::{FullNetwork, Landmarker, LiteNetwork},
     },
     gui,
-    image::{Image, Rect},
+    image::{self, Image, Rect, Color},
     num::TotalF32,
+    timer::FpsCounter,
     webcam::Webcam,
 };
 
@@ -52,6 +53,7 @@ fn main() -> Result<(), zaru::Error> {
         Landmarker::new(LiteNetwork)
     };
 
+    let mut fps = FpsCounter::new("body pose");
     for result in video_source {
         let mut image = result?;
 
@@ -60,24 +62,26 @@ fn main() -> Result<(), zaru::Error> {
             detection.draw(&mut image);
         }
 
-        gui::show_image("pose detection", &image);
-
-        let detection = match detections
+        if let Some(detection) = detections
             .iter()
             .max_by_key(|det| TotalF32(det.confidence()))
         {
-            Some(det) => det,
-            None => continue,
-        };
+            let hips = detection.keypoint_hips();
+            let grow_by = 0.15;
+            let body_rect = Rect::bounding(detection.keypoints())
+                .unwrap()
+                .grow_move_center(hips.0, hips.1)
+                .grow_to_fit_aspect(landmarker.input_resolution().aspect_ratio())
+                .grow_rel(grow_by, grow_by, grow_by, grow_by);
+            image::draw_rect(&mut image, body_rect).color(Color::BLUE);
+            let mut body_view = image.view_mut(&body_rect);
+            let landmarks = landmarker.compute(&body_view);
+            landmarks.draw(&mut body_view);
+        }
 
-        let grow_by = 0.75;
-        let body_rect = Rect::bounding(detection.keypoints())
-            .unwrap()
-            .grow_to_fit_aspect(landmarker.input_resolution().aspect_ratio())
-            .grow_rel(grow_by, grow_by, grow_by, grow_by);
-        let body_view = image.view(&body_rect);
-        let _landmarks = landmarker.compute(&body_view);
-        todo!()
+        gui::show_image("pose detection", &image);
+
+        fps.tick_with(detector.timers().into_iter().chain(landmarker.timers()));
     }
 
     Ok(())
