@@ -13,7 +13,7 @@
 
 use crate::{iter::zip_exact, num::TotalF32};
 
-use super::{BoundingRect, Landmark, RawDetection};
+use super::{BoundingRect, Keypoint, RawDetection};
 
 /// A non-maximum suppression algorithm.
 pub struct NonMaxSuppression {
@@ -93,20 +93,20 @@ impl NonMaxSuppression {
                     let mut acc = RawDetection::new(seed.confidence(), acc_rect);
                     let mut divisor = 0.0;
                     for det in &self.avg_buf {
-                        if acc.landmarks().is_empty() && !det.landmarks().is_empty() {
-                            acc.landmarks_mut()
-                                .resize(det.landmarks().len(), Landmark::new(0.0, 0.0));
+                        if acc.keypoints().is_empty() && !det.keypoints().is_empty() {
+                            acc.keypoints_mut()
+                                .resize(det.keypoints().len(), Keypoint::new(0.0, 0.0));
                         }
 
                         assert_eq!(
-                            acc.landmarks().len(),
-                            det.landmarks().len(),
+                            acc.keypoints().len(),
+                            det.keypoints().len(),
                             "landmark count must be constant"
                         );
 
                         let factor = det.confidence;
                         divisor += factor;
-                        for (acc, lm) in zip_exact(&mut acc.landmarks.iter_mut(), &det.landmarks) {
+                        for (acc, lm) in zip_exact(&mut acc.keypoints.iter_mut(), &det.keypoints) {
                             acc.x += lm.x * factor;
                             acc.y += lm.y * factor;
                         }
@@ -117,7 +117,7 @@ impl NonMaxSuppression {
                         acc_rect.h += rect.h * factor;
                     }
 
-                    for lm in &mut acc.landmarks {
+                    for lm in &mut acc.keypoints {
                         lm.x /= divisor;
                         lm.y /= divisor;
                     }

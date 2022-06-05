@@ -1,7 +1,9 @@
-//! Anchor/Prior generation for Single Shot MultiBox Detectors (SSDs).
+//! Anchor/Prior generation for [Single Shot MultiBox Detectors] (SSDs).
 //!
 //! Note that the implementation in this module is extremely limited and is only meant to work for
 //! our specific networks, not more general networks.
+//!
+//! [Single Shot MultiBox Detectors]: https://arxiv.org/abs/1512.02325
 
 use std::ops::Index;
 

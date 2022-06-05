@@ -129,13 +129,13 @@ fn extract_detection(
     let w = box_params[2] / input_w;
     let h = box_params[3] / input_h;
     let lm = |x, y| {
-        crate::detection::Landmark::new(
+        crate::detection::Keypoint::new(
             x / input_w + anchor.x_center(),
             y / input_h + anchor.y_center(),
         )
     };
 
-    RawDetection::with_landmarks(
+    RawDetection::with_keypoints(
         confidence,
         BoundingRect::from_center(xc, yc, w, h),
         vec![
@@ -182,7 +182,7 @@ impl Detection {
         );
 
         image::draw_rect(image, self.bounding_rect()).color(Color::BLUE);
-        for (i, lm) in self.raw.landmarks().iter().enumerate() {
+        for (i, lm) in self.raw.keypoints().iter().enumerate() {
             let (x, y) = point_to_img(lm.x(), lm.y(), &self.full_res);
             image::draw_marker(image, x, y).color(Color::BLUE);
             image::draw_text(image, x, y - 5, &i.to_string()).color(Color::BLUE);

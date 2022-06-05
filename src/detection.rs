@@ -11,7 +11,7 @@ use crate::{image::Rect, nn::point_to_img, resolution::Resolution};
 /// A detected object.
 ///
 /// A [`RawDetection`] consists of a [`BoundingRect`] enclosing the detected object, a confidence
-/// value, and an optional set of landmarks.
+/// value, and an optional set of located keypoints.
 ///
 /// Called "raw" because it does not reside in any defined coordinate system. Detector
 /// implementations typically provide a wrapper around this type that allows accessing the detection
@@ -20,7 +20,7 @@ use crate::{image::Rect, nn::point_to_img, resolution::Resolution};
 pub struct RawDetection {
     confidence: f32,
     rect: BoundingRect,
-    landmarks: Vec<Landmark>,
+    keypoints: Vec<Keypoint>,
 }
 
 impl RawDetection {
@@ -28,20 +28,20 @@ impl RawDetection {
         Self {
             confidence,
             rect,
-            landmarks: Vec::new(),
+            keypoints: Vec::new(),
         }
     }
 
-    pub fn with_landmarks(confidence: f32, rect: BoundingRect, landmarks: Vec<Landmark>) -> Self {
+    pub fn with_keypoints(confidence: f32, rect: BoundingRect, landmarks: Vec<Keypoint>) -> Self {
         Self {
             confidence,
             rect,
-            landmarks,
+            keypoints: landmarks,
         }
     }
 
-    pub fn push_landmark(&mut self, lm: Landmark) {
-        self.landmarks.push(lm);
+    pub fn push_keypoint(&mut self, keypoint: Keypoint) {
+        self.keypoints.push(keypoint);
     }
 
     pub fn confidence(&self) -> f32 {
@@ -60,28 +60,32 @@ impl RawDetection {
         self.rect = rect;
     }
 
-    pub fn landmarks(&self) -> &[Landmark] {
-        &self.landmarks
+    pub fn keypoints(&self) -> &[Keypoint] {
+        &self.keypoints
     }
 
-    pub fn landmarks_mut(&mut self) -> &mut Vec<Landmark> {
-        &mut self.landmarks
+    pub fn keypoints_mut(&mut self) -> &mut Vec<Keypoint> {
+        &mut self.keypoints
     }
 }
 
-/// A detected landmark.
+/// A 2D keypoint produced as part of a [`RawDetection`].
 ///
-/// A landmark by itself is just a point in an unspecified coordinate system.
+/// A keypoint by itself is just a point in an unspecified coordinate system. Keypoints are also not
+/// necessarily inside the detection bounding box.
 ///
-/// The meaning of a landmark depends on the specific detector and on its index in the landmark
-/// list.
+/// The meaning of a keypoint depends on the specific detector and on its index in the keypoint
+/// list. Typically keypoints are used to crop/rotate a detected object for further processing.
+///
+/// Not all detectors output keypoints. Some may just output bounding rectangles with confidence
+/// scores.
 #[derive(Debug, Clone, Copy)]
-pub struct Landmark {
+pub struct Keypoint {
     x: f32,
     y: f32,
 }
 
-impl Landmark {
+impl Keypoint {
     pub fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }

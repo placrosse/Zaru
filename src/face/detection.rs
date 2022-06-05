@@ -199,14 +199,14 @@ impl Detection {
     /// Returns the coordinates of the left eye's landmark (from the perspective of the input image,
     /// not the depicted person).
     pub fn left_eye(&self) -> (i32, i32) {
-        let lm = &self.raw.landmarks()[0];
+        let lm = &self.raw.keypoints()[0];
         point_to_img(lm.x(), lm.y(), &self.full_res)
     }
 
     /// Returns the coordinates of the right eye's landmark (from the perspective of the input image,
     /// not the depicted person).
     pub fn right_eye(&self) -> (i32, i32) {
-        let lm = self.raw.landmarks()[1];
+        let lm = self.raw.keypoints()[1];
         point_to_img(lm.x(), lm.y(), &self.full_res)
     }
 
@@ -228,7 +228,7 @@ impl Detection {
         );
 
         image::draw_rect(image, self.bounding_rect_raw());
-        for lm in self.raw.landmarks() {
+        for lm in self.raw.keypoints() {
             let (x, y) = point_to_img(lm.x(), lm.y(), &self.full_res);
             image::draw_marker(image, x, y);
         }
@@ -253,13 +253,13 @@ fn extract_detection(
     let w = box_params[2] / input_w;
     let h = box_params[3] / input_h;
     let lm = |x, y| {
-        crate::detection::Landmark::new(
+        crate::detection::Keypoint::new(
             x / input_w + anchor.x_center(),
             y / input_h + anchor.y_center(),
         )
     };
 
-    RawDetection::with_landmarks(
+    RawDetection::with_keypoints(
         confidence,
         BoundingRect::from_center(xc, yc, w, h),
         vec![
