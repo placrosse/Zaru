@@ -3,11 +3,8 @@
 //! The functionality defined in this module (and submodules) is meant to be reusable across
 //! different detectors.
 
-mod filter;
 pub mod nms;
 pub mod ssd;
-
-pub use filter::DetectionFilter;
 
 use crate::{image::Rect, nn::point_to_img, resolution::Resolution};
 

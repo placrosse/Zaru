@@ -166,6 +166,7 @@ impl LandmarkResult {
     /// there is no face in the input image.
     #[inline]
     pub fn face_confidence(&self) -> f32 {
+        // TODO: sigmoid?
         self.face_flag
     }
 
@@ -286,11 +287,9 @@ impl Into<usize> for LandmarkIdx {
 /// [`LandmarkTracker::set_tracked_face`].
 ///
 /// This can be used to avoid the jitter from running a [`Detector`] on every frame of a video feed,
-/// in cases where the application would compute the landmarks anyways. If the landmarks aren't
-/// needed, smoothing the detections directly using a [`DetectionFilter`] is probably more efficient.
+/// in cases where the application would compute the landmarks anyways.
 ///
 /// [`Detector`]: super::detection::Detector
-/// [`DetectionFilter`]: crate::detection::DetectionFilter
 pub struct LandmarkTracker {
     lm: Landmarker,
     face: Option<TrackedFace>,
@@ -353,12 +352,13 @@ impl LandmarkTracker {
         let view_rect = face.rect.grow_to_fit_aspect(self.input_aspect);
         let view = image.view(&view_rect); // TODO rotate
         let res = self.lm.compute(&view);
-        log::trace!(
-            "LandmarkTracker: confidence {}, loss threshold {}",
-            res.face_confidence(),
-            self.loss_thresh
-        );
         if res.face_confidence() < self.loss_thresh {
+            log::debug!(
+                "LandmarkTracker: confidence {}, loss threshold {} -> LOST",
+                res.face_confidence(),
+                self.loss_thresh,
+            );
+
             self.face = None;
             return None;
         }
