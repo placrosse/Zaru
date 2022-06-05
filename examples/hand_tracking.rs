@@ -11,7 +11,7 @@ use zaru::{
 };
 
 const USE_FULL_DETECTION_NETWORK: bool = false;
-const USE_FULL_LANDMARK_NETWORK: bool = false;
+const USE_FULL_LANDMARK_NETWORK: bool = true;
 
 fn main() -> Result<(), zaru::Error> {
     zaru::init_logger!();

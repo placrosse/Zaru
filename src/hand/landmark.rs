@@ -307,7 +307,7 @@ pub trait LandmarkNetwork {
     fn cnn() -> &'static Cnn;
 }
 
-/// A more lightweight landmark estimation network.
+/// A lightweight but fairly inaccurate landmark estimation network.
 ///
 /// Takes a bit over 20ms to run on my machine, so it can't hit 60 FPS, but it is faster than
 /// [`FullNetwork`].
