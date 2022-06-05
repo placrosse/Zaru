@@ -1,12 +1,14 @@
 //! Performance measurement tools.
 
 use std::{
-    cell::{Cell, RefCell},
+    cell::Cell,
     fmt::{self, Arguments},
     time::{Duration, Instant},
 };
 
-const MAX_DURATIONS: usize = 250;
+use crate::filter::{ema, Filter};
+
+const EMA_ALPHA: f32 = 0.3;
 
 /// A timer that can measure and average the time an operation takes.
 ///
@@ -14,8 +16,12 @@ const MAX_DURATIONS: usize = 250;
 /// ([`std::fmt::Display`]).
 pub struct Timer {
     name: &'static str,
-    durations: RefCell<Vec<Duration>>,
-    forgotten: Cell<bool>,
+    ema: ema::Ema,
+    ema_state: Cell<ema::State>,
+    /// The current average time.
+    avg: Cell<f32>,
+    /// The number of time measurements that contributed to the current `avg`.
+    count: Cell<usize>,
 }
 
 impl Timer {
@@ -23,8 +29,10 @@ impl Timer {
     pub fn new(name: &'static str) -> Self {
         Self {
             name,
-            durations: Default::default(),
-            forgotten: Cell::new(false),
+            ema: ema::Ema::new(EMA_ALPHA),
+            ema_state: Default::default(),
+            avg: Cell::new(0.0),
+            count: Cell::new(0),
         }
     }
 
@@ -46,40 +54,25 @@ impl Timer {
     }
 
     fn stop(&mut self, start: Instant) {
-        if self.forgotten.get() {
-            return;
-        }
-
         let duration = start.elapsed();
-        let durations = &mut self.durations.get_mut();
-        if durations.len() < MAX_DURATIONS {
-            durations.push(duration);
-        } else {
-            // FIXME use a better strategy
-            self.forgotten.set(true);
-            durations.clear();
-        }
+        let state = self.ema_state.get_mut();
+        self.avg.set(self.ema.filter(state, duration.as_secs_f32()));
+        *self.count.get_mut() += 1;
     }
 }
 
 /// Displays the average recorded time and resets it.
 impl fmt::Display for Timer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.forgotten.get() {
-            write!(f, "{}: <forgotten>", self.name)
-        } else {
-            // (this can't actually fail, `time` takes `&mut self` and this function can't be
-            // invoked more than once at the same time because `Timer` isn't `Sync`)
-            let mut durations = self.durations.borrow_mut();
-            let len = durations.len();
-            let num = durations.len() as f32;
-            let avg_ms = durations
-                .iter()
-                .fold(0.0, |prev, new| prev + new.as_secs_f32() * 1000.0 / num);
-            durations.clear();
+        // (this can't actually fail, `time` takes `&mut self` and this function can't be
+        // invoked more than once at the same time because `Timer` isn't `Sync`)
+        self.ema_state.replace(Default::default());
 
-            write!(f, "{}: {len}x{avg_ms:.01}ms", self.name)
-        }
+        let avg = self.avg.replace(0.0);
+        let len = self.count.replace(0);
+        let avg_ms = avg * 1000.0;
+
+        write!(f, "{}: {len}x{avg_ms:.01}ms", self.name)
     }
 }
 
