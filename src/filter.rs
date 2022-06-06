@@ -72,6 +72,8 @@ pub trait TimeBasedFilter<V> {
     fn filter(&self, state: &mut Self::State, value: V, elapsed: f32) -> V;
 }
 
+// TODO: `State` assoc type should be moved to supertrait
+
 /// Adapts a [`TimeBasedFilter`] to the [`Filter`] trait by supplying time deltas derived from the
 /// current system time.
 pub struct TimedFilterAdapter<F> {

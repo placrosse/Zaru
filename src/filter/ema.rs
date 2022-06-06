@@ -26,12 +26,12 @@ impl Ema {
 
 /// Filter state for [`Ema`] filters.
 #[derive(Debug, Default)]
-pub struct State {
+pub struct EmaState {
     last: Option<f32>,
 }
 
 impl Filter<f32> for Ema {
-    type State = State;
+    type State = EmaState;
 
     fn filter(&self, state: &mut Self::State, value: f32) -> f32 {
         match state.last {

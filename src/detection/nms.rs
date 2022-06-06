@@ -52,6 +52,10 @@ impl NonMaxSuppression {
         self.mode = mode;
     }
 
+    /// Performs non-maximum suppression on `detections`.
+    ///
+    /// `detections` will be modified in the process. The filtered detections are returned as an
+    /// iterator.
     pub fn process(
         &mut self,
         detections: &mut Vec<RawDetection>,

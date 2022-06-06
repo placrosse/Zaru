@@ -17,7 +17,7 @@ const EMA_ALPHA: f32 = 0.3;
 pub struct Timer {
     name: &'static str,
     ema: ema::Ema,
-    ema_state: Cell<ema::State>,
+    ema_state: Cell<ema::EmaState>,
     /// The current average time.
     avg: Cell<f32>,
     /// The number of time measurements that contributed to the current `avg`.

@@ -1,3 +1,7 @@
+//! [Alpha beta filter] implementation.
+//!
+//! [Alpha beta filter]: https://en.wikipedia.org/wiki/Alpha_beta_filter
+
 use super::TimeBasedFilter;
 
 /// An [alpha beta filter] that predicts a variable using its previous value and estimated rate of

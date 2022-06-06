@@ -13,6 +13,11 @@ use crate::{image::Rect, nn::point_to_img, resolution::Resolution};
 /// A [`RawDetection`] consists of a [`BoundingRect`] enclosing the detected object, a confidence
 /// value, and an optional set of located keypoints.
 ///
+/// Per convention, the confidence value lies between 0.0 and 1.0, which can be achieved by passing
+/// the raw network output through [`crate::num::sigmoid`] (but the network documentation should be
+/// consulted). The confidence value is used when performing non-maximum suppression with
+/// [`nms::SuppressionMode::Average`], so it has to have the expected range when making use of that.
+///
 /// Called "raw" because it does not reside in any defined coordinate system. Detector
 /// implementations typically provide a wrapper around this type that allows accessing the detection
 /// as a [`Rect`] in input image coordinates.
@@ -32,11 +37,11 @@ impl RawDetection {
         }
     }
 
-    pub fn with_keypoints(confidence: f32, rect: BoundingRect, landmarks: Vec<Keypoint>) -> Self {
+    pub fn with_keypoints(confidence: f32, rect: BoundingRect, keypoints: Vec<Keypoint>) -> Self {
         Self {
             confidence,
             rect,
-            keypoints: landmarks,
+            keypoints,
         }
     }
 

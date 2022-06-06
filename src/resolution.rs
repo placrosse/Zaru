@@ -12,17 +12,23 @@ pub struct Resolution {
 }
 
 impl Resolution {
-    /// 1080p – 1920x1080
+    /// 1080p resolution: `1920x1080`
     pub const RES_1080P: Self = Self {
         width: 1920,
         height: 1080,
     };
-    /// 720p – 1280x720
+
+    /// 720p resolution: `1280x720`
     pub const RES_720P: Self = Self {
         width: 1280,
         height: 720,
     };
 
+    /// Creates a new [`Resolution`] of `width x height`.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if either `width` or `height` is zero.
     #[track_caller]
     pub fn new(width: u32, height: u32) -> Self {
         assert!(
@@ -32,16 +38,19 @@ impl Resolution {
         Self { width, height }
     }
 
+    /// Returns the width of this [`Resolution`].
     #[inline]
     pub fn width(&self) -> u32 {
         self.width
     }
 
+    /// Returns the height of this [`Resolution`].
     #[inline]
     pub fn height(&self) -> u32 {
         self.height
     }
 
+    /// Computes the [`AspectRatio`] of this [`Resolution`].
     pub fn aspect_ratio(&self) -> AspectRatio {
         AspectRatio::from(*self)
     }
@@ -98,18 +107,6 @@ impl fmt::Display for Resolution {
 impl fmt::Debug for Resolution {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)
-    }
-}
-
-impl std::ops::Mul<u32> for Resolution {
-    type Output = Self;
-
-    fn mul(self, rhs: u32) -> Self::Output {
-        assert!(rhs != 0, "attempt to multiply resolution with 0");
-        Resolution {
-            width: self.width * rhs,
-            height: self.height * rhs,
-        }
     }
 }
 

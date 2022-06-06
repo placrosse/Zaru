@@ -105,6 +105,8 @@ impl Cnn {
 
     /// Runs the network on an input image, returning the estimated outputs.
     ///
+    /// # Panics
+    ///
     /// The image's resolution must match the CNN's [`input_resolution`][Self::input_resolution],
     /// otherwise this method will panic.
     pub fn estimate<V: AsImageView>(&self, image: &V) -> Result<Outputs, Error> {
