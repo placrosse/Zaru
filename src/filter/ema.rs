@@ -1,6 +1,6 @@
 //! Exponential Moving Average.
 
-use super::Filter;
+use super::{Filter, FilterBase};
 
 /// An Exponential Moving Average (EMA) filter.
 #[derive(Debug, Clone, Copy)]
@@ -30,9 +30,11 @@ pub struct EmaState {
     last: Option<f32>,
 }
 
-impl Filter<f32> for Ema {
+impl FilterBase<f32> for Ema {
     type State = EmaState;
+}
 
+impl Filter<f32> for Ema {
     fn filter(&self, state: &mut Self::State, value: f32) -> f32 {
         match state.last {
             Some(last) => {

@@ -2,7 +2,7 @@
 //!
 //! [Alpha beta filter]: https://en.wikipedia.org/wiki/Alpha_beta_filter
 
-use super::TimeBasedFilter;
+use super::{FilterBase, TimeBasedFilter};
 
 /// An [alpha beta filter] that predicts a variable using its previous value and estimated rate of
 /// change.
@@ -36,9 +36,11 @@ impl AlphaBetaFilter {
     }
 }
 
-impl TimeBasedFilter<f32> for AlphaBetaFilter {
+impl FilterBase<f32> for AlphaBetaFilter {
     type State = AlphaBetaState;
+}
 
+impl TimeBasedFilter<f32> for AlphaBetaFilter {
     fn filter(&self, state: &mut Self::State, value: f32, elapsed: f32) -> f32 {
         let prediction = state.x + state.v * elapsed;
         let residual = value - prediction;

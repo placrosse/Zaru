@@ -32,14 +32,20 @@ use std::time::Instant;
 pub mod alpha_beta;
 pub mod ema;
 
+/// Base trait for filtering algorithms that defines the per-variable state of the filter.
+///
+/// The `V` type parameter is the type of value that this filter operates on (typically `f32` for
+/// basic filter algorithms).
+pub trait FilterBase<V> {
+    /// Per-variable filter state.
+    type State: Default;
+}
+
 /// Trait implemented for filter algorithms operating on data of type `V`.
 ///
 /// The implementing type is expected to carry all filter parameters with it, while any per-variable
-/// state that needs updating is passed as an argument of type [`Filter::State`].
-pub trait Filter<V> {
-    /// Per-variable filter state.
-    type State: Default;
-
+/// state that needs updating is passed as an argument of type [`FilterBase::State`].
+pub trait Filter<V>: FilterBase<V> {
     /// Filters `value` according to the filter parameters stored in `self` and the current filter
     /// state in `state`.
     ///
@@ -56,10 +62,7 @@ pub trait Filter<V> {
 ///
 /// To just use a time-based filter with real-world time stamps, the [`TimedFilterAdapter`] type can
 /// be used.
-pub trait TimeBasedFilter<V> {
-    /// Per-variable filter state.
-    type State: Default;
-
+pub trait TimeBasedFilter<V>: FilterBase<V> {
     /// Filters `value` according to the filter parameters stored in `self` and the current filter
     /// state in `state`.
     ///
@@ -71,8 +74,6 @@ pub trait TimeBasedFilter<V> {
     /// The filtered value is returned.
     fn filter(&self, state: &mut Self::State, value: V, elapsed: f32) -> V;
 }
-
-// TODO: `State` assoc type should be moved to supertrait
 
 /// Adapts a [`TimeBasedFilter`] to the [`Filter`] trait by supplying time deltas derived from the
 /// current system time.
@@ -90,9 +91,11 @@ impl<F> TimedFilterAdapter<F> {
     }
 }
 
-impl<F: TimeBasedFilter<V>, V> Filter<V> for TimedFilterAdapter<F> {
+impl<F: FilterBase<V>, V> FilterBase<V> for TimedFilterAdapter<F> {
     type State = F::State;
+}
 
+impl<F: TimeBasedFilter<V>, V> Filter<V> for TimedFilterAdapter<F> {
     fn filter(&self, state: &mut Self::State, value: V) -> V {
         let elapsed = self.last.elapsed();
         self.filter.filter(state, value, elapsed.as_secs_f32())
