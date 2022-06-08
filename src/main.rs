@@ -2,8 +2,9 @@ mod facetracking;
 
 use zaru::face::detection::{Detection, Detector};
 use zaru::face::eye::EyeLandmarker;
-use zaru::face::landmark::{self, LandmarkResult, LandmarkTracker, TrackedFace};
+use zaru::face::landmark::{self, LandmarkResult, Landmarker};
 use zaru::image::{AsImageView, Color, Image, ImageView, ImageViewMut};
+use zaru::landmark::LandmarkTracker;
 use zaru::num::TotalF32;
 use zaru::procrustes::ProcrustesAnalyzer;
 use zaru::resolution::AspectRatio;
@@ -71,7 +72,9 @@ fn main() -> Result<(), Error> {
                 let mut procrustes_analyzer =
                     ProcrustesAnalyzer::new(landmark::reference_positions());
                 let mut detector = Detector::default();
-                let mut tracker = LandmarkTracker::new();
+                let mut landmarker = Landmarker::new();
+                let mut tracker =
+                    LandmarkTracker::new(landmarker.input_resolution().aspect_ratio());
                 let input_ratio = detector.input_resolution().aspect_ratio();
 
                 let left_eye_img_sender = left_eye_img_sender.activate();
@@ -81,7 +84,7 @@ fn main() -> Result<(), Error> {
                 for mut image in img_recv.activate() {
                     let guard = t_total.start();
 
-                    if tracker.tracked_face().is_none() {
+                    if tracker.roi().is_none() {
                         // Zoom into the camera image and perform detection there. This makes outer
                         // edges of the camera view unusable, but significantly improves the tracking
                         // distance.
@@ -101,22 +104,21 @@ fn main() -> Result<(), Error> {
                                 .bounding_rect_loose()
                                 .move_by(view_rect.x(), view_rect.y());
                             log::trace!("start tracking face at {:?}", rect);
-                            tracker.set_tracked_face(TrackedFace::new(
-                                rect,
-                                target.rotation_radians(),
-                            ));
+                            tracker.set_roi(rect);
                         }
                     }
 
-                    if let Some(res) = tracker.track(&image) {
-                        if landmark_sender.send(res.landmarks().clone()).is_err() {
+                    if let Some(res) = tracker.track(&mut landmarker, &image) {
+                        if landmark_sender.send(res.estimation().clone()).is_err() {
                             break;
                         }
+
+                        image::draw_rect(&mut image, res.view_rect());
 
                         let mut face_image = image.view_mut(&res.view_rect());
                         let (left, right) = extract_eye_images(
                             face_image.as_view(),
-                            res.landmarks(),
+                            res.estimation(),
                             eye_landmark_input_aspect,
                         );
 
@@ -129,26 +131,25 @@ fn main() -> Result<(), Error> {
 
                         let procrustes_result = t_procrustes.time(|| {
                             procrustes_analyzer.analyze(
-                                res.landmarks()
-                                    .raw_landmarks()
-                                    .positions()
-                                    .map(|(x, y, z)| {
+                                res.estimation().raw_landmarks().positions().iter().map(
+                                    |&[x, y, z]| {
                                         // Flip Y to bring us to canonical 3D coordinates (where Y points up).
                                         // Only rotation matters, so we don't have to correct for the added
                                         // translation.
                                         (x, -y, z)
-                                    }),
+                                    },
+                                ),
                             )
                         });
 
-                        for (x, y, _z) in res.landmarks().landmark_positions() {
+                        for (x, y, _z) in res.estimation().landmark_positions() {
                             image::draw_marker(&mut face_image, x as _, y as _).size(3);
                         }
 
                         #[allow(illegal_floating_point_literal_pattern)] // let me have fun
-                        let color = match res.landmarks().face_confidence() {
-                            20.0.. => Color::GREEN,
-                            10.0..=20.0 => Color::YELLOW,
+                        let color = match res.estimation().face_confidence() {
+                            0.75.. => Color::GREEN,
+                            0.5..=0.75 => Color::YELLOW,
                             _ => Color::RED,
                         };
                         let x = (face_image.width() / 2) as _;
@@ -156,7 +157,7 @@ fn main() -> Result<(), Error> {
                             &mut face_image,
                             x,
                             0,
-                            &format!("lm_conf={:.01}", res.landmarks().face_confidence()),
+                            &format!("lm_conf={:.01}", res.estimation().face_confidence()),
                         )
                         .align_top()
                         .color(color);

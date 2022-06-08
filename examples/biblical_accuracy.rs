@@ -1,12 +1,10 @@
 //! Biblically accurate texture blitting benchmark.
 
 use zaru::{
-    face::{
-        detection::Detector,
-        landmark::{LandmarkTracker, TrackedFace},
-    },
+    face::{detection::Detector, landmark::Landmarker},
     gui,
     image::{Color, Image, Rect},
+    landmark::LandmarkTracker,
     num::TotalF32,
     timer::{FpsCounter, Timer},
     webcam::Webcam,
@@ -19,7 +17,8 @@ fn main() -> Result<(), zaru::Error> {
     zaru::init_logger!();
 
     let mut detector = Detector::default();
-    let mut tracker = LandmarkTracker::new();
+    let mut landmarker = Landmarker::new();
+    let mut tracker = LandmarkTracker::new(landmarker.input_resolution().aspect_ratio());
 
     let mut canvas = Image::new(W, H);
     let positions = (0..1000)
@@ -38,26 +37,23 @@ fn main() -> Result<(), zaru::Error> {
     loop {
         let image = webcam.read()?;
 
-        if tracker.tracked_face().is_none() {
+        if tracker.roi().is_none() {
             if let Some(det) = detector
                 .detect(&image)
                 .iter()
                 .max_by_key(|det| TotalF32(det.confidence()))
             {
-                tracker.set_tracked_face(TrackedFace::new(
-                    det.bounding_rect_loose(),
-                    det.rotation_radians(),
-                ));
+                tracker.set_roi(det.bounding_rect_loose());
             }
         }
 
-        if let Some(res) = tracker.track(&image) {
+        if let Some(res) = tracker.track(&mut landmarker, &image) {
             let left_rect = res
-                .landmarks()
+                .estimation()
                 .left_eye()
                 .move_by(res.view_rect().x(), res.view_rect().y());
             let right_rect = res
-                .landmarks()
+                .estimation()
                 .right_eye()
                 .move_by(res.view_rect().x(), res.view_rect().y());
             let left_eye = image.view(&left_rect);
@@ -83,7 +79,7 @@ fn main() -> Result<(), zaru::Error> {
             fps.tick_with(
                 webcam
                     .timers()
-                    .chain(tracker.landmarker().timers())
+                    .chain(landmarker.timers())
                     .chain([&blit_timer]),
             );
         }

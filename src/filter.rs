@@ -137,3 +137,37 @@ impl<A: Filter<V>, V> SimpleFilter<A, V> {
         self.state = Default::default();
     }
 }
+
+/// A filter that passes filtered values through as-is.
+#[derive(Default, Clone, Copy)]
+pub struct NoopFilter {
+    _p: (),
+}
+
+impl NoopFilter {
+    pub fn new() -> Self {
+        Self { _p: () }
+    }
+}
+
+/// State associated with a [`NoopFilter`] instance.
+#[derive(Default, Clone, Copy)]
+pub struct NoopFilterState {
+    _p: (),
+}
+
+impl<V> FilterBase<V> for NoopFilter {
+    type State = NoopFilterState;
+}
+
+impl<V> Filter<V> for NoopFilter {
+    fn filter(&self, _state: &mut Self::State, value: V) -> V {
+        value
+    }
+}
+
+impl<V> TimeBasedFilter<V> for NoopFilter {
+    fn filter(&self, _state: &mut Self::State, value: V, _elapsed: f32) -> V {
+        value
+    }
+}

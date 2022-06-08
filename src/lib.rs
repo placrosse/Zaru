@@ -21,6 +21,7 @@ pub mod gui;
 pub mod hand;
 pub mod image;
 pub mod iter;
+pub mod landmark;
 pub mod nn;
 pub mod num;
 pub mod pipeline;

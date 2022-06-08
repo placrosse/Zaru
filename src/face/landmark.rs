@@ -6,16 +6,15 @@
 //!
 //! [Face Mesh]: https://google.github.io/mediapipe/solutions/face_mesh.html
 
-use std::ops::Index;
-
 use once_cell::sync::Lazy;
 
 use crate::{
     image::{AsImageView, ImageView, Rect},
     iter::zip_exact,
+    landmark::{self, Landmarks},
     nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
     num::sigmoid,
-    resolution::{AspectRatio, Resolution},
+    resolution::Resolution,
     timer::Timer,
 };
 
@@ -52,13 +51,8 @@ impl Landmarker {
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             result_buffer: LandmarkResult {
-                landmarks: Landmarks {
-                    positions: [(0.0, 0.0, 0.0); 468],
-                },
+                landmarks: Landmarks::new(468),
                 face_flag: 0.0,
-                orig_res: Resolution::new(1, 1),
-                orig_aspect: AspectRatio::SQUARE,
-                input_res: MODEL.input_resolution(),
             },
             model: &MODEL,
         }
@@ -86,8 +80,7 @@ impl Landmarker {
     fn compute_impl(&mut self, image: ImageView<'_>) -> &LandmarkResult {
         let input_res = self.model.input_resolution();
         let full_res = image.resolution();
-        self.result_buffer.orig_res = full_res;
-        self.result_buffer.orig_aspect = full_res.aspect_ratio();
+        let orig_aspect = full_res.aspect_ratio();
 
         let mut image = image.reborrow();
         let resized;
@@ -101,11 +94,19 @@ impl Landmarker {
         self.result_buffer.face_flag = sigmoid(result[1].index([0, 0, 0, 0]).as_singular());
         for (coords, out) in zip_exact(
             result[0].index([0, 0, 0]).as_slice().chunks(3),
-            &mut self.result_buffer.landmarks.positions,
+            self.result_buffer.landmarks.positions_mut(),
         ) {
-            out.0 = coords[0];
-            out.1 = coords[1];
-            out.2 = coords[2];
+            let [x, y, z] = [coords[0], coords[1], coords[2]];
+            let (x, y) = unadjust_aspect_ratio(
+                x / input_res.width() as f32,
+                y / input_res.height() as f32,
+                orig_aspect,
+            );
+            let (x, y) = (x * full_res.width() as f32, y * full_res.height() as f32);
+
+            out[0] = x;
+            out[1] = y;
+            out[2] = z;
         }
 
         &self.result_buffer
@@ -117,14 +118,19 @@ impl Landmarker {
     }
 }
 
+impl landmark::Estimator for Landmarker {
+    type Estimation = LandmarkResult;
+
+    fn estimate<V: AsImageView>(&mut self, image: &V) -> &Self::Estimation {
+        self.compute(image)
+    }
+}
+
 /// Landmark results returned by [`Landmarker::compute`].
 #[derive(Clone)]
 pub struct LandmarkResult {
     landmarks: Landmarks,
     face_flag: f32,
-    orig_res: Resolution,
-    orig_aspect: AspectRatio,
-    input_res: Resolution,
 }
 
 impl LandmarkResult {
@@ -135,22 +141,13 @@ impl LandmarkResult {
 
     /// Returns a landmark's position in the input image's coordinate system.
     pub fn landmark_position(&self, index: usize) -> (f32, f32, f32) {
-        let (x, y, z) = self.landmarks.positions[index];
-        let (x, y) = unadjust_aspect_ratio(
-            x / self.input_res.width() as f32,
-            y / self.input_res.height() as f32,
-            self.orig_aspect,
-        );
-        let (x, y) = (
-            x * self.orig_res.width() as f32,
-            y * self.orig_res.height() as f32,
-        );
+        let [x, y, z] = self.landmarks.landmark(index).position();
         (x, y, z)
     }
 
     #[inline]
     pub fn landmark_count(&self) -> usize {
-        self.landmarks.positions.len()
+        self.landmarks.len()
     }
 
     /// Returns a reference to the raw landmarks, unadjusted for the input image resolution.
@@ -207,32 +204,13 @@ impl LandmarkResult {
     }
 }
 
-/// Raw face landmark positions.
-#[derive(Clone)]
-pub struct Landmarks {
-    positions: [(f32, f32, f32); 468],
-}
-
-impl Landmarks {
-    /// Returns an iterator over the positions of all landmarks.
-    pub fn positions(&self) -> impl Iterator<Item = (f32, f32, f32)> + '_ {
-        self.positions.iter().copied()
+impl landmark::Estimation for LandmarkResult {
+    fn confidence(&self) -> f32 {
+        self.face_confidence()
     }
-}
 
-impl Index<LandmarkIdx> for Landmarks {
-    type Output = (f32, f32, f32);
-
-    fn index(&self, index: LandmarkIdx) -> &Self::Output {
-        &self.positions[index as usize]
-    }
-}
-
-impl Index<usize> for Landmarks {
-    type Output = (f32, f32, f32);
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.positions[index]
+    fn landmarks(&self) -> &Landmarks {
+        self.raw_landmarks()
     }
 }
 
@@ -277,149 +255,5 @@ impl Into<usize> for LandmarkIdx {
     #[inline]
     fn into(self) -> usize {
         self as usize
-    }
-}
-
-/// Uses a [`Landmarker`] to track the position of a face across frames.
-///
-/// The last known position of the tracked face is remembered across frames, and used to locate it
-/// in the next frame. To start tracking a face, the user has to set the [`TrackedFace`] by calling
-/// [`LandmarkTracker::set_tracked_face`].
-///
-/// This can be used to avoid the jitter from running a [`Detector`] on every frame of a video feed,
-/// in cases where the application would compute the landmarks anyways.
-///
-/// [`Detector`]: super::detection::Detector
-pub struct LandmarkTracker {
-    lm: Landmarker,
-    face: Option<TrackedFace>,
-    loss_thresh: f32,
-    input_aspect: AspectRatio,
-}
-
-impl LandmarkTracker {
-    const DEFAULT_TRACKING_LOSS_THRESHOLD: f32 = 0.5;
-
-    /// Creates a new landmark tracker which initially does not track a face.
-    pub fn new() -> Self {
-        let lm = Landmarker::new();
-        Self {
-            input_aspect: lm.input_resolution().aspect_ratio(),
-            lm,
-            face: None,
-            loss_thresh: Self::DEFAULT_TRACKING_LOSS_THRESHOLD,
-        }
-    }
-
-    /// Returns the currently tracked face rectangle and rotation.
-    pub fn tracked_face(&self) -> Option<&TrackedFace> {
-        self.face.as_ref()
-    }
-
-    /// Sets face rectangle and rotation to track.
-    pub fn set_tracked_face(&mut self, face: TrackedFace) {
-        self.face = Some(face);
-    }
-
-    /// Sets the confidence threshold below which a tracked face is considered "lost".
-    ///
-    /// This uses the confidence value returned by [`LandmarkResult::face_confidence`].
-    pub fn set_tracking_loss_threshold(&mut self, thresh: f32) {
-        self.loss_thresh = thresh;
-    }
-
-    pub fn landmarker(&self) -> &Landmarker {
-        &self.lm
-    }
-
-    /// Tracks the face across the next frame.
-    ///
-    /// If tracking succeeds, returns the updated [`TrackedFace`] as well as the computed facial
-    /// landmarks.
-    ///
-    /// If no face is currently tracked, or the newly computed landmarks have too low of a
-    /// confidence (as set by [`LandmarkTracker::set_tracking_loss_threshold`]), returns `None`.
-    pub fn track<V: AsImageView>(&mut self, image: &V) -> Option<TrackingResult<'_>> {
-        self.track_impl(image.as_view())
-    }
-
-    fn track_impl(&mut self, image: ImageView<'_>) -> Option<TrackingResult<'_>> {
-        // 1. Extract rotated face
-        // 2. Run landmarker
-        // 3. Update tracked rect and rotation
-
-        let mut face = self.face?;
-        let view_rect = face.rect.grow_to_fit_aspect(self.input_aspect);
-        let view = image.view(&view_rect); // TODO rotate
-        let res = self.lm.compute(&view);
-        if res.face_confidence() < self.loss_thresh {
-            log::debug!(
-                "LandmarkTracker: confidence {}, loss threshold {} -> LOST",
-                res.face_confidence(),
-                self.loss_thresh,
-            );
-
-            self.face = None;
-            return None;
-        }
-
-        let extra_area = 0.3;
-        let rect = Rect::bounding(res.landmark_positions().map(|(x, y, _z)| (x as _, y as _)))
-            .unwrap()
-            .grow_rel(extra_area, extra_area, extra_area, extra_area);
-        face.rect = rect.move_by(view_rect.x(), view_rect.y());
-        // TODO set rotation
-        let face = self.face.insert(face);
-
-        Some(TrackingResult {
-            updated_face: face,
-            landmarks: res,
-            view_rect,
-        })
-    }
-}
-
-pub struct TrackingResult<'a> {
-    updated_face: &'a TrackedFace,
-    landmarks: &'a LandmarkResult,
-    view_rect: Rect,
-}
-
-impl<'a> TrackingResult<'a> {
-    pub fn updated_face(&self) -> &TrackedFace {
-        self.updated_face
-    }
-
-    /// Returns the extracted landmarks, relative to `view_rect`.
-    pub fn landmarks(&self) -> &LandmarkResult {
-        self.landmarks
-    }
-
-    /// Returns the rectangle inside the input image that was used to compute the landmarks.
-    pub fn view_rect(&self) -> Rect {
-        self.view_rect
-    }
-}
-
-/// Location info of a face tracked by a [`LandmarkTracker`].
-#[derive(Clone, Copy)]
-pub struct TrackedFace {
-    /// The rectangle where we last recorded this face. This will be used as the image view in which
-    /// we'll run the landmarker.
-    rect: Rect,
-    rotation: f32,
-}
-
-impl TrackedFace {
-    pub fn new(rect: Rect, rotation: f32) -> Self {
-        Self { rect, rotation }
-    }
-
-    pub fn rect(&self) -> &Rect {
-        &self.rect
-    }
-
-    pub fn rotation(&self) -> f32 {
-        self.rotation
     }
 }
