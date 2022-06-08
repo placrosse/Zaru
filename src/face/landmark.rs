@@ -9,9 +9,10 @@
 use once_cell::sync::Lazy;
 
 use crate::{
+    filter::ema::Ema,
     image::{AsImageView, ImageView, Rect},
     iter::zip_exact,
-    landmark::{self, Landmarks},
+    landmark::{self, LandmarkFilter, Landmarks},
     nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
     num::sigmoid,
     resolution::Resolution,
@@ -42,25 +43,33 @@ pub struct Landmarker {
     t_infer: Timer,
     /// Large, so keep one around and return by ref.
     result_buffer: LandmarkResult,
+    filter: LandmarkFilter,
 }
 
 impl Landmarker {
+    const NUM_LANDMARKS: usize = 468;
+
     /// Creates a new facial landmark calculator.
     pub fn new() -> Self {
         Self {
+            model: &MODEL,
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             result_buffer: LandmarkResult {
-                landmarks: Landmarks::new(468),
+                landmarks: Landmarks::new(Self::NUM_LANDMARKS),
                 face_flag: 0.0,
             },
-            model: &MODEL,
+            filter: LandmarkFilter::new(Ema::new(0.5), Self::NUM_LANDMARKS),
         }
     }
 
     /// Returns the expected input resolution of the internal neural network.
     pub fn input_resolution(&self) -> Resolution {
         self.model.input_resolution()
+    }
+
+    pub fn set_filter(&mut self, filter: LandmarkFilter) {
+        self.filter = filter;
     }
 
     /// Computes facial landmarks in `image`.
@@ -97,6 +106,16 @@ impl Landmarker {
             self.result_buffer.landmarks.positions_mut(),
         ) {
             let [x, y, z] = [coords[0], coords[1], coords[2]];
+            out[0] = x;
+            out[1] = y;
+            out[2] = z;
+        }
+
+        self.filter.filter(&mut self.result_buffer.landmarks);
+
+        // Map landmark coordinates back into the input image.
+        for pos in self.result_buffer.landmarks.positions_mut() {
+            let [x, y] = [pos[0], pos[1]];
             let (x, y) = unadjust_aspect_ratio(
                 x / input_res.width() as f32,
                 y / input_res.height() as f32,
@@ -104,9 +123,8 @@ impl Landmarker {
             );
             let (x, y) = (x * full_res.width() as f32, y * full_res.height() as f32);
 
-            out[0] = x;
-            out[1] = y;
-            out[2] = z;
+            pos[0] = x;
+            pos[1] = y;
         }
 
         &self.result_buffer

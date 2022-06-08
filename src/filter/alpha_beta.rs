@@ -23,8 +23,9 @@ pub struct AlphaBetaFilter {
 /// State of an [`AlphaBetaFilter`].
 #[derive(Debug, Default)]
 pub struct AlphaBetaState {
-    x: f32,
-    /// Predicted change in `x` per call to `push`.
+    /// Last filter prediction. Initially `None`.
+    x: Option<f32>,
+    /// Predicted change in `x` per second.
     v: f32,
 }
 
@@ -42,12 +43,40 @@ impl FilterBase<f32> for AlphaBetaFilter {
 
 impl TimeBasedFilter<f32> for AlphaBetaFilter {
     fn filter(&self, state: &mut Self::State, value: f32, elapsed: f32) -> f32 {
-        let prediction = state.x + state.v * elapsed;
-        let residual = value - prediction;
+        match &mut state.x {
+            None => {
+                state.x = Some(value);
+                value
+            }
+            Some(x) => {
+                let prediction = *x + state.v * elapsed;
+                let residual = value - prediction;
 
-        state.x = prediction + self.alpha * residual;
-        state.v += self.beta * residual / elapsed;
+                *x = prediction + self.alpha * residual;
+                state.v += self.beta * residual / elapsed;
 
-        state.x
+                *x
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_alpha_beta_filter() {
+        let filter = AlphaBetaFilter::new(0.5, 0.1);
+        let state = &mut Default::default();
+
+        assert_eq!(filter.filter(state, 10.0, 0.2), 10.0);
+        assert_eq!(filter.filter(state, 10.0, 0.2), 10.0);
+        assert_eq!(filter.filter(state, 10.0, 0.2), 10.0);
+        assert_eq!(filter.filter(state, 10.0, 0.2), 10.0);
+
+        assert_eq!(filter.filter(state, -10.0, 0.2), 0.0);
+        assert_eq!(filter.filter(state, -10.0, 0.2), -6.0);
+        assert_eq!(filter.filter(state, -10.0, 0.2), -9.4);
     }
 }

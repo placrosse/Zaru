@@ -73,6 +73,15 @@ pub trait TimeBasedFilter<V>: FilterBase<V> {
     ///
     /// The filtered value is returned.
     fn filter(&self, state: &mut Self::State, value: V, elapsed: f32) -> V;
+
+    /// Wraps `self` in a [`TimedFilterAdapter`], returning a [`Filter`] implementation that uses
+    /// the elapsed real-world time.
+    fn real_time(self) -> TimedFilterAdapter<Self>
+    where
+        Self: Sized,
+    {
+        TimedFilterAdapter::new(self)
+    }
 }
 
 /// Adapts a [`TimeBasedFilter`] to the [`Filter`] trait by supplying time deltas derived from the

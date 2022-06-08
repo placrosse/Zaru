@@ -78,6 +78,10 @@ impl Landmark {
 }
 
 /// Batch-filter for landmarks.
+///
+/// This should be applied to the unadjusted landmarks output by the neural network, otherwise the
+/// filter parameters require tuning that depends on the input image size, which may vary across
+/// invocations.
 pub struct LandmarkFilter {
     filter: Box<dyn FnMut(&mut Landmarks)>,
 }
@@ -247,7 +251,7 @@ impl LandmarkTracker {
         let view = full_image.view(&view_rect);
         let estimation = estimator.estimate(&view);
         if estimation.confidence() < self.loss_thresh {
-            log::debug!(
+            log::trace!(
                 "LandmarkTracker: confidence {}, loss threshold {} -> LOST",
                 estimation.confidence(),
                 self.loss_thresh,
