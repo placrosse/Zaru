@@ -1,9 +1,9 @@
 mod facetracking;
 
-use zaru::face::detection::{Detection, Detector};
+use zaru::face::detection::Detector;
 use zaru::face::eye::EyeLandmarker;
 use zaru::face::landmark::{self, LandmarkResult, Landmarker};
-use zaru::image::{AsImageView, Color, Image, ImageView, ImageViewMut};
+use zaru::image::{AsImageView, Image, ImageView};
 use zaru::landmark::LandmarkTracker;
 use zaru::num::TotalF32;
 use zaru::procrustes::ProcrustesAnalyzer;
@@ -89,11 +89,13 @@ fn main() -> Result<(), Error> {
                         // edges of the camera view unusable, but significantly improves the tracking
                         // distance.
                         let view_rect = image.resolution().fit_aspect_ratio(input_ratio);
-                        let view = image.view_mut(&view_rect);
+                        let mut view = image.view_mut(&view_rect);
                         let detections = detector.detect(&view);
 
                         // FIXME: this draws over the image that we're about to compute landmarks on
-                        draw_detections(view, detections);
+                        for det in detections {
+                            det.draw(&mut view);
+                        }
                         gui::show_image("camera", &image);
 
                         if let Some(target) = detections
@@ -142,25 +144,7 @@ fn main() -> Result<(), Error> {
                             )
                         });
 
-                        for (x, y, _z) in res.estimation().landmark_positions() {
-                            image::draw_marker(&mut face_image, x as _, y as _).size(3);
-                        }
-
-                        #[allow(illegal_floating_point_literal_pattern)] // let me have fun
-                        let color = match res.estimation().face_confidence() {
-                            0.75.. => Color::GREEN,
-                            0.5..=0.75 => Color::YELLOW,
-                            _ => Color::RED,
-                        };
-                        let x = (face_image.width() / 2) as _;
-                        image::draw_text(
-                            &mut face_image,
-                            x,
-                            0,
-                            &format!("lm_conf={:.01}", res.estimation().face_confidence()),
-                        )
-                        .align_top()
-                        .color(color);
+                        res.estimation().draw(&mut face_image);
 
                         let cx = (face_image.width() / 2) as i32;
                         let cy = (face_image.height() / 2) as i32;
@@ -283,34 +267,4 @@ fn extract_eye_images(
     let left = face_image.view(&left).to_image();
     let right = face_image.view(&right).to_image();
     (left, right)
-}
-
-fn draw_detections(mut target: ImageViewMut<'_>, detections: &[Detection]) {
-    // FIXME move somewhere else
-    for det in detections {
-        det.draw(&mut target);
-
-        #[allow(illegal_floating_point_literal_pattern)] // let me have fun
-        let color = match det.confidence() {
-            1.5.. => Color::GREEN,
-            0.5..=1.5 => Color::YELLOW,
-            _ => Color::RED,
-        };
-        image::draw_text(
-            &mut target,
-            det.bounding_rect_loose().x() + (det.bounding_rect_loose().width() / 2) as i32,
-            det.bounding_rect_loose().y(),
-            &format!("conf={:.01}", det.confidence()),
-        )
-        .align_top()
-        .color(color);
-
-        let alignment_color = Color::from_rgb8(180, 180, 180);
-        let (x0, y0) = det.left_eye();
-        let (x1, y1) = det.right_eye();
-        image::draw_line(&mut target, x0, y0, x1, y1).color(alignment_color);
-        let rot = format!("{:.01}°", det.rotation_radians().to_degrees());
-        image::draw_text(&mut target, (x0 + x1) / 2, (y0 + y1) / 2 - 10, &rot)
-            .color(alignment_color);
-    }
 }

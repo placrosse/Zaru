@@ -210,7 +210,7 @@ impl Detection {
         point_to_img(lm.x(), lm.y(), &self.full_res)
     }
 
-    /// Draws the bounding box and landmarks of this detection onto an image.
+    /// Draws this detection onto an image.
     ///
     /// # Panics
     ///
@@ -234,6 +234,29 @@ impl Detection {
         }
 
         image::draw_rect(image, self.bounding_rect_loose()).color(Color::GREEN);
+
+        #[allow(illegal_floating_point_literal_pattern)] // let me have fun
+        let color = match self.confidence() {
+            0.8.. => Color::GREEN,
+            0.4..=0.8 => Color::YELLOW,
+            _ => Color::RED,
+        };
+        image::draw_text(
+            image,
+            self.bounding_rect_loose().x() + (self.bounding_rect_loose().width() / 2) as i32,
+            self.bounding_rect_loose().y(),
+            &format!("conf={:.01}", self.confidence()),
+        )
+        .align_top()
+        .color(color);
+
+        let alignment_color = Color::from_rgb8(180, 180, 180);
+        let (x0, y0) = self.left_eye();
+        let (x1, y1) = self.right_eye();
+        image::draw_line(image, x0, y0, x1, y1).color(alignment_color);
+        // FIXME: builtin font does not have ° symbol
+        let rot = format!("{:.01} deg", self.rotation_radians().to_degrees());
+        image::draw_text(image, (x0 + x1) / 2, (y0 + y1) / 2 - 10, &rot).color(alignment_color);
     }
 }
 

@@ -176,7 +176,12 @@ impl EyeLandmarks {
     }
 
     fn draw_impl(&self, mut image: ImageViewMut<'_>) {
-        assert_eq!(image.resolution(), self.full_res);
+        assert_eq!(
+            image.resolution(),
+            self.full_res,
+            "attempted to draw eye landmarks onto canvas with mismatched size",
+        );
+
         for (x, y) in self.eye_contour().iter().take(16) {
             image::draw_marker(&mut image, *x as _, *y as _)
                 .size(1)

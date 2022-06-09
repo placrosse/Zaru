@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 
 use crate::{
     filter::ema::Ema,
-    image::{AsImageView, ImageView, Rect},
+    image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
     iter::zip_exact,
     landmark::{self, LandmarkFilter, Landmarks},
     nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
@@ -56,6 +56,7 @@ impl Landmarker {
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             result_buffer: LandmarkResult {
+                full_res: Resolution::new(1, 1),
                 landmarks: Landmarks::new(Self::NUM_LANDMARKS),
                 face_flag: 0.0,
             },
@@ -100,6 +101,7 @@ impl Landmarker {
         let result = self.t_infer.time(|| self.model.estimate(&image)).unwrap();
         log::trace!("inference result: {:?}", result);
 
+        self.result_buffer.full_res = full_res;
         self.result_buffer.face_flag = sigmoid(result[1].index([0, 0, 0, 0]).as_singular());
         for (coords, out) in zip_exact(
             result[0].index([0, 0, 0]).as_slice().chunks(3),
@@ -147,6 +149,7 @@ impl landmark::Estimator for Landmarker {
 /// Landmark results returned by [`Landmarker::compute`].
 #[derive(Clone)]
 pub struct LandmarkResult {
+    full_res: Resolution,
     landmarks: Landmarks,
     face_flag: f32,
 }
@@ -219,6 +222,44 @@ impl LandmarkResult {
             }),
         )
         .unwrap()
+    }
+
+    /// Draws the landmark result onto an image.
+    ///
+    /// # Panics
+    ///
+    /// The image must have the same resolution as the image the detection was performed on,
+    /// otherwise this method will panic.
+    pub fn draw<I: AsImageViewMut>(&self, image: &mut I) {
+        self.draw_impl(&mut image.as_view_mut());
+    }
+
+    fn draw_impl(&self, image: &mut ImageViewMut<'_>) {
+        assert_eq!(
+            image.resolution(),
+            self.full_res,
+            "attempted to draw face landmarks onto canvas with mismatched size",
+        );
+
+        for (x, y, _z) in self.landmark_positions() {
+            image::draw_marker(image, x as _, y as _).size(3);
+        }
+
+        #[allow(illegal_floating_point_literal_pattern)] // let me have fun
+        let color = match self.face_confidence() {
+            0.75.. => Color::GREEN,
+            0.5..=0.75 => Color::YELLOW,
+            _ => Color::RED,
+        };
+        let x = (image.width() / 2) as _;
+        image::draw_text(
+            image,
+            x,
+            0,
+            &format!("lm_conf={:.01}", self.face_confidence()),
+        )
+        .align_top()
+        .color(color);
     }
 }
 
