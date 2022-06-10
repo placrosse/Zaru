@@ -195,6 +195,6 @@ impl EyeLandmarks {
 
         let (x, y) = self.iris_center();
         image::draw_circle(&mut image, x as _, y as _, self.iris_diameter() as u32)
-            .color(Color::RED);
+            .color(Color::CYAN);
     }
 }

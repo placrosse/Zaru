@@ -145,7 +145,7 @@ impl Detector {
 }
 
 /// A detected face, consisting of a bounding box and landmarks.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Detection {
     raw: RawDetection,
     full_res: Resolution,

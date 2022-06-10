@@ -162,7 +162,8 @@ fn main() -> Result<(), Error> {
                     fps.tick_with(
                         [&t_total, &t_procrustes]
                             .into_iter()
-                            .chain(detector.timers()),
+                            .chain(detector.timers())
+                            .chain(landmarker.timers()),
                     );
                 }
             })

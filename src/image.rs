@@ -528,6 +528,7 @@ impl Color {
     pub const BLUE: Self = Self([0, 0, 255, 255]);
     pub const YELLOW: Self = Self([255, 255, 0, 255]);
     pub const MAGENTA: Self = Self([255, 0, 255, 255]);
+    pub const CYAN: Self = Self([0, 255, 255, 255]);
 
     #[inline]
     pub const fn from_rgb8(r: u8, g: u8, b: u8) -> Self {
