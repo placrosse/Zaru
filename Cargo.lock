@@ -2868,8 +2868,6 @@ dependencies = [
 [[package]]
 name = "zune-jpeg"
 version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8f9d6253ff0bab2e0b3a7f0f685735ee9af2f666086c8895c03f1d8fd0882ba"
 dependencies = [
  "log",
  "num_cpus",

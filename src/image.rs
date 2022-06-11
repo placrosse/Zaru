@@ -39,10 +39,10 @@ pub use rect::*;
 enum JpegBackend {
     JpegDecoder,
     Mozjpeg,
-    ZuneJpeg, // Does not seem to support Motion JPEG (?)
+    ZuneJpeg,
 }
 
-const JPEG_BACKEND: JpegBackend = JpegBackend::JpegDecoder;
+const JPEG_BACKEND: JpegBackend = JpegBackend::ZuneJpeg;
 
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
@@ -112,8 +112,12 @@ impl Image {
             }
             JpegBackend::ZuneJpeg => {
                 let mut decomp = zune_jpeg::Decoder::new();
+                decomp.set_num_threads(1)?;
+                decomp.rgba();
                 let buf = decomp.decode_buffer(data)?;
-                let buf = ImageBuffer::from_raw(decomp.width() as u32, decomp.height() as u32, buf)
+                let width = u32::from(decomp.width());
+                let height = u32::from(decomp.height());
+                let buf = ImageBuffer::from_raw(width, height, buf)
                     .expect("failed to create ImageBuffer");
                 buf
             }

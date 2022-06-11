@@ -255,7 +255,7 @@ impl Detection {
         .align_top()
         .color(color);
 
-        let alignment_color = Color::from_rgb8(180, 180, 180);
+        let alignment_color = Color::WHITE;
         let (x0, y0) = self.left_eye();
         let (x1, y1) = self.right_eye();
         image::draw_line(image, x0, y0, x1, y1).color(alignment_color);
