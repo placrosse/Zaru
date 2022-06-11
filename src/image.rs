@@ -187,8 +187,8 @@ impl Image {
     /// # Panics
     ///
     /// This will panic if `(x, y)` is outside the bounds of this image.
-    #[inline]
-    pub fn get(&self, x: u32, y: u32) -> Color {
+    #[cfg(test)]
+    fn get(&self, x: u32, y: u32) -> Color {
         let rgb = &self.buf[(x, y)];
         Color(rgb.0)
     }
@@ -198,8 +198,8 @@ impl Image {
     /// # Panics
     ///
     /// This will panic if `(x, y)` is outside the bounds of this image.
-    #[inline]
-    pub fn set(&mut self, x: u32, y: u32, color: Color) {
+    #[cfg(test)]
+    fn set(&mut self, x: u32, y: u32, color: Color) {
         self.buf[(x, y)] = Rgba(color.0);
     }
 
@@ -326,7 +326,7 @@ impl<'a> ImageView<'a> {
     ///
     /// This will panic if `(x, y)` is outside the bounds of this view.
     #[inline]
-    pub fn get(&self, x: u32, y: u32) -> Color {
+    pub(crate) fn get(&self, x: u32, y: u32) -> Color {
         let rgb = self.sub_image.get_pixel(x, y);
         Color(rgb.0)
     }
@@ -463,7 +463,7 @@ impl<'a> ImageViewMut<'a> {
     ///
     /// This will panic if `(x, y)` is outside the bounds of this view.
     #[inline]
-    pub fn get(&self, x: u32, y: u32) -> Color {
+    fn get(&self, x: u32, y: u32) -> Color {
         let rgb = self.sub_image.get_pixel(x, y);
         Color(rgb.0)
     }
@@ -474,7 +474,7 @@ impl<'a> ImageViewMut<'a> {
     ///
     /// This will panic if `(x, y)` is outside the bounds of this view.
     #[inline]
-    pub fn set(&mut self, x: u32, y: u32, color: Color) {
+    fn set(&mut self, x: u32, y: u32, color: Color) {
         self.sub_image.put_pixel(x, y, Rgba(color.0));
     }
 
