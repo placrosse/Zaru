@@ -121,14 +121,14 @@ impl Rect {
         }
     }
 
-    /// Grows this rectangle by adding a margin on every side.
+    /// Grows each side of this rectangle by adding a margin.
     ///
     /// # Panics
     ///
     /// This method will panic if the adding margin makes the rectangle's width or height overflow a
     /// `u32`, or if the resulting width or height would be less than 0.
     #[must_use]
-    pub fn grow(&self, left: i32, right: i32, top: i32, bottom: i32) -> Self {
+    pub fn grow_sides(&self, left: i32, right: i32, top: i32, bottom: i32) -> Self {
         Self {
             rect: embedded_graphics::primitives::Rectangle {
                 top_left: Point {
@@ -147,17 +147,29 @@ impl Rect {
         }
     }
 
-    /// Grows this rectangle by relative margins, returning the new rectangle.
+    /// Grows this rectangle by adding a margin relative to width and height.
+    ///
+    /// `amount` is the relative amount of the rectangles width and height to add to each side.
+    #[must_use]
+    pub fn grow_rel(&self, amount: f32) -> Self {
+        let left = self.rect.size.width as f32 * amount;
+        let right = self.rect.size.width as f32 * amount;
+        let top = self.rect.size.height as f32 * amount;
+        let bottom = self.rect.size.height as f32 * amount;
+        self.grow_sides(left as i32, right as i32, top as i32, bottom as i32)
+    }
+
+    /// Grows each side of this rectangle by a margin relative to the rectangles width or height.
     ///
     /// `left` and `right` are fractions of the rectangle's width, `top` and `bottom` are fractions
     /// of the rectangle's height.
     #[must_use]
-    pub fn grow_rel(&self, left: f32, right: f32, top: f32, bottom: f32) -> Self {
+    pub fn grow_sides_rel(&self, left: f32, right: f32, top: f32, bottom: f32) -> Self {
         let left = self.rect.size.width as f32 * left;
         let right = self.rect.size.width as f32 * right;
         let top = self.rect.size.height as f32 * top;
         let bottom = self.rect.size.height as f32 * bottom;
-        self.grow(left as i32, right as i32, top as i32, bottom as i32)
+        self.grow_sides(left as i32, right as i32, top as i32, bottom as i32)
     }
 
     // FIXME: grow width and height by different amounts, grow width and height by the same amt

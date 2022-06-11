@@ -24,7 +24,7 @@ fn main() -> Result<(), zaru::Error> {
         for detection in detector.detect(&image) {
             let dest_rect = detection
                 .bounding_rect_raw()
-                .grow_rel(0.4, 0.4, 0.4, 0.4)
+                .grow_rel(0.4)
                 .grow_to_fit_aspect(current_frame.image_view().resolution().aspect_ratio());
             // FIXME: because `view_mut` auto-crops `dest_rect`, the resulting view might have a
             // different aspect ratio than `dest_rect` and stretch the overlay weirdly.

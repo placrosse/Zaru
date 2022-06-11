@@ -82,7 +82,7 @@ fn main() -> Result<(), zaru::Error> {
                 let grow_by = 0.4;
                 let rect = dets[0]
                     .bounding_rect_raw()
-                    .grow_rel(grow_by, grow_by, grow_by, grow_by)
+                    .grow_rel(grow_by)
                     .grow_to_fit_aspect(target_aspect);
                 let face = image
                     .view(&rect)

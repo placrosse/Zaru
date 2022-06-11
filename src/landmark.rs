@@ -268,12 +268,7 @@ impl LandmarkTracker {
                 .map(|lm| (lm.x() as _, lm.y() as _)),
         )
         .unwrap()
-        .grow_rel(
-            self.roi_padding,
-            self.roi_padding,
-            self.roi_padding,
-            self.roi_padding,
-        )
+        .grow_rel(self.roi_padding)
         .move_by(view_rect.x(), view_rect.y());
         self.roi = Some(updated_roi);
 

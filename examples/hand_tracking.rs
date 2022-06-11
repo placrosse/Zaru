@@ -43,9 +43,7 @@ fn main() -> Result<(), zaru::Error> {
             .max_by_key(|det| TotalF32(det.confidence()))
         {
             let grow_by = 1.5;
-            let hand_rect = detection
-                .bounding_rect()
-                .grow_rel(grow_by, grow_by, grow_by, grow_by);
+            let hand_rect = detection.bounding_rect().grow_rel(grow_by);
             image::draw_rect(&mut image, hand_rect).color(Color::BLUE);
             let mut hand_view = image.view_mut(&hand_rect);
             let landmarks = landmarker.compute(&hand_view);

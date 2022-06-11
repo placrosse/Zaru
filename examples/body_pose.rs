@@ -7,7 +7,7 @@ use zaru::{
         landmark::{FullNetwork, Landmarker, LiteNetwork},
     },
     gui,
-    image::{self, Image, Rect, Color},
+    image::{self, Color, Image, Rect},
     num::TotalF32,
     timer::FpsCounter,
     webcam::Webcam,
@@ -72,7 +72,7 @@ fn main() -> Result<(), zaru::Error> {
                 .unwrap()
                 .grow_move_center(hips.0, hips.1)
                 .grow_to_fit_aspect(landmarker.input_resolution().aspect_ratio())
-                .grow_rel(grow_by, grow_by, grow_by, grow_by);
+                .grow_rel(grow_by);
             image::draw_rect(&mut image, body_rect).color(Color::BLUE);
             let mut body_view = image.view_mut(&body_rect);
             let landmarks = landmarker.compute(&body_view);

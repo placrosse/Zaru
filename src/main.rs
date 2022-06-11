@@ -258,12 +258,8 @@ fn extract_eye_images(
     let right = lm.right_eye();
 
     const MARGIN: f32 = 0.9;
-    let left = left
-        .grow_rel(MARGIN, MARGIN, MARGIN, MARGIN)
-        .grow_to_fit_aspect(target_aspect);
-    let right = right
-        .grow_rel(MARGIN, MARGIN, MARGIN, MARGIN)
-        .grow_to_fit_aspect(target_aspect);
+    let left = left.grow_rel(MARGIN).grow_to_fit_aspect(target_aspect);
+    let right = right.grow_rel(MARGIN).grow_to_fit_aspect(target_aspect);
 
     let left = face_image.view(&left).to_image();
     let right = face_image.view(&right).to_image();
