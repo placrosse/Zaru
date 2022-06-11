@@ -27,7 +27,7 @@ mod tests;
 use std::{fmt, ops::Index, path::Path};
 
 use embedded_graphics::{pixelcolor::raw::RawU32, prelude::PixelColor};
-use image::{GenericImage, GenericImageView, ImageBuffer, ImageFormat, Rgba, RgbaImage};
+use image::{GenericImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
 
 use crate::resolution::Resolution;
 
@@ -35,9 +35,35 @@ pub use blend::*;
 pub use draw::*;
 pub use rect::Rect;
 
-/// Whether to use "mozjpeg"/libjpeg-turbo for JPEG decoding. It's faster than the `image` crate
-/// (6-7 ms instead of ~10ms for 1080p frames).
-const USE_MOZJPEG: bool = true;
+#[allow(dead_code)]
+enum JpegBackend {
+    JpegDecoder,
+    Mozjpeg,
+    ZuneJpeg, // Does not seem to support Motion JPEG (?)
+}
+
+const JPEG_BACKEND: JpegBackend = JpegBackend::JpegDecoder;
+
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+enum ImageFormat {
+    Jpeg,
+    Png,
+}
+
+impl ImageFormat {
+    fn from_path(path: &Path) -> crate::Result<Self> {
+        match path.extension().and_then(|ext| ext.to_str()) {
+            Some("jpg" | "jpeg") => Ok(Self::Jpeg),
+            Some("png") => Ok(Self::Png),
+            _ => Err(format!(
+                "invalid image path '{}' (must have one of the supported extensions)",
+                path.display()
+            )
+            .into()),
+        }
+    }
+}
 
 /// An 8-bit sRGB image with alpha channel.
 #[derive(Clone)]
@@ -49,32 +75,64 @@ pub struct Image {
 
 impl Image {
     /// Loads an image from the filesystem.
+    ///
+    /// The path must have a supported file extension (`jpeg`, `jpg` or `png`).
     pub fn load<A: AsRef<Path>>(path: A) -> Result<Self, crate::Error> {
-        let image = image::open(path)?;
-        let buf = image.into_rgba8();
+        Self::load_impl(path.as_ref())
+    }
 
-        Ok(Self { buf })
+    fn load_impl(path: &Path) -> Result<Self, crate::Error> {
+        match ImageFormat::from_path(path)? {
+            ImageFormat::Jpeg => {
+                let data = std::fs::read(path)?;
+                Self::decode_jpeg(&data)
+            }
+            ImageFormat::Png => {
+                let data = std::fs::read(path)?;
+                let buf =
+                    image::load_from_memory_with_format(&data, image::ImageFormat::Png)?.to_rgba8();
+                Ok(Self { buf })
+            }
+        }
     }
 
     /// Decodes a JFIF JPEG or Motion JPEG from a byte slice.
     pub fn decode_jpeg(data: &[u8]) -> Result<Self, crate::Error> {
-        let buf = if USE_MOZJPEG {
-            let decompressor = mozjpeg::Decompress::new_mem(data)?;
-            let mut decomp = decompressor.rgba()?;
-            let buf = decomp.read_scanlines_flat().unwrap();
-            let buf = ImageBuffer::from_raw(decomp.width() as u32, decomp.height() as u32, buf)
-                .expect("failed to create ImageBuffer");
-            buf
-        } else {
-            // FIXME: this might be using multithreading internally
-            image::load_from_memory_with_format(data, ImageFormat::Jpeg)?.to_rgba8()
+        let buf = match JPEG_BACKEND {
+            JpegBackend::JpegDecoder => {
+                image::load_from_memory_with_format(data, image::ImageFormat::Jpeg)?.to_rgba8()
+            }
+            JpegBackend::Mozjpeg => {
+                let decompressor = mozjpeg::Decompress::new_mem(data)?;
+                let mut decomp = decompressor.rgba()?;
+                let buf = decomp.read_scanlines_flat().unwrap();
+                let buf = ImageBuffer::from_raw(decomp.width() as u32, decomp.height() as u32, buf)
+                    .expect("failed to create ImageBuffer");
+                buf
+            }
+            JpegBackend::ZuneJpeg => {
+                let mut decomp = zune_jpeg::Decoder::new();
+                let buf = decomp.decode_buffer(data)?;
+                let buf = ImageBuffer::from_raw(decomp.width() as u32, decomp.height() as u32, buf)
+                    .expect("failed to create ImageBuffer");
+                buf
+            }
         };
 
         Ok(Self { buf })
     }
 
+    /// Saves an image to the file system.
+    ///
+    /// The path must have a supported file extension (`jpeg`, `jpg` or `png`).
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), crate::Error> {
-        Ok(self.buf.save(path)?)
+        self.save_impl(path.as_ref())
+    }
+
+    fn save_impl(&self, path: &Path) -> Result<(), crate::Error> {
+        match ImageFormat::from_path(path)? {
+            _ => Ok(self.buf.save(path)?),
+        }
     }
 
     /// Creates an empty image of a specified size.
