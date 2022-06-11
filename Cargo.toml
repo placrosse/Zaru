@@ -14,8 +14,7 @@ crossbeam = "0.8.1"
 serde = { version = "1.0.136", features = ["derive"] }
 
 # neural nets
-#tract-onnx = "0.16.4"
-tract-onnx = { path = "../tract/onnx" }
+tract-onnx = "0.16.9"
 tinyvec = { version = "1.6.0", features = ["alloc"] }
 wonnx = { path = "../wonnx/wonnx" }
 
