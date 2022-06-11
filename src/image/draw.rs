@@ -7,9 +7,12 @@ use embedded_graphics::{
     primitives::{self, Line, PrimitiveStyle, Rectangle},
     text::{self, Text, TextStyleBuilder},
 };
+use itertools::Itertools;
 use nalgebra::{UnitQuaternion, Vector2, Vector3};
 
 use crate::image::{AsImageViewMut, Color, ImageViewMut, Rect};
+
+use super::RotatedRect;
 
 /// Guard returned by [`draw_rect`]; draws the rectangle when dropped and allows customization.
 pub struct DrawRect<'a> {
@@ -45,6 +48,49 @@ impl Drop for DrawRect<'_> {
         {
             Ok(_) => {}
             Err(infallible) => match infallible {},
+        }
+    }
+}
+
+/// Guard returned by [`draw_rotated_rect`]; draws the rotated rectangle when dropped and allows
+/// customization.
+pub struct DrawRotatedRect<'a> {
+    image: ImageViewMut<'a>,
+    rect: RotatedRect,
+    color: Color,
+    stroke_width: u32,
+}
+
+impl<'a> DrawRotatedRect<'a> {
+    /// Sets the color.
+    pub fn color(&mut self, color: Color) -> &mut Self {
+        self.color = color;
+        self
+    }
+
+    /// Sets the stroke width.
+    ///
+    /// By default, a stroke width of 1 is used.
+    pub fn stroke_width(&mut self, width: u32) -> &mut Self {
+        self.stroke_width = width;
+        self
+    }
+}
+
+impl<'a> Drop for DrawRotatedRect<'a> {
+    fn drop(&mut self) {
+        let corners = self.rect.rotated_corners();
+        for (start, end) in corners.into_iter().circular_tuple_windows().take(4) {
+            let (sx, sy) = ((start.0 + 0.5) as i32, (start.1 + 0.5) as i32);
+            let (ex, ey) = ((end.0 + 0.5) as i32, (end.1 + 0.5) as i32);
+
+            match Line::new(Point::new(sx, sy), Point::new(ex, ey))
+                .into_styled(PrimitiveStyle::with_stroke(self.color, self.stroke_width))
+                .draw(&mut Target(self.image.reborrow()))
+            {
+                Ok(_) => {}
+                Err(infallible) => match infallible {},
+            }
         }
     }
 }
@@ -320,6 +366,19 @@ impl<'a> Drop for DrawQuaternion<'a> {
 /// Draws a rectangle onto an image.
 pub fn draw_rect<I: AsImageViewMut>(image: &mut I, rect: Rect) -> DrawRect<'_> {
     DrawRect {
+        image: image.as_view_mut(),
+        rect,
+        color: Color::RED,
+        stroke_width: 1,
+    }
+}
+
+/// Draws a rotated rectangle onto an image.
+pub fn draw_rotated_rect<I: AsImageViewMut>(
+    image: &mut I,
+    rect: RotatedRect,
+) -> DrawRotatedRect<'_> {
+    DrawRotatedRect {
         image: image.as_view_mut(),
         rect,
         color: Color::RED,

@@ -57,9 +57,6 @@ impl Resolution {
 
     /// Computes a centered, maximally sized [`Rect`] that lies inside of `self` and has the given
     /// aspect ratio.
-    ///
-    /// This can be used to perform an aspect ratio aware resize operation that automatically leaves
-    /// black bars around the image.
     pub fn fit_aspect_ratio(&self, ratio: AspectRatio) -> Rect {
         // FIXME: should this be a method on `Rect` instead (or in addition)?
 

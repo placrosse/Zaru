@@ -38,6 +38,8 @@ fn main() -> Result<(), zaru::Error> {
             detection.draw(&mut image);
         }
 
+        // FIXME: detection threshold is a bit too low.
+        // could also be fixed by discarding the hand if the landmark confidence is too low.
         if let Some(detection) = detections
             .iter()
             .max_by_key(|det| TotalF32(det.confidence()))

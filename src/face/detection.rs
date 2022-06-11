@@ -14,7 +14,7 @@ use crate::{
         ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
         BoundingRect, RawDetection,
     },
-    image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
+    image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect, RotatedRect},
     nn::{create_linear_color_mapper, point_to_img, Cnn, CnnInputShape, NeuralNetwork},
     num::{sigmoid, TotalF32},
     resolution::Resolution,
@@ -227,13 +227,18 @@ impl Detection {
             "attempted to draw `Detection` onto canvas with mismatched size",
         );
 
-        image::draw_rect(image, self.bounding_rect_raw());
+        image::draw_rect(image, self.bounding_rect_raw()).color(Color::from_rgb8(170, 0, 0));
         for lm in self.raw.keypoints() {
             let (x, y) = point_to_img(lm.x(), lm.y(), &self.full_res);
             image::draw_marker(image, x, y);
         }
 
-        image::draw_rect(image, self.bounding_rect_loose()).color(Color::GREEN);
+        image::draw_rect(image, self.bounding_rect_loose()).color(Color::from_rgb8(0, 170, 0));
+
+        image::draw_rotated_rect(
+            image,
+            RotatedRect::new(self.bounding_rect_loose(), self.rotation_radians()),
+        );
 
         #[allow(illegal_floating_point_literal_pattern)] // let me have fun
         let color = match self.confidence() {

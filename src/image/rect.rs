@@ -5,6 +5,7 @@ use std::{
 
 use embedded_graphics::prelude::*;
 use itertools::Itertools;
+use nalgebra::{Point2, Rotation2};
 
 use crate::resolution::AspectRatio;
 
@@ -238,10 +239,10 @@ impl Rect {
         self.rect.size.height
     }
 
-    pub fn center(&self) -> (i32, i32) {
+    pub fn center(&self) -> (f32, f32) {
         (
-            self.x() + (self.width() / 2) as i32,
-            self.y() + (self.height() / 2) as i32,
+            self.x() as f32 + (self.width() as f32 / 2.0),
+            self.y() as f32 + (self.height() as f32 / 2.0),
         )
     }
 
@@ -314,6 +315,62 @@ impl fmt::Debug for Rect {
         let bx = i64::from(x) + i64::from(w);
         let by = i64::from(y) + i64::from(h);
         write!(f, "Rect @ ({x},{y})-({bx},{by})/{w}x{h}")
+    }
+}
+
+/// A [`Rect`], rotated around its center.
+#[derive(Debug, Clone, Copy)]
+pub struct RotatedRect {
+    rect: Rect,
+    radians: f32,
+}
+
+impl RotatedRect {
+    /// Creates a new rotated rectangle.
+    ///
+    /// `radians` is the clockwise rotation to apply to the [`Rect`].
+    #[inline]
+    pub fn new(rect: Rect, radians: f32) -> Self {
+        Self { rect, radians }
+    }
+
+    /// Returns the rectangle's clockwise rotation in radians.
+    #[inline]
+    pub fn rotation_radians(&self) -> f32 {
+        self.radians
+    }
+
+    /// Returns the rectangle's clockwise rotation in degrees.
+    pub fn rotation_degrees(&self) -> f32 {
+        self.radians.to_degrees()
+    }
+
+    /// Returns a reference to the underlying non-rotated rectangle.
+    #[inline]
+    pub fn rect(&self) -> &Rect {
+        &self.rect
+    }
+
+    /// Returns the rotated rectangle's corners.
+    ///
+    /// The order is: top-left, top-right, bottom-right, bottom-left, as seen from the non-rotated
+    /// rect: after the rotation is applied, the corners can be rotated anywhere else, but the order
+    /// is retained.
+    pub fn rotated_corners(&self) -> [(f32, f32); 4] {
+        let (x, y) = (self.rect.x() as f32, self.rect.y() as f32);
+        let (w, h) = (self.rect.width() as f32, self.rect.height() as f32);
+        let corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)];
+
+        let rotation = Rotation2::new(self.radians);
+        let (cx, cy) = self.rect.center();
+        let center = Point2::new(cx, cy);
+        corners.map(|(x, y)| {
+            let point = Point2::new(x, y);
+            let rel = point - center;
+            let rot = rotation * rel;
+            let abs = center + rot;
+            (abs.x, abs.y)
+        })
     }
 }
 

@@ -33,7 +33,7 @@ use crate::resolution::Resolution;
 
 pub use blend::*;
 pub use draw::*;
-pub use rect::Rect;
+pub use rect::*;
 
 #[allow(dead_code)]
 enum JpegBackend {
