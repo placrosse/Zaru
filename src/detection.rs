@@ -76,8 +76,8 @@ impl RawDetection {
 
 /// A 2D keypoint produced as part of a [`RawDetection`].
 ///
-/// A keypoint by itself is just a point in an unspecified coordinate system. Keypoints are also not
-/// necessarily inside the detection bounding box.
+/// A keypoint by itself is just a point in an unspecified coordinate system. Keypoints are often,
+/// but not always, inside the detection bounding box.
 ///
 /// The meaning of a keypoint depends on the specific detector and on its index in the keypoint
 /// list. Typically keypoints are used to crop/rotate a detected object for further processing.
@@ -105,6 +105,8 @@ impl Keypoint {
 }
 
 /// Axis-aligned bounding rectangle of a detected object.
+///
+/// This primarily differs from [`Rect`] in that it uses float coordinates instead of integers.
 #[derive(Debug, Clone, Copy)]
 pub struct BoundingRect {
     xc: f32,
@@ -114,6 +116,7 @@ pub struct BoundingRect {
 }
 
 impl BoundingRect {
+    /// Creates a bounding rectangle centered at `(xc,yc)`.
     pub fn from_center(xc: f32, yc: f32, w: f32, h: f32) -> Self {
         Self { xc, yc, w, h }
     }
@@ -160,6 +163,7 @@ impl BoundingRect {
         (self.xc + self.w / 2.0, self.yc + self.h / 2.0)
     }
 
+    /// Returns the amount of area covered by `self`.
     pub fn area(&self) -> f32 {
         self.w * self.h
     }

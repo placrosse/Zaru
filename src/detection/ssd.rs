@@ -17,10 +17,12 @@ pub struct Anchor {
 }
 
 impl Anchor {
+    /// Returns the X coordinate of the anchor's center.
     pub fn x_center(&self) -> f32 {
         self.x_center
     }
 
+    /// Returns the Y coordinate of the anchor's center.
     pub fn y_center(&self) -> f32 {
         self.y_center
     }
@@ -35,7 +37,7 @@ pub struct LayerInfo {
 }
 
 impl LayerInfo {
-    /// Creates a new SSD layer description.
+    /// Creates a new SSD output layer description.
     ///
     /// # Parameters
     ///
@@ -50,6 +52,7 @@ impl LayerInfo {
     }
 }
 
+/// Parameters needed for SSD anchor calculation.
 pub struct AnchorParams<'a> {
     /// List of output layers.
     ///
@@ -70,11 +73,15 @@ pub struct AnchorParams<'a> {
     pub layers: &'a [LayerInfo],
 }
 
+/// A list of SSD anchors/priors.
+///
+/// This type can be indexed with `usize` to get the [`Anchor`] at that index.
 pub struct Anchors {
     anchors: Vec<Anchor>,
 }
 
 impl Anchors {
+    /// Computes SSD anchors for a network described by `params`.
     pub fn calculate(params: &AnchorParams<'_>) -> Self {
         let mut anchors = Vec::new();
 

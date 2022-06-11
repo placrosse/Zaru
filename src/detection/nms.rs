@@ -1,15 +1,15 @@
 //! Non-Maximum Suppression and Averaging.
 //!
-//! Typical Single-Short MultiBox Detectors (SSD) produce duplicate detections for individual
+//! Typical Single-Shot MultiBox Detectors (SSD) produce duplicate detections for individual
 //! objects. Non-Maximum Suppression (NMS) is an algorithm that filters these duplicates out,
 //! leaving only a single detection with high confidence for each object.
 //!
 //! This module implements 2 variants of NMS, selected with [`SuppressionMode`]: The classic
-//! Non-Maximum Suppression algorithm that removes any less confident detections
+//! Non-Maximum Suppression algorithm that removes any overlapping detections with lower confidence
 //! ([`SuppressionMode::Remove`]), and the slightly smarter Non-Maximum Averaging
 //! ([`SuppressionMode::Average`]) which instead computes a weighted average of overlapping
 //! detections. Since the latter reduces jitter between frames, and does not seem to have any
-//! appreciable drawbacks, it is used by default.
+//! appreciable drawbacks (outside of a minor computational cost), it is used by default.
 
 use crate::{iter::zip_exact, num::TotalF32};
 
