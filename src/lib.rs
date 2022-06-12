@@ -13,8 +13,8 @@ use log::LevelFilter;
 
 pub mod anim;
 pub mod body;
-pub mod defer;
 pub mod detection;
+pub mod drop;
 pub mod face;
 pub mod filter;
 pub mod gui;
