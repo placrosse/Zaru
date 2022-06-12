@@ -239,6 +239,11 @@ impl Rect {
         self.rect.size.height
     }
 
+    /// Returns the number of pixels contained in `self`.
+    pub fn area(&self) -> u64 {
+        u64::from(self.rect.size.width) * u64::from(self.rect.size.height)
+    }
+
     pub fn center(&self) -> (f32, f32) {
         (
             self.x() as f32 + (self.width() as f32 / 2.0),
@@ -282,6 +287,19 @@ impl Rect {
             rect,
         );
         Some(rect)
+    }
+
+    fn intersection_area(&self, other: &Self) -> u64 {
+        self.intersection(other).map_or(0, |rect| rect.area())
+    }
+
+    fn union_area(&self, other: &Self) -> u64 {
+        self.area() + other.area() - self.intersection_area(other)
+    }
+
+    /// Computes the Intersection over Union (IOU) of `self` and `other`.
+    pub fn iou(&self, other: &Self) -> f32 {
+        self.intersection_area(other) as f32 / self.union_area(other) as f32
     }
 
     /// Returns whether `self` contains `other`.
