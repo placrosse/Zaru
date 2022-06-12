@@ -10,7 +10,7 @@ use zaru::procrustes::ProcrustesAnalyzer;
 use zaru::resolution::AspectRatio;
 use zaru::timer::{FpsCounter, Timer};
 use zaru::webcam::Webcam;
-use zaru::{defer::defer, gui, image, pipeline, Error};
+use zaru::{drop::defer, gui, image, pipeline, Error};
 
 fn main() -> Result<(), Error> {
     zaru::init_logger!();
