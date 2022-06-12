@@ -14,12 +14,18 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crossbeam::channel::{RecvError, SendError};
+use crossbeam::channel::{RecvError, SendError, TrySendError};
+
+use crate::drop::DropBomb;
 
 /// Creates a channel suitable for sending data between pipeline stages.
 ///
 /// Values sent across the channel are not buffered. A call to [`Sender::send`] will block until
 /// another thread is at a matching [`Receiver::recv`] call.
+///
+/// Therefore, this type of channel is suitable only for data moving *forwards* in a processing
+/// pipeline, or *into* a [`Worker`]. If data is sent backwards, a [`promise`] should be used
+/// instead.
 pub fn channel<T>() -> (InactiveSender<T>, InactiveReceiver<T>) {
     let (sender, recv) = crossbeam::channel::bounded(0);
 
@@ -28,44 +34,6 @@ pub fn channel<T>() -> (InactiveSender<T>, InactiveReceiver<T>) {
         InactiveReceiver { inner: recv },
     )
 }
-/*
-/// Creates a "buffer" channel suitable for data that bypasses pipeline stages.
-///
-/// This functions almost the same as [`channel`], but will buffer exactly 1 value without blocking.
-///
-/// To understand what this is useful for, consider the following setup:
-///
-/// ```text
-///                         +----------+
-///          /------------> | Thread 2 | ---\
-/// +----------+            +----------+     \     +----------+
-/// | Thread 1 |                              +--> | Thread 4 |
-/// +----------+            +----------+     /     +----------+
-///        | \------------> | Thread 3 | ---/        ^
-///        |                +----------+             |
-///        |                                         |
-///        |                 buffer                  |
-///        +-----------------------------------------+
-/// ```
-///
-/// Here, thread 1 sends some data to threads 2 and 3, which then perform some (presumably
-/// expensive) computations on it and send the result to thread 4. However, thread 1 might *also*
-/// produce some data that is directly of interest to thread 4 and isn't needed by threads 2 and 3.
-///
-/// It could just send this data along to thread 2 or 3 and have that forward it to thread 4, but
-/// that introduces some complexity in thread 2 or 3, and also requires picking one of them to
-/// forward the extra data.
-///
-/// Using an additional channel to send the data directly to thread 4 does not work because that
-/// blocks until thread 4
-pub fn buffer<T>() -> (InactiveSender<T>, InactiveReceiver<T>) {
-    let (sender, recv) = crossbeam::channel::bounded(1);
-
-    (
-        InactiveSender { inner: sender },
-        InactiveReceiver { inner: recv },
-    )
-}*/
 
 /// The inactive sending half of a channel.
 pub struct InactiveSender<T> {
@@ -132,6 +100,10 @@ impl<T> Sender<T> {
     pub fn send(&self, value: T) -> Result<(), SendError<T>> {
         self.inner.send(value)
     }
+
+    pub fn try_send(&self, value: T) -> Result<(), TrySendError<T>> {
+        self.inner.try_send(value)
+    }
 }
 
 /// The receiving half of a channel.
@@ -174,6 +146,85 @@ impl<T> Iterator for IntoIter<T> {
         self.inner.next()
     }
 }
+
+/// Creates a connected pair of [`Promise`] and [`PromiseHandle`].
+pub fn promise<T>() -> (Promise<T>, PromiseHandle<T>) {
+    // Capacity of 1 means that `Promise::fulfill` will never block, which is the property we want.
+    let (sender, recv) = crossbeam::channel::bounded(1);
+    let bomb = DropBomb::new("`Promise` dropped without being fulfilled");
+
+    (
+        Promise {
+            inner: sender,
+            bomb,
+        },
+        PromiseHandle { recv },
+    )
+}
+
+/// An empty slot that can be filled with a `T`, fulfilling the promise.
+///
+/// This is a *linear type*: if it gets dropped without being fulfilled, the thread will panic.
+///
+/// This API is vaguely inspired by C++'s `std::promise`.
+pub struct Promise<T> {
+    inner: crossbeam::channel::Sender<T>,
+    bomb: DropBomb,
+}
+
+impl<T> Promise<T> {
+    /// Fulfills the promise with a value, consuming it.
+    ///
+    /// If a thread is currently waiting at [`PromiseHandle::block`], it will be woken up.
+    ///
+    /// This method does not block or fail. If the connected [`PromiseHandle`] was dropped, `value`
+    /// will be dropped and nothing happens. The calling thread is expected to exit when it attempts
+    /// to obtain a new [`Promise`] to fulfill.
+    pub fn fulfill(mut self, value: T) {
+        // This ignores errors. The assumption is that the thread will exit once it tried to obtain
+        // a new `Promise` to fulfill.
+        self.inner.send(value).ok();
+        self.bomb.defuse();
+    }
+}
+
+/// A handle connected to a [`Promise`] that will eventually resolve to a value of type `T`.
+///
+/// C++ calls this a "future", but that means something pretty different in Rust.
+pub struct PromiseHandle<T> {
+    recv: crossbeam::channel::Receiver<T>,
+}
+
+impl<T> PromiseHandle<T> {
+    /// Blocks the calling thread until the [`Promise`] is fulfilled.
+    pub fn block(self) -> Result<T, PromiseDropped> {
+        /*
+        Problem: when this fails, we know that the other thread has panicked, but we have no access
+        to its panic payload, so we can't propagate it. If the other thread is a `Worker`, it will
+        propagate automatically when dropped, but we cannot trigger that from this method: if we
+        unwind with a different payload, `Worker`s destructor cannot resume unwinding with the
+        correct payload later.
+        So we make the caller handle this.
+        */
+        self.recv.recv().map_err(|_| PromiseDropped)
+    }
+
+    /// Returns whether the associated [`Promise`] has been fulfilled.
+    ///
+    /// If this returns `true`, calling [`PromiseHandle::block`] on `self` will return immediately,
+    /// without blocking.
+    pub fn is_fulfilled(&self) -> bool {
+        !self.recv.is_empty()
+    }
+}
+
+/// An error indicating that the connected [`Promise`] object was dropped without being fulfilled.
+///
+/// Since [`Promise`] panics on drop, this indicates that the thread holding it is panicking. Thus,
+/// when this error is received, the other thread should be joined and its panic payload propagated
+/// (if it's a [`Worker`], simply dropping it is enough).
+#[derive(Debug, Clone, Copy)]
+pub struct PromiseDropped;
 
 /// A handle to a worker thread that processes messages of type `I`.
 ///
