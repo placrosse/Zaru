@@ -5,11 +5,13 @@ use once_cell::sync::Lazy;
 use crate::{
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut},
     iter::zip_exact,
+    landmark::{Estimation, Estimator, Landmarks},
     nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
-    resolution::{AspectRatio, Resolution},
+    resolution::Resolution,
     timer::Timer,
 };
 
+#[derive(Clone)]
 pub struct Landmarker {
     cnn: &'static Cnn,
     t_resize: Timer,
@@ -25,12 +27,7 @@ impl Landmarker {
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             result_buffer: LandmarkResult {
-                orig_res: Resolution::new(1, 1),
-                orig_aspect: AspectRatio::SQUARE,
-                input_res: N::cnn().input_resolution(),
-                landmarks: Landmarks {
-                    positions: [(0.0, 0.0, 0.0); 21],
-                },
+                landmarks: Landmarks::new(21),
                 presence: 0.0,
                 raw_handedness: 0.0,
             },
@@ -50,8 +47,7 @@ impl Landmarker {
     fn compute_impl(&mut self, image: ImageView<'_>) -> &LandmarkResult {
         let input_res = self.input_resolution();
         let full_res = image.resolution();
-        self.result_buffer.orig_res = full_res;
-        self.result_buffer.orig_aspect = full_res.aspect_ratio();
+        let aspect_ratio = full_res.aspect_ratio();
 
         let mut image = image.reborrow();
         let resized;
@@ -76,11 +72,19 @@ impl Landmarker {
         self.result_buffer.raw_handedness = handedness.index([0, 0]).as_singular();
         for (coords, out) in zip_exact(
             screen_landmarks.index([0]).as_slice().chunks(3),
-            &mut self.result_buffer.landmarks.positions,
+            self.result_buffer.landmarks.positions_mut(),
         ) {
-            out.0 = coords[0];
-            out.1 = coords[1];
-            out.2 = coords[2];
+            let [x, y, z] = [coords[0], coords[1], coords[2]];
+            let (x, y) = unadjust_aspect_ratio(
+                x / input_res.width() as f32,
+                y / input_res.height() as f32,
+                aspect_ratio,
+            );
+            let (x, y) = (x * full_res.width() as f32, y * full_res.height() as f32);
+
+            out[0] = x;
+            out[1] = y;
+            out[2] = z;
         }
 
         &self.result_buffer
@@ -94,64 +98,58 @@ impl Landmarker {
 /// Landmark results returned by [`Landmarker::compute`].
 #[derive(Clone)]
 pub struct LandmarkResult {
-    orig_res: Resolution,
-    orig_aspect: AspectRatio,
-    input_res: Resolution,
-
     landmarks: Landmarks,
     presence: f32,
     raw_handedness: f32,
 }
 
 impl LandmarkResult {
+    pub fn move_by(&mut self, x: f32, y: f32, z: f32) {
+        for pos in self.landmarks.positions_mut() {
+            pos[0] += x;
+            pos[1] += y;
+            pos[2] += z;
+        }
+    }
+
     /// Returns the 3D landmark positions in the input image's coordinate system.
-    pub fn landmark_positions(&self) -> impl Iterator<Item = (f32, f32, f32)> + '_ {
+    pub fn landmark_positions(&self) -> impl Iterator<Item = [f32; 3]> + '_ {
         (0..self.landmark_count()).map(|index| self.landmark_position(index))
     }
 
     /// Returns a landmark's position in the input image's coordinate system.
-    pub fn landmark_position(&self, index: usize) -> (f32, f32, f32) {
-        let (x, y, z) = self.landmarks.positions[index];
-        let (x, y) = unadjust_aspect_ratio(
-            x / self.input_res.width() as f32,
-            y / self.input_res.height() as f32,
-            self.orig_aspect,
-        );
-        let (x, y) = (
-            x * self.orig_res.width() as f32,
-            y * self.orig_res.height() as f32,
-        );
-        (x, y, z)
+    pub fn landmark_position(&self, index: usize) -> [f32; 3] {
+        self.landmarks.positions()[index]
     }
 
     /// Returns an iterator over the landmarks that surround the palm.
-    pub fn palm_landmarks(&self) -> impl Iterator<Item = (f32, f32, f32)> + '_ {
+    pub fn palm_landmarks(&self) -> impl Iterator<Item = [f32; 3]> + '_ {
         PALM_LANDMARKS
             .iter()
             .map(|lm| self.landmark_position(*lm as usize))
     }
 
     /// Computes the center position of the hand's palm by averaging some of the landmarks.
-    pub fn palm_center(&self) -> (f32, f32, f32) {
+    pub fn palm_center(&self) -> [f32; 3] {
         let mut pos = (0.0, 0.0, 0.0);
         let mut count = 0;
-        for (x, y, z) in self.palm_landmarks() {
+        for [x, y, z] in self.palm_landmarks() {
             pos.0 += x;
             pos.1 += y;
             pos.2 += z;
             count += 1;
         }
 
-        (
+        [
             pos.0 / count as f32,
             pos.1 / count as f32,
             pos.2 / count as f32,
-        )
+        ]
     }
 
     #[inline]
     pub fn landmark_count(&self) -> usize {
-        self.landmarks.positions.len()
+        self.landmarks.len()
     }
 
     /// Returns the presence flag, indicating the confidence of whether a hand was in the input
@@ -185,7 +183,7 @@ impl LandmarkResult {
             Handedness::Right => "R",
         };
 
-        let (palm_x, palm_y, _) = self.palm_center();
+        let [palm_x, palm_y, _] = self.palm_center();
         let (palm_x, palm_y) = (palm_x as i32, palm_y as i32);
 
         image::draw_text(target, palm_x, palm_y - 5, hand);
@@ -197,14 +195,32 @@ impl LandmarkResult {
         );
 
         for (a, b) in CONNECTIVITY {
-            let (a_x, a_y, _) = self.landmark_position(*a as usize);
-            let (b_x, b_y, _) = self.landmark_position(*b as usize);
+            let [a_x, a_y, _] = self.landmark_position(*a as usize);
+            let [b_x, b_y, _] = self.landmark_position(*b as usize);
 
             image::draw_line(target, a_x as _, a_y as _, b_x as _, b_y as _).color(Color::GREEN);
         }
-        for (x, y, _) in self.landmark_positions() {
+        for [x, y, _] in self.landmark_positions() {
             image::draw_marker(target, x as i32, y as i32);
         }
+    }
+}
+
+impl Estimation for LandmarkResult {
+    fn confidence(&self) -> f32 {
+        self.presence()
+    }
+
+    fn landmarks(&self) -> &crate::landmark::Landmarks {
+        &self.landmarks
+    }
+}
+
+impl Estimator for Landmarker {
+    type Estimation = LandmarkResult;
+
+    fn estimate<V: AsImageView>(&mut self, image: &V) -> &Self::Estimation {
+        self.compute(image)
     }
 }
 
@@ -212,12 +228,6 @@ impl LandmarkResult {
 pub enum Handedness {
     Left,
     Right,
-}
-
-/// Raw landmark positions.
-#[derive(Clone)]
-pub struct Landmarks {
-    positions: [(f32, f32, f32); 21],
 }
 
 /// Names for the hand pose landmarks.
