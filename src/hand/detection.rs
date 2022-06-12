@@ -150,6 +150,7 @@ fn extract_detection(
     )
 }
 
+#[derive(Debug, Clone)]
 pub struct Detection {
     raw: RawDetection,
     full_res: Resolution,
@@ -181,11 +182,20 @@ impl Detection {
             "attempted to draw `Detection` onto canvas with mismatched size",
         );
 
-        image::draw_rect(image, self.bounding_rect()).color(Color::BLUE);
+        let rect = self.bounding_rect();
+        image::draw_text(
+            image,
+            rect.x() + rect.width() as i32 / 2,
+            rect.y(),
+            &format!("conf={:.2}", self.confidence()),
+        )
+        .align_bottom()
+        .color(Color::CYAN);
+        image::draw_rect(image, rect).color(Color::CYAN);
         for (i, lm) in self.raw.keypoints().iter().enumerate() {
             let (x, y) = point_to_img(lm.x(), lm.y(), &self.full_res);
-            image::draw_marker(image, x, y).color(Color::BLUE);
-            image::draw_text(image, x, y - 5, &i.to_string()).color(Color::BLUE);
+            image::draw_marker(image, x, y).color(Color::CYAN);
+            image::draw_text(image, x, y - 5, &i.to_string()).color(Color::CYAN);
         }
     }
 }
