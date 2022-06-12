@@ -2,3 +2,4 @@
 
 pub mod detection;
 pub mod landmark;
+pub mod tracking;

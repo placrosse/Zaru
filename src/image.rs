@@ -6,8 +6,13 @@
 //!
 //! `view` and `view_mut` will clip the passed rectangle if it's partially outside the base view,
 //! and return a zero-size view if it's completely outside. This is a problem if the caller doesn't
-//! expect this. For example, the caller might then `blend` another image onto the view, or `blend`
-//! the view onto some other image, which will resize it if the view has an unexpected size.
+//! expect this:
+//!
+//! - the caller might then `blend` another image onto the view, or `blend` the view onto some other
+//!   image, which will resize it if the view has an unexpected size.
+//! - the user might use view-relative coordinates for computations, which are now offset by some
+//!   number of pixels (this happened in `LandmarkTracker`).
+//!
 //! Alternative solutions:
 //!
 //! - Panic when the rectangle isn't completely inside the base view. This was the old behavior. It
@@ -309,6 +314,7 @@ impl<'a> ImageView<'a> {
     /// Returns the size of this view.
     #[inline]
     pub fn resolution(&self) -> Resolution {
+        // FIXME: panics on empty views
         Resolution::new(self.width(), self.height())
     }
 

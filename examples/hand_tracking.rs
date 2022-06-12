@@ -1,11 +1,9 @@
+use std::sync::Arc;
+
 use zaru::{
     gui,
-    hand::{
-        detection::{self, PalmDetector},
-        landmark::{self, Landmarker},
-    },
-    image::{self, Color},
-    num::TotalF32,
+    hand::{detection, landmark, tracking::HandTracker},
+    image,
     timer::FpsCounter,
     webcam::Webcam,
 };
@@ -16,49 +14,40 @@ const USE_FULL_LANDMARK_NETWORK: bool = true;
 fn main() -> Result<(), zaru::Error> {
     zaru::init_logger!();
 
-    let mut detector = if USE_FULL_DETECTION_NETWORK {
-        PalmDetector::new(detection::FullNetwork)
-    } else {
-        PalmDetector::new(detection::LiteNetwork)
-    };
-
-    let mut landmarker = if USE_FULL_LANDMARK_NETWORK {
-        Landmarker::new(landmark::FullNetwork)
-    } else {
-        Landmarker::new(landmark::LiteNetwork)
+    let mut tracker = match (USE_FULL_DETECTION_NETWORK, USE_FULL_LANDMARK_NETWORK) {
+        (false, false) => HandTracker::new(detection::LiteNetwork, landmark::LiteNetwork),
+        (false, true) => HandTracker::new(detection::LiteNetwork, landmark::FullNetwork),
+        (true, false) => HandTracker::new(detection::FullNetwork, landmark::LiteNetwork),
+        (true, true) => HandTracker::new(detection::FullNetwork, landmark::FullNetwork),
     };
 
     let mut fps = FpsCounter::new("hand tracker");
     let mut webcam = Webcam::open()?;
+
+    let mut prev = Arc::new(webcam.read()?);
+    tracker.track(prev.clone());
     loop {
-        let mut image = webcam.read()?;
+        let image = Arc::new(webcam.read()?);
+        tracker.track(image.clone());
 
-        let detections = detector.detect(&image);
-        for detection in detections {
-            detection.draw(&mut image);
+        let target = Arc::make_mut(&mut prev);
+        for hand in tracker.hands() {
+            let rect = hand.view_rect();
+            image::draw_rect(target, rect);
+            image::draw_text(
+                target,
+                rect.center().0 as _,
+                rect.y(),
+                &format!("{:?}", hand.id()),
+            )
+            .align_top();
+            hand.landmark_result().draw(target);
         }
 
-        // FIXME: detection threshold is a bit too low.
-        // could also be fixed by discarding the hand if the landmark confidence is too low.
-        if let Some(detection) = detections
-            .iter()
-            .max_by_key(|det| TotalF32(det.confidence()))
-        {
-            let grow_by = 1.5;
-            let hand_rect = detection.bounding_rect().grow_rel(grow_by);
-            image::draw_rect(&mut image, hand_rect).color(Color::BLUE);
-            let mut hand_view = image.view_mut(&hand_rect);
-            let landmarks = landmarker.compute(&hand_view);
-            landmarks.draw(&mut hand_view);
-        }
+        gui::show_image("hand tracking", target);
 
-        gui::show_image("hand tracking", &image);
+        prev = image;
 
-        fps.tick_with(
-            webcam
-                .timers()
-                .chain(detector.timers())
-                .chain(landmarker.timers()),
-        );
+        fps.tick_with(webcam.timers());
     }
 }

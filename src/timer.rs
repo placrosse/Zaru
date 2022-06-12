@@ -76,6 +76,13 @@ impl fmt::Display for Timer {
     }
 }
 
+/// Cloning a timer resets its collected timings.
+impl Clone for Timer {
+    fn clone(&self) -> Self {
+        Self::new(self.name)
+    }
+}
+
 /// Guard returned by [`Timer::start`]. Stops timing the operation when dropped.
 pub struct TimerGuard<'a> {
     start: Instant,
