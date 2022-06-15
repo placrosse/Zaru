@@ -14,7 +14,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crossbeam::channel::{RecvError, SendError, TrySendError};
+use crossbeam::channel::{RecvError, SendError};
 
 use crate::drop::DropBomb;
 
@@ -100,10 +100,6 @@ impl<T> Sender<T> {
     pub fn send(&self, value: T) -> Result<(), SendError<T>> {
         self.inner.send(value)
     }
-
-    pub fn try_send(&self, value: T) -> Result<(), TrySendError<T>> {
-        self.inner.try_send(value)
-    }
 }
 
 /// The receiving half of a channel.
@@ -181,7 +177,7 @@ impl<T> Promise<T> {
     /// will be dropped and nothing happens. The calling thread is expected to exit when it attempts
     /// to obtain a new [`Promise`] to fulfill.
     pub fn fulfill(mut self, value: T) {
-        // This ignores errors. The assumption is that the thread will exit once it tried to obtain
+        // This ignores errors. The assumption is that the thread will exit once it tries to obtain
         // a new `Promise` to fulfill.
         self.inner.send(value).ok();
         self.bomb.defuse();
@@ -214,6 +210,7 @@ impl<T> PromiseHandle<T> {
     /// If this returns `true`, calling [`PromiseHandle::block`] on `self` will return immediately,
     /// without blocking.
     pub fn is_fulfilled(&self) -> bool {
+        // FIXME: this returns `false` when the promise is dropped, should really return `true` instead!
         !self.recv.is_empty()
     }
 }
