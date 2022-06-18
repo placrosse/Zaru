@@ -193,8 +193,18 @@ impl HandTracker {
             }
         }));
 
-        // TODO: might need a pass that removes trackers whose RoIs have started to overlap since
-        // they were spawned.
+        // Check if any of the tracked regions started to overlap, and remove one of them.
+        for i in (0..self.hands.len()).rev() {
+            let roi = *self.hands[i].roi.lock().unwrap();
+
+            for j in 0..i {
+                let other_roi = *self.hands[j].roi.lock().unwrap();
+                if roi.iou(&other_roi) >= self.iou_thresh {
+                    self.hands.swap_remove(i);
+                    break;
+                }
+            }
+        }
 
         if (self.hands.is_empty() || Instant::now() >= self.next_det)
             && self.detections_handle.is_none()
