@@ -15,7 +15,7 @@ fn main() -> Result<(), zaru::Error> {
     } else {
         Detector::new(ShortRangeNetwork)
     };
-    let input_ratio = detector.input_resolution().aspect_ratio();
+    let input_ratio = detector.input_resolution().aspect_ratio().unwrap();
 
     let mut fps = FpsCounter::new("face detector");
     let mut webcam = Webcam::open()?;

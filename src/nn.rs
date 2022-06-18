@@ -176,7 +176,11 @@ pub(crate) fn unadjust_aspect_ratio(
 ///
 /// [`Image::aspect_aware_resize`]: crate::image::Image::aspect_aware_resize
 pub(crate) fn point_to_img(x: f32, y: f32, full_res: &Resolution) -> (i32, i32) {
-    let (x, y) = unadjust_aspect_ratio(x, y, full_res.aspect_ratio());
+    let orig_aspect = match full_res.aspect_ratio() {
+        Some(ratio) => ratio,
+        None => return (0, 0),
+    };
+    let (x, y) = unadjust_aspect_ratio(x, y, orig_aspect);
 
     let x = (x * full_res.width() as f32) as i32;
     let y = (y * full_res.height() as f32) as i32;

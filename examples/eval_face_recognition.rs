@@ -51,7 +51,7 @@ fn main() -> Result<(), zaru::Error> {
         CnnInputShape::NCHW,
         create_linear_color_mapper(-1.0..=1.0),
     )?;
-    let target_aspect = cnn.input_resolution().aspect_ratio();
+    let target_aspect = cnn.input_resolution().aspect_ratio().unwrap();
 
     let mut classes = Vec::new();
     let mut image_paths = Vec::new();

@@ -18,7 +18,10 @@ fn main() -> Result<(), Error> {
     let mut left_eye_landmarker = EyeLandmarker::new();
     let mut right_eye_landmarker = EyeLandmarker::new();
 
-    let eye_landmark_input_aspect = left_eye_landmarker.input_resolution().aspect_ratio();
+    let eye_landmark_input_aspect = left_eye_landmarker
+        .input_resolution()
+        .aspect_ratio()
+        .unwrap();
 
     let (img_sender, img_recv) = pipeline::channel();
     let (left_eye_img_sender, left_eye_img_recv) = pipeline::channel();
@@ -74,8 +77,8 @@ fn main() -> Result<(), Error> {
                 let mut detector = Detector::default();
                 let mut landmarker = Landmarker::new();
                 let mut tracker =
-                    LandmarkTracker::new(landmarker.input_resolution().aspect_ratio());
-                let input_ratio = detector.input_resolution().aspect_ratio();
+                    LandmarkTracker::new(landmarker.input_resolution().aspect_ratio().unwrap());
+                let input_ratio = detector.input_resolution().aspect_ratio().unwrap();
 
                 let left_eye_img_sender = left_eye_img_sender.activate();
                 let right_eye_img_sender = right_eye_img_sender.activate();

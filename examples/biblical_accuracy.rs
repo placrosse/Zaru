@@ -18,7 +18,7 @@ fn main() -> Result<(), zaru::Error> {
 
     let mut detector = Detector::default();
     let mut landmarker = Landmarker::new();
-    let mut tracker = LandmarkTracker::new(landmarker.input_resolution().aspect_ratio());
+    let mut tracker = LandmarkTracker::new(landmarker.input_resolution().aspect_ratio().unwrap());
 
     let mut canvas = Image::new(W, H);
     let positions = (0..1000)

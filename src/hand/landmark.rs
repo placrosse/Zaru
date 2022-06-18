@@ -47,7 +47,7 @@ impl Landmarker {
     fn compute_impl(&mut self, image: ImageView<'_>) -> &LandmarkResult {
         let input_res = self.input_resolution();
         let full_res = image.resolution();
-        let aspect_ratio = full_res.aspect_ratio();
+        let aspect_ratio = full_res.aspect_ratio().unwrap();
 
         let mut image = image.reborrow();
         let resized;

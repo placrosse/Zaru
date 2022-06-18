@@ -71,7 +71,7 @@ fn main() -> Result<(), zaru::Error> {
             let body_rect = Rect::bounding(detection.keypoints())
                 .unwrap()
                 .grow_move_center(hips.0, hips.1)
-                .grow_to_fit_aspect(landmarker.input_resolution().aspect_ratio())
+                .grow_to_fit_aspect(landmarker.input_resolution().aspect_ratio().unwrap())
                 .grow_rel(grow_by);
             image::draw_rect(&mut image, body_rect).color(Color::BLUE);
             let mut body_view = image.view_mut(&body_rect);

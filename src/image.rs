@@ -384,7 +384,6 @@ impl<'a> ImageView<'a> {
     /// Returns the size of this view.
     #[inline]
     pub fn resolution(&self) -> Resolution {
-        // FIXME: panics on empty views
         Resolution::new(self.width(), self.height())
     }
 
@@ -455,8 +454,14 @@ impl<'a> ImageView<'a> {
     /// For performance (as this runs on the CPU), this uses nearest neighbor interpolation, so the
     /// result won't look very good, but it should suffice for most use cases.
     pub fn aspect_aware_resize(&self, new_res: Resolution) -> Image {
-        let cur_ratio = self.resolution().aspect_ratio();
-        let new_ratio = new_res.aspect_ratio();
+        let (cur_ratio, new_ratio) =
+            match (self.resolution().aspect_ratio(), new_res.aspect_ratio()) {
+                (Some(a), Some(b)) => (a, b),
+                _ => {
+                    // old or new res contains zero pixels, just return an empty image of the right size
+                    return Image::new(new_res.width(), new_res.height());
+                }
+            };
 
         log::trace!(
             "aspect-aware resize from {} -> {} ({} -> {})",
@@ -470,7 +475,7 @@ impl<'a> ImageView<'a> {
             buf: ImageBuffer::new(new_res.width(), new_res.height()),
         };
 
-        let target_rect = new_res.fit_aspect_ratio(self.resolution().aspect_ratio());
+        let target_rect = new_res.fit_aspect_ratio(cur_ratio);
         let mut target_view = out.view_mut(&target_rect);
 
         for dest_y in 0..target_rect.height() {

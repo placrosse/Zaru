@@ -148,7 +148,8 @@ impl HandTracker {
         self.hands.extend(detections.iter().map(|det| {
             let roi = det.bounding_rect().grow_rel(grow_by);
             let mut landmarker = self.landmarker.clone();
-            let mut tracker = LandmarkTracker::new(landmarker.input_resolution().aspect_ratio());
+            let mut tracker =
+                LandmarkTracker::new(landmarker.input_resolution().aspect_ratio().unwrap());
             tracker.set_roi(roi);
             let roi_arc = Arc::new(Mutex::new(roi));
             let roi_arc2 = roi_arc.clone();

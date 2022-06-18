@@ -25,16 +25,7 @@ impl Resolution {
     };
 
     /// Creates a new [`Resolution`] of `width x height`.
-    ///
-    /// # Panics
-    ///
-    /// This function panics if either `width` or `height` is zero.
-    #[track_caller]
     pub fn new(width: u32, height: u32) -> Self {
-        assert!(
-            width != 0 && height != 0,
-            "attempted to create a resolution with 0 width or height"
-        );
         Self { width, height }
     }
 
@@ -51,8 +42,10 @@ impl Resolution {
     }
 
     /// Computes the [`AspectRatio`] of this [`Resolution`].
-    pub fn aspect_ratio(&self) -> AspectRatio {
-        AspectRatio::from(*self)
+    ///
+    /// If `self` has a width or height of 0, `None` is returned.
+    pub fn aspect_ratio(&self) -> Option<AspectRatio> {
+        AspectRatio::new(self.width(), self.height())
     }
 
     /// Computes a centered, maximally sized [`Rect`] that lies inside of `self` and has the given
@@ -60,7 +53,10 @@ impl Resolution {
     pub fn fit_aspect_ratio(&self, ratio: AspectRatio) -> Rect {
         // FIXME: should this be a method on `Rect` instead (or in addition)?
 
-        let to_ratio = self.aspect_ratio();
+        let to_ratio = match self.aspect_ratio() {
+            Some(ratio) => ratio,
+            None => return Rect::from_top_left(0, 0, self.width(), self.height()),
+        };
 
         let from_ratio = ratio.as_f32();
         let to_ratio = to_ratio.as_f32();
@@ -126,31 +122,23 @@ impl AspectRatio {
 
     /// Creates the aspect ratio representing `width:height`.
     ///
-    /// # Panics
-    ///
-    /// This function will panic if `width` or `height` are zero.
-    pub fn new(width: u32, height: u32) -> Self {
-        assert!(
-            width != 0 && height != 0,
-            "attempted to create an aspect ratio with 0 width or height"
-        );
+    /// If either `width` or `height` is `0`, returns `None`.
+    pub fn new(width: u32, height: u32) -> Option<Self> {
+        if width == 0 || height == 0 {
+            return None;
+        }
+
         let gcd = gcd(width, height);
-        Self {
+        Some(Self {
             width: width / gcd,
             height: height / gcd,
-        }
+        })
     }
 
     /// Returns the `f32` corresponding to this ratio.
     #[inline]
     pub fn as_f32(&self) -> f32 {
         self.width as f32 / self.height as f32
-    }
-}
-
-impl From<Resolution> for AspectRatio {
-    fn from(res: Resolution) -> Self {
-        Self::new(res.width(), res.height())
     }
 }
 
@@ -195,8 +183,8 @@ mod tests {
 
     #[test]
     fn test_aspect_ratio() {
-        let ratio1 = AspectRatio::new(1920, 1080);
-        let ratio2 = AspectRatio::new(1280, 720);
+        let ratio1 = AspectRatio::new(1920, 1080).unwrap();
+        let ratio2 = AspectRatio::new(1280, 720).unwrap();
         assert_eq!(ratio1, ratio2);
         assert_eq!(ratio1.to_string(), "16:9");
         assert_eq!(ratio2.to_string(), "16:9");
@@ -205,15 +193,15 @@ mod tests {
     #[test]
     fn test_fit_aspect_ratio() {
         assert_eq!(
-            Resolution::new(16, 16).fit_aspect_ratio(AspectRatio::new(16, 8)),
+            Resolution::new(16, 16).fit_aspect_ratio(AspectRatio::new(16, 8).unwrap()),
             Rect::from_ranges(0..16, 4..12)
         );
         assert_eq!(
-            Resolution::new(16, 16).fit_aspect_ratio(AspectRatio::new(8, 16)),
+            Resolution::new(16, 16).fit_aspect_ratio(AspectRatio::new(8, 16).unwrap()),
             Rect::from_ranges(4..12, 0..16)
         );
         assert_eq!(
-            Resolution::new(16, 8).fit_aspect_ratio(AspectRatio::new(16, 8)),
+            Resolution::new(16, 8).fit_aspect_ratio(AspectRatio::new(16, 8).unwrap()),
             Rect::from_ranges(0..16, 0..8)
         );
     }
