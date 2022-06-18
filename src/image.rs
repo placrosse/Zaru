@@ -1,26 +1,12 @@
 //! Image manipulation.
 //!
-//! # TODO
+//! This module provides:
 //!
-//! ## View Clipping is problematic
-//!
-//! `view` and `view_mut` will clip the passed rectangle if it's partially outside the base view,
-//! and return a zero-size view if it's completely outside. This is a problem if the caller doesn't
-//! expect this:
-//!
-//! - the caller might then `blend` another image onto the view, or `blend` the view onto some other
-//!   image, which will resize it if the view has an unexpected size.
-//! - the user might use view-relative coordinates for computations, which are now offset by some
-//!   number of pixels (this happened in `LandmarkTracker`).
-//!
-//! Alternative solutions:
-//!
-//! - Panic when the rectangle isn't completely inside the base view. This was the old behavior. It
-//!   didn't work well because detection boxes are *typically* within the image, but sometimes
-//!   aren't, and getting a panic only for edge cases you don't typically encounter is bad.
-//! - Return `Option<_>`. This leaves it to the caller to handle the clipping.
-//! - Always return a view of the requested size, but without backing data for any pixel outside
-//!   the base view (ie. have writes ignored and return 0 on read).
+//! - The [`Image`] type, an owned RGBA image.
+//! - [`ImageView`] and [`ImageViewMut`], borrowed rectangular views into an underlying [`Image`].
+//! - The [`AsImageView`] and [`AsImageViewMut`] traits to abstract over images and views.
+//! - A variety of freestanding `draw_*` functions to quickly visualize objects.
+//! - [`Rect`] and [`RotatedRect`], integer-valued rectangles representing parts of an image.
 
 mod blend;
 mod draw;
@@ -210,40 +196,25 @@ impl Image {
 
     /// Creates an immutable view into an area of this image, specified by `rect`.
     ///
-    /// If `rect` lies partially outside of `self`, the resulting view is first clipped to `self`
-    /// and will be smaller than `rect`. If `rect` lies fully outside of `self`, the resulting view
-    /// will be empty.
+    /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
+    /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
+    /// `rect`.
     pub fn view(&self, rect: &Rect) -> ImageView<'_> {
-        match self.rect().intersection(rect) {
-            Some(rect) => ImageView {
-                sub_image: self
-                    .buf
-                    .view(rect.x() as _, rect.y() as _, rect.width(), rect.height()),
-            },
-            None => ImageView {
-                sub_image: self.buf.view(0, 0, 0, 0),
-            },
+        ImageView {
+            image: self,
+            data: ViewData::full(self).view(*rect),
         }
     }
 
     /// Creates a mutable view into an area of this image, specified by `rect`.
     ///
-    /// If `rect` lies partially outside of `self`, the resulting view is first clipped to `self`
-    /// and will be smaller than `rect`. If `rect` lies fully outside of `self`, the resulting view
-    /// will be empty.
+    /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
+    /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
+    /// `rect`.
     pub fn view_mut(&mut self, rect: &Rect) -> ImageViewMut<'_> {
-        match self.rect().intersection(rect) {
-            Some(rect) => ImageViewMut {
-                sub_image: self.buf.sub_image(
-                    rect.x() as _,
-                    rect.y() as _,
-                    rect.width(),
-                    rect.height(),
-                ),
-            },
-            None => ImageViewMut {
-                sub_image: self.buf.sub_image(0, 0, 0, 0),
-            },
+        ImageViewMut {
+            data: ViewData::full(self).view(*rect),
+            image: self,
         }
     }
 
@@ -295,20 +266,119 @@ impl fmt::Debug for Image {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ViewData {
+    /// View into the base `Image`, clipped to its dimensions, may be empty.
+    view_rect: Rect,
+    // size of this view
+    width: u32,
+    height: u32,
+    // offset of `view_rect` inside this view
+    off_x: u32,
+    off_y: u32,
+}
+
+impl ViewData {
+    fn full(image: &Image) -> Self {
+        Self {
+            view_rect: image.rect(),
+            width: image.width(),
+            height: image.height(),
+            off_x: 0,
+            off_y: 0,
+        }
+    }
+
+    fn view(&self, rect: Rect) -> Self {
+        let backed_area = self.backed_area();
+        let clipped = backed_area
+            .intersection(&rect)
+            .unwrap_or(Rect::from_center(0, 0, 0, 0));
+        let view_rect = Rect::from_top_left(
+            self.view_rect.x() + (clipped.x() - backed_area.x()),
+            self.view_rect.y() + (clipped.y() - backed_area.y()),
+            clipped.width(),
+            clipped.height(),
+        );
+
+        Self {
+            view_rect,
+            width: rect.width(),
+            height: rect.height(),
+            off_x: (clipped.x() - rect.x()) as _,
+            off_y: (clipped.y() - rect.y()) as _,
+        }
+    }
+
+    fn rect(&self) -> Rect {
+        Rect::from_top_left(0, 0, self.width, self.height)
+    }
+
+    /// Returns a `Rect` contained within `self` that contains all the pixels with backing data.
+    fn backed_area(&self) -> Rect {
+        Rect::from_top_left(
+            self.off_x as _,
+            self.off_y as _,
+            self.view_rect.width(),
+            self.view_rect.height(),
+        )
+    }
+
+    fn width(&self) -> u32 {
+        self.width
+    }
+
+    fn height(&self) -> u32 {
+        self.height
+    }
+}
+
 /// An immutable view of a rectangular section of an [`Image`].
+#[derive(Clone, Copy)]
 pub struct ImageView<'a> {
-    pub(crate) sub_image: image::SubImage<&'a RgbaImage>,
+    image: &'a Image,
+    data: ViewData,
 }
 
 impl<'a> ImageView<'a> {
+    fn as_generic_image_view(&self) -> impl GenericImageView<Pixel = Rgba<u8>> + '_ {
+        struct Wrapper<'a>(ImageView<'a>);
+
+        impl GenericImageView for Wrapper<'_> {
+            type Pixel = Rgba<u8>;
+
+            fn dimensions(&self) -> (u32, u32) {
+                (self.0.width(), self.0.height())
+            }
+
+            fn bounds(&self) -> (u32, u32, u32, u32) {
+                (0, 0, self.0.width(), self.0.height())
+            }
+
+            fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
+                if self.0.data.backed_area().contains_point(x.into(), y.into()) {
+                    let x =
+                        self.0.data.view_rect.x() as u32 + x - self.0.data.backed_area().x() as u32;
+                    let y =
+                        self.0.data.view_rect.y() as u32 + y - self.0.data.backed_area().y() as u32;
+                    self.0.image.buf[(x, y)]
+                } else {
+                    Rgba([0, 0, 0, 0])
+                }
+            }
+        }
+
+        Wrapper(*self)
+    }
+
     /// Returns the width of this view, in pixels.
     pub fn width(&self) -> u32 {
-        self.sub_image.width()
+        self.data.width()
     }
 
     /// Returns the height of this view, in pixels.
     pub fn height(&self) -> u32 {
-        self.sub_image.height()
+        self.data.height()
     }
 
     /// Returns the size of this view.
@@ -323,7 +393,7 @@ impl<'a> ImageView<'a> {
     /// The rectangle will be positioned at `(0, 0)` and have the width and height of the view.
     #[inline]
     pub fn rect(&self) -> Rect {
-        Rect::from_top_left(0, 0, self.width(), self.height())
+        self.data.rect()
     }
 
     /// Gets the image color at the given pixel coordinates.
@@ -333,8 +403,7 @@ impl<'a> ImageView<'a> {
     /// This will panic if `(x, y)` is outside the bounds of this view.
     #[inline]
     pub(crate) fn get(&self, x: u32, y: u32) -> Color {
-        let rgb = self.sub_image.get_pixel(x, y);
-        Color(rgb.0)
+        Color(self.as_generic_image_view().get_pixel(x, y).0)
     }
 
     /// Borrows an identical [`ImageView`] from `self` that may have a shorter lifetime.
@@ -343,49 +412,42 @@ impl<'a> ImageView<'a> {
     /// to be a method call here because user-defined types cannot opt into making this happen
     /// automatically.
     pub fn reborrow(&self) -> ImageView<'_> {
-        ImageView {
-            sub_image: self.sub_image.view(0, 0, self.width(), self.height()),
-        }
+        // FIXME: remove
+        *self
     }
 
     /// Creates an immutable subview into an area of this view, specified by `rect`.
     ///
-    /// If `rect` lies partially outside of `self`, the resulting view is first clipped to `self`
-    /// and will be smaller than `rect`. If `rect` lies fully outside of `self`, the resulting view
-    /// will be empty.
+    /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
+    /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
+    /// `rect`.
     pub fn view(&self, rect: &Rect) -> ImageView<'_> {
-        match self.rect().intersection(rect) {
-            Some(rect) => ImageView {
-                sub_image: self.sub_image.view(
-                    rect.x() as _,
-                    rect.y() as _,
-                    rect.width(),
-                    rect.height(),
-                ),
-            },
-            None => ImageView {
-                sub_image: self.sub_image.view(0, 0, 0, 0),
-            },
+        ImageView {
+            image: self.image,
+            data: self.data.view(*rect),
         }
     }
 
     pub fn flip_horizontal(&self) -> Image {
         Image {
-            buf: image::imageops::flip_horizontal(&*self.sub_image),
+            buf: image::imageops::flip_horizontal(&self.as_generic_image_view()),
         }
     }
 
     pub fn flip_vertical(&self) -> Image {
         Image {
-            buf: image::imageops::flip_vertical(&*self.sub_image),
+            buf: image::imageops::flip_vertical(&self.as_generic_image_view()),
         }
     }
 
     /// Copies the contents of this view into a new [`Image`].
     pub fn to_image(&self) -> Image {
-        Image {
-            buf: self.sub_image.to_image(),
-        }
+        let mut image = Image::new(self.width(), self.height());
+        image
+            .buf
+            .copy_from(&self.as_generic_image_view(), 0, 0)
+            .unwrap();
+        image
     }
 
     /// Resizes this image to a new size, adding black bars to keep the original aspect ratio.
@@ -435,18 +497,76 @@ impl fmt::Debug for ImageView<'_> {
 
 /// A mutable view of a rectangular section of an [`Image`].
 pub struct ImageViewMut<'a> {
-    sub_image: image::SubImage<&'a mut RgbaImage>,
+    image: &'a mut Image,
+    data: ViewData,
 }
 
 impl<'a> ImageViewMut<'a> {
+    fn as_generic_image(&mut self) -> impl GenericImage<Pixel = Rgba<u8>> + '_ {
+        struct Wrapper<'b>(ImageViewMut<'b>, Rgba<u8>);
+
+        impl Wrapper<'_> {
+            fn coords(&self, x: u32, y: u32) -> Option<(u32, u32)> {
+                if self.0.data.backed_area().contains_point(x.into(), y.into()) {
+                    let x =
+                        self.0.data.view_rect.x() as u32 + x - self.0.data.backed_area().x() as u32;
+                    let y =
+                        self.0.data.view_rect.y() as u32 + y - self.0.data.backed_area().y() as u32;
+                    Some((x, y))
+                } else {
+                    None
+                }
+            }
+        }
+
+        impl GenericImageView for Wrapper<'_> {
+            type Pixel = Rgba<u8>;
+
+            fn dimensions(&self) -> (u32, u32) {
+                (self.0.width(), self.0.height())
+            }
+
+            fn bounds(&self) -> (u32, u32, u32, u32) {
+                (0, 0, self.0.width(), self.0.height())
+            }
+
+            fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
+                self.coords(x, y)
+                    .map_or(Rgba([0, 0, 0, 0]), |(x, y)| self.0.image.buf[(x, y)])
+            }
+        }
+
+        impl GenericImage for Wrapper<'_> {
+            fn get_pixel_mut(&mut self, x: u32, y: u32) -> &mut Self::Pixel {
+                self.coords(x, y)
+                    .map_or(&mut self.1, |(x, y)| &mut self.0.image.buf[(x, y)])
+            }
+
+            fn put_pixel(&mut self, x: u32, y: u32, pixel: Self::Pixel) {
+                if let Some((x, y)) = self.coords(x, y) {
+                    self.0.image.buf[(x, y)] = pixel;
+                }
+            }
+
+            fn blend_pixel(&mut self, x: u32, y: u32, pixel: Self::Pixel) {
+                if let Some((x, y)) = self.coords(x, y) {
+                    #[allow(deprecated)]
+                    self.0.image.buf.blend_pixel(x, y, pixel);
+                }
+            }
+        }
+
+        Wrapper(self.reborrow(), Rgba([0, 0, 0, 0]))
+    }
+
     /// Returns the width of this view, in pixels.
     pub fn width(&self) -> u32 {
-        self.sub_image.width()
+        self.data.width()
     }
 
     /// Returns the height of this view, in pixels.
     pub fn height(&self) -> u32 {
-        self.sub_image.height()
+        self.data.height()
     }
 
     /// Returns the size of this view.
@@ -460,7 +580,7 @@ impl<'a> ImageViewMut<'a> {
     /// The rectangle will be positioned at `(0, 0)` and have the width and height of the view.
     #[inline]
     pub fn rect(&self) -> Rect {
-        Rect::from_top_left(0, 0, self.width(), self.height())
+        self.data.rect()
     }
 
     /// Gets the image color at the given pixel coordinates.
@@ -470,7 +590,7 @@ impl<'a> ImageViewMut<'a> {
     /// This will panic if `(x, y)` is outside the bounds of this view.
     #[inline]
     fn get(&self, x: u32, y: u32) -> Color {
-        let rgb = self.sub_image.get_pixel(x, y);
+        let rgb = self.as_view().as_generic_image_view().get_pixel(x, y);
         Color(rgb.0)
     }
 
@@ -481,7 +601,7 @@ impl<'a> ImageViewMut<'a> {
     /// This will panic if `(x, y)` is outside the bounds of this view.
     #[inline]
     fn set(&mut self, x: u32, y: u32, color: Color) {
-        self.sub_image.put_pixel(x, y, Rgba(color.0));
+        self.as_generic_image().put_pixel(x, y, Rgba(color.0));
     }
 
     /// Borrows an identical [`ImageViewMut`] from `self` that may have a shorter lifetime.
@@ -491,77 +611,54 @@ impl<'a> ImageViewMut<'a> {
     /// automatically.
     pub fn reborrow(&mut self) -> ImageViewMut<'_> {
         ImageViewMut {
-            sub_image: self.sub_image.sub_image(0, 0, self.width(), self.height()),
+            image: &mut *self.image,
+            data: self.data,
         }
     }
 
     /// Creates an immutable subview into an area of this view, specified by `rect`.
     ///
-    /// If `rect` lies partially outside of `self`, the resulting view is first clipped to `self`
-    /// and will be smaller than `rect`. If `rect` lies fully outside of `self`, the resulting view
-    /// will be empty.
+    /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
+    /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
+    /// `rect`.
     pub fn view(&self, rect: &Rect) -> ImageView<'_> {
-        match self.rect().intersection(rect) {
-            Some(rect) => ImageView {
-                sub_image: self.sub_image.view(
-                    rect.x() as _,
-                    rect.y() as _,
-                    rect.width(),
-                    rect.height(),
-                ),
-            },
-            None => ImageView {
-                sub_image: self.sub_image.view(0, 0, 0, 0),
-            },
+        ImageView {
+            image: self.image,
+            data: self.data.view(*rect),
         }
     }
 
     /// Creates a mutable view into an area of this view, specified by `rect`.
     ///
-    /// If `rect` lies partially outside of `self`, the resulting view is first clipped to `self`
-    /// and will be smaller than `rect`. If `rect` lies fully outside of `self`, the resulting view
-    /// will be empty.
+    /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
+    /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
+    /// `rect`.
     pub fn view_mut(&mut self, rect: &Rect) -> ImageViewMut<'_> {
-        match self.rect().intersection(rect) {
-            Some(rect) => ImageViewMut {
-                sub_image: self.sub_image.sub_image(
-                    rect.x() as _,
-                    rect.y() as _,
-                    rect.width(),
-                    rect.height(),
-                ),
-            },
-            None => ImageViewMut {
-                sub_image: self.sub_image.sub_image(0, 0, 0, 0),
-            },
+        ImageViewMut {
+            image: self.image,
+            data: self.data.view(*rect),
         }
     }
 
     pub fn flip_horizontal(&self) -> Image {
-        Image {
-            buf: image::imageops::flip_horizontal(&*self.sub_image),
-        }
+        self.as_view().flip_horizontal()
     }
 
     pub fn flip_vertical(&self) -> Image {
-        Image {
-            buf: image::imageops::flip_vertical(&*self.sub_image),
-        }
+        self.as_view().flip_vertical()
     }
 
     pub fn flip_horizontal_in_place(&mut self) {
-        image::imageops::flip_horizontal_in_place(&mut *self.sub_image);
+        image::imageops::flip_horizontal_in_place(&mut self.as_generic_image());
     }
 
     pub fn flip_vertical_in_place(&mut self) {
-        image::imageops::flip_vertical_in_place(&mut *self.sub_image);
+        image::imageops::flip_vertical_in_place(&mut self.as_generic_image());
     }
 
     /// Copies the contents of this view into a new [`Image`].
     pub fn to_image(&self) -> Image {
-        Image {
-            buf: self.sub_image.to_image(),
-        }
+        self.as_view().to_image()
     }
 
     /// Overwrites the data in `self` with a `src` image, stretching or shrinking `src` as
@@ -589,6 +686,8 @@ impl fmt::Debug for ImageViewMut<'_> {
 pub struct Color(pub(crate) [u8; 4]);
 
 impl Color {
+    /// Fully transparent black (all components are 0).
+    pub const NULL: Self = Self([0, 0, 0, 0]);
     pub const BLACK: Self = Self([0, 0, 0, 255]);
     pub const WHITE: Self = Self([255, 255, 255, 255]);
     pub const RED: Self = Self([255, 0, 0, 255]);
@@ -695,7 +794,8 @@ impl AsImageViewMut for Image {
 impl<'a> AsImageView for ImageViewMut<'a> {
     fn as_view(&self) -> ImageView<'_> {
         ImageView {
-            sub_image: self.sub_image.view(0, 0, self.width(), self.height()),
+            data: self.data,
+            image: self.image,
         }
     }
 }

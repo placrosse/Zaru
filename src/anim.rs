@@ -10,10 +10,13 @@ use std::{
 
 use image::{
     codecs::{gif::GifDecoder, png::PngDecoder},
-    AnimationDecoder, Delay, Frame, SubImage,
+    AnimationDecoder,
 };
 
-use crate::{image::ImageView, Result};
+use crate::{
+    image::{AsImageView, Image, ImageView},
+    Result,
+};
 
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
@@ -24,7 +27,7 @@ pub enum AnimationFormat {
 
 /// A timed sequence of images.
 pub struct Animation {
-    frames: Vec<Frame>,
+    frames: Vec<(Image, Duration)>,
 }
 
 impl Animation {
@@ -68,7 +71,7 @@ impl Animation {
 
     fn from_reader_impl(reader: &mut dyn BufRead, format: AnimationFormat) -> Result<Self> {
         let frames = match format {
-            AnimationFormat::Gif => GifDecoder::new(reader)?.into_frames().collect_frames()?,
+            AnimationFormat::Gif => GifDecoder::new(reader)?.into_frames(),
             AnimationFormat::Apng => {
                 let dec = PngDecoder::new(reader)?;
                 if !dec.is_apng() {
@@ -76,9 +79,20 @@ impl Animation {
                         format!("attempted to load APNG animation from still image PNG").into(),
                     );
                 }
-                dec.apng().into_frames().collect_frames()?
+                dec.apng().into_frames()
             }
         };
+
+        let frames = frames
+            .map(|res| {
+                let frame = res?;
+                let dur = Duration::from(frame.delay());
+                let image = Image {
+                    buf: frame.into_buffer(),
+                };
+                Ok((image, dur))
+            })
+            .collect::<Result<_>>()?;
 
         Ok(Self { frames })
     }
@@ -93,14 +107,7 @@ impl Animation {
         Self {
             frames: frames
                 .into_iter()
-                .map(|fr| {
-                    Frame::from_parts(
-                        fr.image.to_image().buf,
-                        0,
-                        0,
-                        Delay::from_saturating_duration(fr.duration),
-                    )
-                })
+                .map(|fr| (fr.image.to_image(), fr.duration))
                 .collect(),
         }
     }
@@ -119,25 +126,19 @@ impl Animation {
 /// An iterator over the [`AnimationFrame`]s that make up an [`Animation`].
 #[derive(Clone)]
 pub struct FrameIter<'a> {
-    frames: slice::Iter<'a, Frame>,
+    frames: slice::Iter<'a, (Image, Duration)>,
 }
 
 impl<'a> Iterator for FrameIter<'a> {
     type Item = AnimationFrame<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.frames.next().map(|frame| AnimationFrame {
-            image: ImageView {
-                sub_image: SubImage::new(
-                    frame.buffer(),
-                    0,
-                    0,
-                    frame.buffer().width(),
-                    frame.buffer().height(),
-                ),
-            },
-            duration: frame.delay().into(),
-        })
+        self.frames
+            .next()
+            .map(|&(ref image, duration)| AnimationFrame {
+                image: image.as_view(),
+                duration,
+            })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

@@ -302,6 +302,13 @@ impl Rect {
         self.intersection_area(other) as f32 / self.union_area(other) as f32
     }
 
+    pub fn contains_point(&self, x: i64, y: i64) -> bool {
+        i64::from(self.x()) <= x
+            && i64::from(self.y()) <= y
+            && i64::from(self.x()) + i64::from(self.width()) > x
+            && i64::from(self.y()) + i64::from(self.height()) > y
+    }
+
     /// Returns whether `self` contains `other`.
     pub fn contains_rect(&self, other: &Rect) -> bool {
         // TODO: specify behavior with 0-area rects
@@ -409,6 +416,20 @@ mod tests {
         assert!(outer.contains_rect(&Rect::from_top_left(-8, -8, 10, 10)));
         assert!(!outer.contains_rect(&Rect::from_top_left(-9, -8, 10, 10)));
         assert!(!outer.contains_rect(&Rect::from_top_left(-8, -9, 10, 10)));
+    }
+
+    #[test]
+    fn test_contains_point() {
+        let rect = Rect::from_top_left(-5, 5, 10, 5);
+        assert!(rect.contains_point(-5, 5));
+        assert!(rect.contains_point(-5 + 9, 5 + 4));
+        assert!(!rect.contains_point(-5 + 9 + 1, 5 + 4));
+        assert!(!rect.contains_point(-5 + 9, 5 + 4 + 1));
+
+        let empty = Rect::from_center(0, 0, 0, 0);
+        assert!(!empty.contains_point(0, 0));
+        assert!(!empty.contains_point(0, 1));
+        assert!(!empty.contains_point(0, -1));
     }
 
     #[test]
