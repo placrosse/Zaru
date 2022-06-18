@@ -106,7 +106,7 @@ impl HandTracker {
             let old_ph = std::mem::replace(&mut hand.ph, ph);
             match old_ph.block().unwrap() {
                 Some(lm) => {
-                    hand.worker.send((image.clone(), promise)).unwrap();
+                    hand.worker.send((image.clone(), promise));
                     hand.lm = Some(lm);
                     true
                 }
@@ -183,7 +183,7 @@ impl HandTracker {
             let id = self.next_hand_id;
             self.next_hand_id.0 += 1;
             let (promise, ph) = promise();
-            worker.send((image.clone(), promise)).unwrap();
+            worker.send((image.clone(), promise));
             TrackedHand {
                 id,
                 roi: roi_arc.clone(),
@@ -209,12 +209,11 @@ impl HandTracker {
         if (self.hands.is_empty() || Instant::now() >= self.next_det)
             && self.detections_handle.is_none()
         {
-            // If the detector is waiting for a message, start a detection.
+            // We want to start a detection, and none is currently running, so start one.
             let (promise, handle) = promise();
-            if let Ok(()) = self.detector.send((image.clone(), promise)) {
-                self.detections_handle = Some(handle);
-                self.next_det += self.det_interval;
-            }
+            self.detector.send((image.clone(), promise));
+            self.detections_handle = Some(handle);
+            self.next_det += self.det_interval;
         }
     }
 }

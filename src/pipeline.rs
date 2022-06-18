@@ -275,8 +275,15 @@ impl<I: Send + 'static> Worker<I> {
     /// Sends a message to the worker thread.
     ///
     /// This will block until the thread is available to accept the message.
-    pub fn send(&mut self, msg: I) -> Result<(), SendError<I>> {
-        self.sender.as_mut().unwrap().send(msg)
+    ///
+    /// If the worker has panicked, this will propagate the panic to the calling thread.
+    pub fn send(&mut self, msg: I) {
+        match self.sender.as_mut().unwrap().send(msg) {
+            Ok(()) => {}
+            Err(_) => {
+                self.wait_for_exit();
+            }
+        }
     }
 }
 
@@ -300,11 +307,9 @@ mod tests {
     }
 
     #[test]
-    fn worker_does_not_propagate_panic_on_send() {
+    fn worker_propagates_panic_on_send() {
         let mut worker = Worker::spawn("panic", |_| silent_panic("worker panic".into())).unwrap();
-        catch_unwind(AssertUnwindSafe(|| worker.send(())))
-            .unwrap()
-            .unwrap_err();
-        catch_unwind(AssertUnwindSafe(|| drop(worker))).unwrap_err();
+        catch_unwind(AssertUnwindSafe(|| worker.send(()))).unwrap_err();
+        catch_unwind(AssertUnwindSafe(|| drop(worker))).unwrap();
     }
 }
