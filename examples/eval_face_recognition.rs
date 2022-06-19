@@ -84,9 +84,7 @@ fn main() -> Result<(), zaru::Error> {
                     .bounding_rect_raw()
                     .grow_rel(grow_by)
                     .grow_to_fit_aspect(target_aspect);
-                let face = image
-                    .view(&rect)
-                    .aspect_aware_resize(cnn.input_resolution());
+                let face = image.view(rect).aspect_aware_resize(cnn.input_resolution());
                 let out = cnn.estimate(&face).unwrap();
                 let view = out[0].index([0]);
                 let f = view.as_slice();

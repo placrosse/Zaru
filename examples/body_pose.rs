@@ -74,7 +74,7 @@ fn main() -> Result<(), zaru::Error> {
                 .grow_to_fit_aspect(landmarker.input_resolution().aspect_ratio().unwrap())
                 .grow_rel(grow_by);
             image::draw_rect(&mut image, body_rect).color(Color::BLUE);
-            let mut body_view = image.view_mut(&body_rect);
+            let mut body_view = image.view_mut(body_rect);
             let landmarks = landmarker.compute(&body_view);
             landmarks.draw(&mut body_view);
         }

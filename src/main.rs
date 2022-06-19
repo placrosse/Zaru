@@ -92,7 +92,7 @@ fn main() -> Result<(), Error> {
                         // edges of the camera view unusable, but significantly improves the tracking
                         // distance.
                         let view_rect = image.resolution().fit_aspect_ratio(input_ratio);
-                        let mut view = image.view_mut(&view_rect);
+                        let mut view = image.view_mut(view_rect);
                         let detections = detector.detect(&view);
 
                         // FIXME: this draws over the image that we're about to compute landmarks on
@@ -120,7 +120,7 @@ fn main() -> Result<(), Error> {
 
                         image::draw_rect(&mut image, res.view_rect());
 
-                        let mut face_image = image.view_mut(&res.view_rect());
+                        let mut face_image = image.view_mut(res.view_rect());
                         let (left, right) = extract_eye_images(
                             face_image.as_view(),
                             res.estimation(),
@@ -264,7 +264,7 @@ fn extract_eye_images(
     let left = left.grow_rel(MARGIN).grow_to_fit_aspect(target_aspect);
     let right = right.grow_rel(MARGIN).grow_to_fit_aspect(target_aspect);
 
-    let left = face_image.view(&left).to_image();
-    let right = face_image.view(&right).to_image();
+    let left = face_image.view(left).to_image();
+    let right = face_image.view(right).to_image();
     (left, right)
 }

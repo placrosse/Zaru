@@ -23,7 +23,7 @@ fn main() -> Result<(), zaru::Error> {
         let mut image = webcam.read()?;
 
         let view_rect = image.resolution().fit_aspect_ratio(input_ratio);
-        let mut view = image.view_mut(&view_rect);
+        let mut view = image.view_mut(view_rect);
 
         for detection in detector.detect(&view) {
             detection.draw(&mut view);

@@ -56,8 +56,8 @@ fn main() -> Result<(), zaru::Error> {
                 .estimation()
                 .right_eye()
                 .move_by(res.view_rect().x(), res.view_rect().y());
-            let left_eye = image.view(&left_rect);
-            let right_eye = image.view(&right_rect);
+            let left_eye = image.view(left_rect);
+            let right_eye = image.view(right_rect);
 
             canvas.clear(Color::BLACK);
 
@@ -65,7 +65,7 @@ fn main() -> Result<(), zaru::Error> {
                 for (x, y, right) in &positions {
                     let src_view = if *right { &right_eye } else { &left_eye };
                     let src_rect = if *right { &right_rect } else { &left_rect };
-                    let mut dest_view = canvas.view_mut(&Rect::from_center(
+                    let mut dest_view = canvas.view_mut(Rect::from_center(
                         *x,
                         *y,
                         src_rect.width(),

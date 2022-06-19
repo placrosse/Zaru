@@ -65,12 +65,12 @@ fn view_data() {
 fn view() {
     let image = mkimage([[C::RED, C::GREEN]]);
 
-    let view = image.view(&Rect::from_corners((1, 0), (1, 0)));
+    let view = image.view(Rect::from_corners((1, 0), (1, 0)));
     assert_eq!(view.width(), 1);
     assert_eq!(view.height(), 1);
     assert_eq!(view.get(0, 0), C::GREEN);
 
-    let view = image.view(&Rect::from_corners((1, 0), (99, 99)));
+    let view = image.view(Rect::from_corners((1, 0), (99, 99)));
     assert_eq!(view.width(), 99);
     assert_eq!(view.height(), 100);
     assert_eq!(view.get(0, 0), C::GREEN);

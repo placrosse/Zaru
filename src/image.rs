@@ -199,10 +199,10 @@ impl Image {
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
     /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
     /// `rect`.
-    pub fn view(&self, rect: &Rect) -> ImageView<'_> {
+    pub fn view(&self, rect: Rect) -> ImageView<'_> {
         ImageView {
             image: self,
-            data: ViewData::full(self).view(*rect),
+            data: ViewData::full(self).view(rect),
         }
     }
 
@@ -211,9 +211,9 @@ impl Image {
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
     /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
     /// `rect`.
-    pub fn view_mut(&mut self, rect: &Rect) -> ImageViewMut<'_> {
+    pub fn view_mut(&mut self, rect: Rect) -> ImageViewMut<'_> {
         ImageViewMut {
-            data: ViewData::full(self).view(*rect),
+            data: ViewData::full(self).view(rect),
             image: self,
         }
     }
@@ -420,10 +420,10 @@ impl<'a> ImageView<'a> {
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
     /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
     /// `rect`.
-    pub fn view(&self, rect: &Rect) -> ImageView<'_> {
+    pub fn view(&self, rect: Rect) -> ImageView<'_> {
         ImageView {
             image: self.image,
-            data: self.data.view(*rect),
+            data: self.data.view(rect),
         }
     }
 
@@ -476,7 +476,7 @@ impl<'a> ImageView<'a> {
         };
 
         let target_rect = new_res.fit_aspect_ratio(cur_ratio);
-        let mut target_view = out.view_mut(&target_rect);
+        let mut target_view = out.view_mut(target_rect);
 
         for dest_y in 0..target_rect.height() {
             for dest_x in 0..target_rect.width() {
@@ -626,10 +626,10 @@ impl<'a> ImageViewMut<'a> {
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
     /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
     /// `rect`.
-    pub fn view(&self, rect: &Rect) -> ImageView<'_> {
+    pub fn view(&self, rect: Rect) -> ImageView<'_> {
         ImageView {
             image: self.image,
-            data: self.data.view(*rect),
+            data: self.data.view(rect),
         }
     }
 
@@ -638,10 +638,10 @@ impl<'a> ImageViewMut<'a> {
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
     /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
     /// `rect`.
-    pub fn view_mut(&mut self, rect: &Rect) -> ImageViewMut<'_> {
+    pub fn view_mut(&mut self, rect: Rect) -> ImageViewMut<'_> {
         ImageViewMut {
             image: self.image,
-            data: self.data.view(*rect),
+            data: self.data.view(rect),
         }
     }
 
@@ -780,7 +780,7 @@ pub trait AsImageViewMut: AsImageView {
 
 impl AsImageView for Image {
     fn as_view(&self) -> ImageView<'_> {
-        self.view(&Rect::from_top_left(0, 0, self.width(), self.height()))
+        self.view(Rect::from_top_left(0, 0, self.width(), self.height()))
     }
 }
 
@@ -792,7 +792,7 @@ impl<'a> AsImageView for ImageView<'a> {
 
 impl AsImageViewMut for Image {
     fn as_view_mut(&mut self) -> ImageViewMut<'_> {
-        self.view_mut(&Rect::from_top_left(0, 0, self.width(), self.height()))
+        self.view_mut(Rect::from_top_left(0, 0, self.width(), self.height()))
     }
 }
 

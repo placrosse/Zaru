@@ -248,7 +248,7 @@ impl LandmarkTracker {
         let roi = self.roi?;
         let view_rect = roi.grow_to_fit_aspect(self.input_ratio);
         let full_image = full_image.as_view();
-        let view = full_image.view(&view_rect);
+        let view = full_image.view(view_rect);
         let estimation = estimator.estimate(&view);
         if estimation.confidence() < self.loss_thresh {
             log::trace!(
