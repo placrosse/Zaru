@@ -1,3 +1,8 @@
+//! Detection and tracking of multiple hands.
+//!
+//! This is a higher-level module that provides a self-contained hand tracking solution that will
+//! detect and track any number of hands, and compute landmarks for each one.
+
 use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant},
@@ -14,6 +19,7 @@ use super::{
     landmark::{self, LandmarkResult, Landmarker},
 };
 
+/// Self-contained hand detector, tracker, and landmarker.
 pub struct HandTracker {
     hands: Vec<TrackedHand>,
     next_hand_id: HandId,
@@ -26,10 +32,13 @@ pub struct HandTracker {
 }
 
 impl HandTracker {
+    /// Default intersection-over-union threshold for deduplicating tracking regions.
     pub const DEFAULT_IOU_THRESH: f32 = 0.3;
 
+    /// Default interval for palm detection, when at least one hand is in view.
     pub const DEFAULT_REDETECT_INTERVAL: Duration = Duration::from_millis(300);
 
+    /// Creates a new [`HandTracker`] with the given palm detection and landmarking networks.
     pub fn new<D, L>(detector: D, landmarker: L) -> Self
     where
         D: detection::PalmDetectionNetwork,
@@ -70,6 +79,8 @@ impl HandTracker {
     ///
     /// This scheme ensures that newly appearing hands get picked up in a timely fashion, but
     /// without blocking (detection is expensive, so it runs in its own worker).
+    ///
+    /// By default, [`Self::DEFAULT_REDETECT_INTERVAL`] is used.
     pub fn set_redetect_interval(&mut self, interval: Duration) {
         self.det_interval = interval;
     }
@@ -80,6 +91,8 @@ impl HandTracker {
     /// Since redetection will also detect all hands that are already being tracked, this threshold
     /// is used to ensure that each hand is only tracked once. No new tracking worker is spawned if
     /// a detection overlaps with an existing tracker's region of interest.
+    ///
+    /// By default, [`Self::DEFAULT_IOU_THRESH`] is used.
     pub fn set_iou_thresh(&mut self, thresh: f32) {
         self.iou_thresh = thresh;
     }
@@ -95,11 +108,11 @@ impl HandTracker {
         })
     }
 
-    /// Blocks until all tracking from the last call to `track` are finished, and restarts them on
-    /// `image`.
+    /// Blocks until all tracking computations from the last call to `track` are finished, and
+    /// restarts them on `image`.
     ///
-    /// When this method returns, [`HandTracker::hands`] will return the state of all hands in the
-    /// image passed to the last call to `track`.
+    /// After this method returns, [`HandTracker::hands`] will return the state of all hands in the
+    /// previous image passed to `track`.
     pub fn track(&mut self, image: Arc<Image>) {
         self.hands.retain_mut(|hand| {
             let (promise, ph) = promise();
@@ -126,8 +139,8 @@ impl HandTracker {
 
         let grow_by = 1.5; // Palm -> Hand grow factor
 
-        // Compute IoU with existing RoIs, discard detection if it overlaps, spawn tracker when
-        // it doesn't.
+        // Compute IoU with existing RoIs, discard detection if it overlaps with any, spawn tracker
+        // when it doesn't.
         detections.retain(|det| {
             for hand in &self.hands {
                 if hand
@@ -241,15 +254,17 @@ pub struct HandData<'a> {
 }
 
 impl<'a> HandData<'a> {
+    /// Returns the unique ID of this hand.
     pub fn id(&self) -> HandId {
         self.id
     }
 
-    /// Hand landmarks, in global coordinates.
+    /// Returns the hand landmarks, in global image coordinates.
     pub fn landmark_result(&self) -> &LandmarkResult {
         self.lm
     }
 
+    /// Returns the hand's bounding rectangle in the original image.
     pub fn view_rect(&self) -> Rect {
         self.view_rect
     }
