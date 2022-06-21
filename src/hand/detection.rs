@@ -1,5 +1,6 @@
 //! Palm detection.
 
+use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
 use crate::{
@@ -8,7 +9,7 @@ use crate::{
         ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
         BoundingRect, RawDetection,
     },
-    image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
+    image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect, RotatedRect},
     nn::{create_linear_color_mapper, point_to_img, Cnn, CnnInputShape, NeuralNetwork},
     num::sigmoid,
     resolution::Resolution,
@@ -165,6 +166,24 @@ impl Detection {
         self.raw.bounding_rect().to_rect(&self.full_res)
     }
 
+    pub fn keypoint(&self, keypoint: Keypoint) -> (i32, i32) {
+        let p = self.raw.keypoints()[keypoint as usize];
+        point_to_img(p.x(), p.y(), &self.full_res)
+    }
+
+    /// Computes the clockwise rotation of the palm compared to an upright position.
+    ///
+    /// A rotation of 0° means that fingers are pointed upwards.
+    pub fn rotation_radians(&self) -> f32 {
+        let (x, y) = self.keypoint(Keypoint::MiddleFingerMcp);
+        let finger = Point2::new(x as f32, y as f32);
+        let (x, y) = self.keypoint(Keypoint::Palm);
+        let palm = Point2::new(x as f32, y as f32);
+
+        let rel = palm - finger;
+        Rotation2::rotation_between(&Vector2::y(), &rel).angle()
+    }
+
     /// Draws the bounding box of this detection onto an image.
     ///
     /// # Panics
@@ -191,13 +210,41 @@ impl Detection {
         )
         .align_bottom()
         .color(Color::CYAN);
+
         image::draw_rect(image, rect).color(Color::CYAN);
-        for (i, lm) in self.raw.keypoints().iter().enumerate() {
-            let (x, y) = point_to_img(lm.x(), lm.y(), &self.full_res);
+        image::draw_rotated_rect(image, RotatedRect::new(rect, self.rotation_radians()))
+            .color(Color::BLUE);
+
+        for (i, p) in self.raw.keypoints().iter().enumerate() {
+            let (x, y) = point_to_img(p.x(), p.y(), &self.full_res);
             image::draw_marker(image, x, y).color(Color::CYAN);
             image::draw_text(image, x, y - 5, &i.to_string()).color(Color::CYAN);
         }
+
+        let a = self.keypoint(Keypoint::MiddleFingerMcp);
+        let b = self.keypoint(Keypoint::Palm);
+        image::draw_line(image, a.0, a.1, b.0, b.1).color(Color::CYAN);
+        image::draw_text(
+            image,
+            (a.0 + b.0) / 2,
+            (a.1 + b.1) / 2,
+            &format!("{:.1} deg", self.rotation_radians().to_degrees()),
+        )
+        .color(Color::BLUE)
+        .align_left();
     }
+}
+
+/// A keypoint of a [`Detection`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Keypoint {
+    Palm = 0,
+    IndexFingerMcp = 1,
+    MiddleFingerMcp = 2,
+    RingFingerMcp = 3,
+    PinkyMcp = 4,
+    ThumbCmc = 5,
+    ThumbMcp = 6,
 }
 
 pub trait PalmDetectionNetwork {
