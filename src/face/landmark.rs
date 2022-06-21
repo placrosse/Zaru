@@ -6,6 +6,7 @@
 //!
 //! [Face Mesh]: https://google.github.io/mediapipe/solutions/face_mesh.html
 
+use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
 use crate::{
@@ -188,6 +189,16 @@ impl LandmarkResult {
         self.face_flag
     }
 
+    pub fn rotation_radians(&self) -> f32 {
+        let left_eye = self.landmark_position(LandmarkIdx::LeftEyeLeftCorner as _);
+        let right_eye = self.landmark_position(LandmarkIdx::RightEyeRightCorner as _);
+        let left_to_right_eye = Vector2::new(
+            (right_eye.0 - left_eye.0) as f32,
+            (right_eye.1 - left_eye.1) as f32,
+        );
+        Rotation2::rotation_between(&Vector2::x(), &left_to_right_eye).angle()
+    }
+
     /// Returns a [`Rect`] containing the left eye.
     pub fn left_eye(&self) -> Rect {
         Rect::bounding(
@@ -260,6 +271,25 @@ impl LandmarkResult {
         )
         .align_top()
         .color(color);
+
+        let left_eye = self.landmark_position(LandmarkIdx::LeftEyeLeftCorner as _);
+        let right_eye = self.landmark_position(LandmarkIdx::RightEyeRightCorner as _);
+        image::draw_line(
+            image,
+            left_eye.0 as _,
+            left_eye.1 as _,
+            right_eye.0 as _,
+            right_eye.1 as _,
+        )
+        .color(Color::WHITE);
+        image::draw_text(
+            image,
+            ((left_eye.0 + right_eye.0) / 2.0) as i32,
+            ((left_eye.1 + right_eye.1) / 2.0) as i32,
+            &format!("{:.1} deg", self.rotation_radians().to_degrees()),
+        )
+        .align_bottom()
+        .color(Color::WHITE);
     }
 }
 
