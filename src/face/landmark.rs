@@ -256,7 +256,6 @@ impl LandmarkResult {
             image::draw_marker(image, x as _, y as _).size(3);
         }
 
-        #[allow(illegal_floating_point_literal_pattern)] // let me have fun
         let color = match self.face_confidence() {
             0.75.. => Color::GREEN,
             0.5..=0.75 => Color::YELLOW,

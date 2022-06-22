@@ -240,7 +240,6 @@ impl Detection {
             RotatedRect::new(self.bounding_rect_loose(), self.rotation_radians()),
         );
 
-        #[allow(illegal_floating_point_literal_pattern)] // let me have fun
         let color = match self.confidence() {
             0.8.. => Color::GREEN,
             0.4..=0.8 => Color::YELLOW,

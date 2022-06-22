@@ -9,6 +9,8 @@
 //! One notable exceptions to this are neural networks outputting 3D coordinates – depending on the
 //! network, they might use X and Y coordinates from the input image, so Y will point *down*.
 
+#![allow(illegal_floating_point_literal_pattern)] // let me have fun
+
 use log::LevelFilter;
 
 pub mod anim;
