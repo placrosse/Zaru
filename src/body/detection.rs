@@ -83,7 +83,7 @@ impl PoseDetector {
         let full_res = image.resolution();
         let input_resolution = self.input_resolution();
 
-        let mut image = image.reborrow();
+        let mut image = image;
         let resized;
         if image.resolution() != input_resolution {
             resized = self

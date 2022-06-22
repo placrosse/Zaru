@@ -57,7 +57,7 @@ impl Landmarker {
         self.result_buffer.orig_res = full_res;
         self.result_buffer.orig_aspect = orig_aspect;
 
-        let mut image = image.reborrow();
+        let mut image = image;
         let resized;
         if image.resolution() != input_res {
             resized = self.t_resize.time(|| image.aspect_aware_resize(input_res));

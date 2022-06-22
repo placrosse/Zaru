@@ -405,16 +405,6 @@ impl<'a> ImageView<'a> {
         Color(self.as_generic_image_view().get_pixel(x, y).0)
     }
 
-    /// Borrows an identical [`ImageView`] from `self` that may have a shorter lifetime.
-    ///
-    /// This is equivalent to the implicit "reborrowing" that happens on Rust references. It needs
-    /// to be a method call here because user-defined types cannot opt into making this happen
-    /// automatically.
-    pub fn reborrow(&self) -> ImageView<'_> {
-        // FIXME: remove
-        *self
-    }
-
     /// Creates an immutable subview into an area of this view, specified by `rect`.
     ///
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
@@ -786,7 +776,7 @@ impl AsImageView for Image {
 
 impl<'a> AsImageView for ImageView<'a> {
     fn as_view(&self) -> ImageView<'_> {
-        self.reborrow()
+        *self
     }
 }
 
