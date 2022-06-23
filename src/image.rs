@@ -606,7 +606,7 @@ impl<'a> ImageViewMut<'a> {
     /// automatically.
     pub fn reborrow(&mut self) -> ImageViewMut<'_> {
         ImageViewMut {
-            image: &mut *self.image,
+            image: self.image,
             data: self.data,
         }
     }

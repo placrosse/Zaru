@@ -30,7 +30,7 @@ impl Landmarks {
         self.positions.len()
     }
 
-    pub fn landmarks(&self) -> impl Iterator<Item = Landmark> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = Landmark> + '_ {
         self.positions.iter().map(|&pos| Landmark { pos })
     }
 
@@ -264,7 +264,7 @@ impl LandmarkTracker {
         let updated_roi = Rect::bounding(
             estimation
                 .landmarks()
-                .landmarks()
+                .iter()
                 .map(|lm| (lm.x() as _, lm.y() as _)),
         )
         .unwrap()
