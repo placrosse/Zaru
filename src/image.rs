@@ -7,6 +7,29 @@
 //! - The [`AsImageView`] and [`AsImageViewMut`] traits to abstract over images and views.
 //! - A variety of freestanding `draw_*` functions to quickly visualize objects.
 //! - [`Rect`] and [`RotatedRect`], integer-valued rectangles representing parts of an image.
+//!
+//! # TODO
+//!
+//! ## Rotated Views
+//!
+//! Many neural nets require the object they act on to be oriented a certain way. We can implement
+//! this by replacing the [`Rect`] taken by `view` and `view_mut` with a [`RotatedRect`].
+//!
+//! Problem: this doesn't easily work with the out-of-bounds-reads-as-zero semantics image views
+//! have, since creating nested views can create arbitrarily complex bounding polygons that need to
+//! be checked, which can only be implemented by allocating, which I'd like to avoid. At the same
+//! time, allowing out-of-bounds reads has proven immensely useful, so I'd like to keep that.
+//!
+//! Solution 1: use a separate view type that allows rotation, but does not allow the creation of
+//! subviews. Drawbacks: requires 4 dedicated view types, and interacts badly with the
+//! view traits.
+//!
+//! Solution 2: forgo the out-of-bounds-reads-as-zero semantics, but only for subviews. Accessing an
+//! out-of-bounds pixel will work fine and yield the backing data of the underlying [`Image`] at the
+//! right position. Only accessing data that is fully out of bounds of the underlying [`Image`] will
+//! have the current read-as-zero-writes-ignored semantics. This also means that creating a larger
+//! view from a smaller view is possible (gives up monotonic property, rules out `split_at_mut`-like
+//! API for images).
 
 mod blend;
 mod draw;
@@ -268,68 +291,47 @@ impl fmt::Debug for Image {
 
 #[derive(Debug, Clone, Copy)]
 struct ViewData {
-    /// View into the base `Image`, clipped to its dimensions, may be empty.
-    view_rect: Rect,
-    // size of this view
-    width: u32,
-    height: u32,
-    // offset of `view_rect` inside this view
-    off_x: u32,
-    off_y: u32,
+    /// Rectangle in the root image's coordinates.
+    rect: Rect,
 }
 
 impl ViewData {
     fn full(image: &Image) -> Self {
-        Self {
-            view_rect: image.rect(),
-            width: image.width(),
-            height: image.height(),
-            off_x: 0,
-            off_y: 0,
-        }
+        Self { rect: image.rect() }
     }
 
     fn view(&self, rect: Rect) -> Self {
-        let backed_area = self.backed_area();
-        let clipped = backed_area
-            .intersection(&rect)
-            .unwrap_or(Rect::from_center(0, 0, 0, 0));
-        let view_rect = Rect::from_top_left(
-            self.view_rect.x() + (clipped.x() - backed_area.x()),
-            self.view_rect.y() + (clipped.y() - backed_area.y()),
-            clipped.width(),
-            clipped.height(),
-        );
-
         Self {
-            view_rect,
-            width: rect.width(),
-            height: rect.height(),
-            off_x: (clipped.x() - rect.x()) as _,
-            off_y: (clipped.y() - rect.y()) as _,
+            rect: rect.move_by(self.rect.x(), self.rect.y()),
         }
     }
 
     fn rect(&self) -> Rect {
-        Rect::from_top_left(0, 0, self.width, self.height)
-    }
-
-    /// Returns a `Rect` contained within `self` that contains all the pixels with backing data.
-    fn backed_area(&self) -> Rect {
-        Rect::from_top_left(
-            self.off_x as _,
-            self.off_y as _,
-            self.view_rect.width(),
-            self.view_rect.height(),
-        )
+        Rect::from_top_left(0, 0, self.width(), self.height())
     }
 
     fn width(&self) -> u32 {
-        self.width
+        self.rect.width()
     }
 
     fn height(&self) -> u32 {
-        self.height
+        self.rect.height()
+    }
+
+    fn image_coord(&self, x: u32, y: u32, image: &Image) -> Option<(u32, u32)> {
+        let x: u32 = (i64::from(x) + i64::from(self.rect.x())).try_into().ok()?;
+        let y: u32 = (i64::from(y) + i64::from(self.rect.y())).try_into().ok()?;
+        if x >= image.width() || y >= image.height() {
+            return None;
+        }
+        Some((x, y))
+    }
+
+    fn get(&self, x: u32, y: u32, image: &Image) -> Color {
+        match self.image_coord(x, y, image) {
+            Some((x, y)) => Color(image.buf[(x, y)].0),
+            _ => Color::NULL,
+        }
     }
 }
 
@@ -356,15 +358,7 @@ impl<'a> ImageView<'a> {
             }
 
             fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
-                if self.0.data.backed_area().contains_point(x.into(), y.into()) {
-                    let x =
-                        self.0.data.view_rect.x() as u32 + x - self.0.data.backed_area().x() as u32;
-                    let y =
-                        self.0.data.view_rect.y() as u32 + y - self.0.data.backed_area().y() as u32;
-                    self.0.image.buf[(x, y)]
-                } else {
-                    Rgba([0, 0, 0, 0])
-                }
+                Rgba(self.0.data.get(x, y, self.0.image).0)
             }
         }
 
@@ -500,20 +494,6 @@ impl<'a> ImageViewMut<'a> {
     fn as_generic_image(&mut self) -> impl GenericImage<Pixel = Rgba<u8>> + '_ {
         struct Wrapper<'b>(ImageViewMut<'b>, Rgba<u8>);
 
-        impl Wrapper<'_> {
-            fn coords(&self, x: u32, y: u32) -> Option<(u32, u32)> {
-                if self.0.data.backed_area().contains_point(x.into(), y.into()) {
-                    let x =
-                        self.0.data.view_rect.x() as u32 + x - self.0.data.backed_area().x() as u32;
-                    let y =
-                        self.0.data.view_rect.y() as u32 + y - self.0.data.backed_area().y() as u32;
-                    Some((x, y))
-                } else {
-                    None
-                }
-            }
-        }
-
         impl GenericImageView for Wrapper<'_> {
             type Pixel = Rgba<u8>;
 
@@ -526,25 +506,26 @@ impl<'a> ImageViewMut<'a> {
             }
 
             fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
-                self.coords(x, y)
-                    .map_or(Rgba([0, 0, 0, 0]), |(x, y)| self.0.image.buf[(x, y)])
+                Rgba(self.0.data.get(x, y, self.0.image).0)
             }
         }
 
         impl GenericImage for Wrapper<'_> {
             fn get_pixel_mut(&mut self, x: u32, y: u32) -> &mut Self::Pixel {
-                self.coords(x, y)
+                self.0
+                    .data
+                    .image_coord(x, y, self.0.image)
                     .map_or(&mut self.1, |(x, y)| &mut self.0.image.buf[(x, y)])
             }
 
             fn put_pixel(&mut self, x: u32, y: u32, pixel: Self::Pixel) {
-                if let Some((x, y)) = self.coords(x, y) {
+                if let Some((x, y)) = self.0.data.image_coord(x, y, self.0.image) {
                     self.0.image.buf[(x, y)] = pixel;
                 }
             }
 
             fn blend_pixel(&mut self, x: u32, y: u32, pixel: Self::Pixel) {
-                if let Some((x, y)) = self.coords(x, y) {
+                if let Some((x, y)) = self.0.data.image_coord(x, y, self.0.image) {
                     #[allow(deprecated)]
                     self.0.image.buf.blend_pixel(x, y, pixel);
                 }
