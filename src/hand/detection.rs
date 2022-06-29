@@ -177,10 +177,10 @@ impl Detection {
     pub fn rotation_radians(&self) -> f32 {
         let (x, y) = self.keypoint(Keypoint::MiddleFingerMcp);
         let finger = Point2::new(x as f32, y as f32);
-        let (x, y) = self.keypoint(Keypoint::Palm);
-        let palm = Point2::new(x as f32, y as f32);
+        let (x, y) = self.keypoint(Keypoint::Wrist);
+        let wrist = Point2::new(x as f32, y as f32);
 
-        let rel = palm - finger;
+        let rel = wrist - finger;
         Rotation2::rotation_between(&Vector2::y(), &rel).angle()
     }
 
@@ -222,7 +222,7 @@ impl Detection {
         }
 
         let a = self.keypoint(Keypoint::MiddleFingerMcp);
-        let b = self.keypoint(Keypoint::Palm);
+        let b = self.keypoint(Keypoint::Wrist);
         image::draw_line(image, a.0, a.1, b.0, b.1).color(Color::CYAN);
         image::draw_text(
             image,
@@ -238,7 +238,7 @@ impl Detection {
 /// A keypoint of a [`Detection`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Keypoint {
-    Palm = 0,
+    Wrist = 0,
     IndexFingerMcp = 1,
     MiddleFingerMcp = 2,
     RingFingerMcp = 3,
