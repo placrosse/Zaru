@@ -1,5 +1,6 @@
 //! Hand landmark prediction.
 
+use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
 use crate::{
@@ -147,6 +148,19 @@ impl LandmarkResult {
         ]
     }
 
+    /// Computes the clockwise rotation of the palm compared to an upright position.
+    ///
+    /// A rotation of 0° means that fingers are pointed upwards.
+    pub fn rotation_radians(&self) -> f32 {
+        let [x, y, _] = self.landmark_position(LandmarkIdx::MiddleFingerMcp as usize);
+        let finger = Point2::new(x as f32, y as f32);
+        let [x, y, _] = self.landmark_position(LandmarkIdx::Wrist as usize);
+        let wrist = Point2::new(x as f32, y as f32);
+
+        let rel = wrist - finger;
+        Rotation2::rotation_between(&Vector2::y(), &rel).angle()
+    }
+
     #[inline]
     pub fn landmark_count(&self) -> usize {
         self.landmarks.len()
@@ -185,6 +199,18 @@ impl LandmarkResult {
 
         let [palm_x, palm_y, _] = self.palm_center();
         let (palm_x, palm_y) = (palm_x as i32, palm_y as i32);
+
+        let [a_x, a_y, _] = self.landmark_position(LandmarkIdx::MiddleFingerMcp as usize);
+        let [b_x, b_y, _] = self.landmark_position(LandmarkIdx::Wrist as usize);
+        image::draw_line(target, a_x as _, a_y as _, b_x as _, b_y as _)
+            .color(Color::from_rgb8(127, 127, 127));
+        image::draw_text(
+            target,
+            b_x as _,
+            b_y as _,
+            &format!("{:.1} deg", self.rotation_radians().to_degrees()),
+        )
+        .align_top();
 
         image::draw_text(target, palm_x, palm_y - 5, hand);
         image::draw_text(
