@@ -399,6 +399,12 @@ impl RotatedRect {
     }
 }
 
+impl From<Rect> for RotatedRect {
+    fn from(rect: Rect) -> Self {
+        Self { rect, radians: 0.0 }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
