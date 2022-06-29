@@ -240,6 +240,10 @@ impl Estimation for LandmarkResult {
     fn landmarks(&self) -> &crate::landmark::Landmarks {
         &self.landmarks
     }
+
+    fn angle_radians(&self) -> Option<f32> {
+        Some(self.rotation_radians())
+    }
 }
 
 impl Estimator for Landmarker {

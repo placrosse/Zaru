@@ -300,6 +300,10 @@ impl landmark::Estimation for LandmarkResult {
     fn landmarks(&self) -> &Landmarks {
         self.raw_landmarks()
     }
+
+    fn angle_radians(&self) -> Option<f32> {
+        Some(self.rotation_radians())
+    }
 }
 
 include!(concat!(

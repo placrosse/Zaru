@@ -141,6 +141,18 @@ pub trait Estimation {
     /// The landmark coordinates must be the the coordinate system of the image passed to
     /// [`Estimator::estimate`].
     fn landmarks(&self) -> &Landmarks;
+
+    /// Returns the estimated clockwise object rotation in radians.
+    ///
+    /// This can be used by a [`LandmarkTracker`] to automatically rotate the object before passing
+    /// it to the [`Estimator`]. This helps some estimators that expect the object to be in a
+    /// certain orientation.
+    ///
+    /// If this returns [`None`], no angle estimate is available, and the RoI will not automatically
+    /// follow the rotation of the tracked object.
+    fn angle_radians(&self) -> Option<f32> {
+        None
+    }
 }
 
 /// Trait for landmark estimators.
