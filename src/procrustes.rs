@@ -28,11 +28,19 @@ pub struct ProcrustesAnalyzer {
 
 impl ProcrustesAnalyzer {
     /// Creates a new procrustes analyzer that attempts to fit data points to `reference`.
+    ///
+    /// # Panics
+    ///
+    /// This panics if the `reference` iterator yields fewer than 2 points.
     pub fn new(reference: impl Iterator<Item = (f32, f32, f32)>) -> Self {
-        let mut reference = reference
+        let reference = reference
             .map(|(x, y, z)| Vector3::new(x, y, z))
             .collect::<Vec<_>>();
 
+        Self::new_impl(reference)
+    }
+
+    fn new_impl(mut reference: Vec<Vector3<f32>>) -> Self {
         assert!(
             reference.len() > 1,
             "need at least 2 points for procrustes analysis"
@@ -70,12 +78,22 @@ impl ProcrustesAnalyzer {
     ///
     /// # Limitations
     ///
-    /// This function does not work in the presence of reflections or non-uniform scaling.
+    /// This function does not work in the presence of reflections. It is also unable to compute a
+    /// non-uniform scaling applied to the data (uniform scaling works fine).
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if `points` yields a different number of points than contained in
+    /// the reference data passed to [`new`][Self::new].
     pub fn analyze(&mut self, points: impl Iterator<Item = (f32, f32, f32)>) -> AnalysisResult {
         self.buf.clear();
         self.buf
             .extend(points.map(|(x, y, z)| Vector3::new(x, y, z)));
 
+        self.analyze_impl()
+    }
+
+    fn analyze_impl(&mut self) -> AnalysisResult {
         assert_eq!(
             self.buf.len(),
             self.q.shape().0,
