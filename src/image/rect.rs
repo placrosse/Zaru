@@ -108,6 +108,20 @@ impl Rect {
         Some(Self::span_inner(x_min, y_min, x_max, y_max))
     }
 
+    pub fn including(&self, x: i32, y: i32) -> Self {
+        let mut x_min = self.x();
+        let mut y_min = self.y();
+        let mut x_max = self.x() + self.width() as i32 - 1;
+        let mut y_max = self.y() + self.height() as i32 - 1;
+
+        x_min = cmp::min(x_min, x);
+        x_max = cmp::max(x_max, x);
+        y_min = cmp::min(y_min, y);
+        y_max = cmp::max(y_max, y);
+
+        Self::span_inner(x_min, y_min, x_max, y_max)
+    }
+
     fn span_inner(x_min: i32, y_min: i32, x_max: i32, y_max: i32) -> Self {
         assert!(x_min <= x_max, "x_min={}, x_max={}", x_min, x_max);
         assert!(y_min <= y_max, "y_min={}, y_max={}", y_min, y_max);
@@ -256,6 +270,11 @@ impl Rect {
         Rect::from_top_left(self.x() + x, self.y() + y, self.width(), self.height())
     }
 
+    #[must_use]
+    pub fn move_to(&self, x: i32, y: i32) -> Rect {
+        Rect::from_top_left(x, y, self.width(), self.height())
+    }
+
     /// Computes the intersection of `self` and `other`.
     ///
     /// Returns `None` when the intersection is empty (ie. the rectangles do not overlap).
@@ -344,10 +363,14 @@ impl fmt::Debug for Rect {
 }
 
 /// A [`Rect`], rotated around its center.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct RotatedRect {
     rect: Rect,
     radians: f32,
+    sin: f32,
+    cos: f32,
+    inv_sin: f32,
+    inv_cos: f32,
 }
 
 impl RotatedRect {
@@ -356,8 +379,19 @@ impl RotatedRect {
     /// `radians` is the clockwise rotation to apply to the [`Rect`].
     #[inline]
     pub fn new(rect: Rect, radians: f32) -> Self {
-        Self { rect, radians }
+        Self {
+            rect,
+            radians,
+            sin: radians.sin(),
+            cos: radians.cos(),
+            inv_sin: (-radians).sin(),
+            inv_cos: (-radians).cos(),
+        }
     }
+
+    // NOTE: Implementing the `bounding`/`including` API is pretty difficult: transforming a point
+    // into the rotated rect's coordinates and then adjusting the rect to contain the point moves
+    // its center, which changes where the point would map to.
 
     /// Returns the rectangle's clockwise rotation in radians.
     #[inline]
@@ -374,6 +408,18 @@ impl RotatedRect {
     #[inline]
     pub fn rect(&self) -> &Rect {
         &self.rect
+    }
+
+    /// Sets the underlying non-rotated rectangle.
+    #[inline]
+    pub fn set_rect(&mut self, rect: Rect) {
+        self.rect = rect;
+    }
+
+    /// Applies a closure to the underlying non-rotated [`Rect`].
+    pub fn map(mut self, f: impl FnOnce(Rect) -> Rect) -> Self {
+        self.rect = f(self.rect);
+        self
     }
 
     /// Returns the rotated rectangle's corners.
@@ -397,16 +443,69 @@ impl RotatedRect {
             (abs.x, abs.y)
         })
     }
+
+    pub fn contains_point(&self, x: i32, y: i32) -> bool {
+        let [x, y] = self.transform_in(x, y).map(i64::from);
+
+        // The rect offset was already compensated for by the transform.
+        self.rect.move_to(0, 0).contains_point(x, y)
+    }
+
+    /// Transforms a point from the parent coordinate system into the [`RotatedRect`]'s system.
+    pub fn transform_in_f32(&self, x: f32, y: f32) -> [f32; 2] {
+        let [x, y] = [
+            x as f32 - self.rect.x() as f32,
+            y as f32 - self.rect.y() as f32,
+        ];
+        let [cx, cy] = [
+            self.rect.width() as f32 / 2.0,
+            self.rect.height() as f32 / 2.0,
+        ];
+        // Offset by [0.5,0.5] to place us in pixel center.
+        let [x, y] = [x - cx + 0.5, y - cy + 0.5];
+        let [x, y] = [
+            x * self.inv_cos - y * self.inv_sin + cx - 0.5,
+            y * self.inv_cos + x * self.inv_sin + cy - 0.5,
+        ];
+        [x, y]
+    }
+
+    pub fn transform_in(&self, x: i32, y: i32) -> [i32; 2] {
+        let [x, y] = self.transform_in_f32(x as f32, y as f32);
+        [x.round() as i32, y.round() as i32]
+    }
+
+    /// Transforms a point from the [`RotatedRect`]'s coordinate system to the parent system.
+    pub fn transform_out_f32(&self, x: f32, y: f32) -> [f32; 2] {
+        let [cx, cy] = [
+            self.rect.width() as f32 / 2.0,
+            self.rect.height() as f32 / 2.0,
+        ];
+        // Offset by [0.5,0.5] to place us in pixel center.
+        let [x, y] = [x - cx + 0.5, y - cy + 0.5];
+        let [x, y] = [
+            x * self.cos - y * self.sin + cx - 0.5,
+            y * self.cos + x * self.sin + cy - 0.5,
+        ];
+        [x + self.rect.x() as f32, y + self.rect.y() as f32]
+    }
+
+    pub fn transform_out(&self, x: i32, y: i32) -> [i32; 2] {
+        let [x, y] = self.transform_out_f32(x as f32, y as f32);
+        [x.round() as i32, y.round() as i32]
+    }
 }
 
 impl From<Rect> for RotatedRect {
     fn from(rect: Rect) -> Self {
-        Self { rect, radians: 0.0 }
+        Self::new(rect, 0.0)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::f32::consts::TAU;
+
     use super::*;
 
     #[test]
@@ -475,6 +574,14 @@ mod tests {
     }
 
     #[test]
+    fn test_including() {
+        let zero = Rect::from_corners((0, 0), (0, 0));
+        assert_eq!(zero.including(0, 0), Rect::from_corners((0, 0), (0, 0)));
+        assert_eq!(zero.including(1, 1), Rect::from_corners((0, 0), (1, 1)));
+        assert_eq!(zero.including(-1, -1), Rect::from_corners((-1, -1), (0, 0)));
+    }
+
+    #[test]
     fn test_fit_aspect() {
         assert_eq!(
             Rect::from_center(10, 10, 50, 100).grow_to_fit_aspect(AspectRatio::SQUARE),
@@ -495,5 +602,84 @@ mod tests {
         let orig = Rect::from_top_left(0, 0, 0, 0);
         assert_eq!(orig.grow_move_center(0, 0), orig);
         assert_eq!(orig.grow_move_center(1, 0), Rect::from_top_left(0, 0, 2, 0));
+    }
+
+    #[test]
+    fn test_rotated_rect_transform() {
+        // Not actually rotated
+        let null = RotatedRect::new(Rect::from_top_left(0, 0, 1, 1), 0.0);
+        assert_eq!(null.transform_in(0, 0), [0, 0]);
+        assert_eq!(null.transform_out(0, 0), [0, 0]);
+
+        assert_eq!(null.transform_in(1, -1), [1, -1]);
+        assert_eq!(null.transform_out(1, -1), [1, -1]);
+
+        let offset = RotatedRect::new(Rect::from_top_left(10, 20, 1, 1), 0.0);
+        assert_eq!(offset.transform_in(0, 0), [-10, -20]);
+        assert_eq!(offset.transform_in(10, 20), [0, 0]);
+
+        // Rotated clockwise by 90°
+        let right = RotatedRect::new(Rect::from_top_left(0, 0, 1, 1), TAU / 4.0);
+        assert_eq!(right.transform_in(0, 0), [0, 0]);
+        assert_eq!(right.transform_out(0, 0), [0, 0]);
+
+        assert_eq!(right.transform_in(1, 0), [0, -1],);
+        assert_eq!(right.transform_out(0, -1), [1, 0]);
+
+        // Offset, rotated by 180°
+        let rect = RotatedRect::new(Rect::from_top_left(10, 20, 1, 1), TAU / 2.0);
+        assert_eq!(rect.transform_in(10, 20), [0, 0]);
+        assert_eq!(rect.transform_out(0, 0), [10, 20]);
+    }
+
+    #[test]
+    fn test_rotated_rect_contains_point() {
+        // 1x1 rect at origin
+        let rect = RotatedRect::new(Rect::from_top_left(0, 0, 1, 1), 1.0);
+        assert!(rect.contains_point(0, 0));
+        assert!(!rect.contains_point(0, 1));
+        assert!(!rect.contains_point(1, 1));
+        assert!(!rect.contains_point(1, 0));
+        assert!(!rect.contains_point(0, -1));
+
+        // 1x1 rect offset
+        let rect = RotatedRect::new(Rect::from_top_left(10, 20, 1, 1), 1.0);
+        assert!(rect.contains_point(10, 20));
+        assert!(!rect.contains_point(9, 20));
+        assert!(!rect.contains_point(10, 21));
+
+        // Wide rect, flipped
+        let rect = RotatedRect::new(Rect::from_top_left(10, 20, 100, 1), TAU / 2.0);
+        assert!(!rect.contains_point(-20, 20));
+        assert!(!rect.contains_point(9, 20));
+        assert!(rect.contains_point(10, 20));
+        assert!(rect.contains_point(100, 20));
+        assert!(rect.contains_point(55, 20));
+        assert!(!rect.contains_point(55, 21));
+        assert!(!rect.contains_point(55, 19));
+
+        // Wide rect, rotated 90°
+        let rect = RotatedRect::new(Rect::from_center(0, 0, 51, 1), TAU / 4.0);
+        assert!(rect.contains_point(0, 0));
+        assert!(rect.contains_point(0, 1));
+        assert!(rect.contains_point(0, 25));
+        assert!(!rect.contains_point(0, 26));
+        assert!(rect.contains_point(0, -1));
+        assert!(rect.contains_point(0, -25));
+        assert!(!rect.contains_point(0, -26));
+        assert!(!rect.contains_point(1, 0));
+        assert!(!rect.contains_point(-1, 0));
+
+        // Wide rect, offset, rotated 90°
+        let rect = RotatedRect::new(Rect::from_center(10, 10, 51, 1), TAU / 4.0);
+        assert!(rect.contains_point(10, 0));
+        assert!(rect.contains_point(10, 1));
+        assert!(rect.contains_point(10, 35));
+        assert!(!rect.contains_point(10, 36));
+        assert!(rect.contains_point(10, -1));
+        assert!(rect.contains_point(10, -15));
+        assert!(!rect.contains_point(10, -16));
+        assert!(!rect.contains_point(11, 0));
+        assert!(!rect.contains_point(9, 0));
     }
 }

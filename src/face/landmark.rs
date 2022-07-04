@@ -6,6 +6,10 @@
 //!
 //! [Face Mesh]: https://google.github.io/mediapipe/solutions/face_mesh.html
 
+// NOTE: MediaPipe also has a `face_landmarks_with_attention` network, which outputs more accurate
+// eye and mouth landmarks. However, it uses custom ops, and so can't be converted to a
+// non-TensorFlow format.
+
 use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
