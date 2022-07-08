@@ -1,3 +1,5 @@
+//! TODO: just make them use floats already
+
 use std::{
     cmp, fmt,
     ops::{Bound, RangeBounds},
@@ -7,7 +9,7 @@ use embedded_graphics::prelude::*;
 use itertools::Itertools;
 use nalgebra::{Point2, Rotation2};
 
-use crate::resolution::AspectRatio;
+use crate::{num::TotalF32, resolution::AspectRatio};
 
 /// An axis-aligned rectangle.
 ///
@@ -389,9 +391,59 @@ impl RotatedRect {
         }
     }
 
-    // NOTE: Implementing the `bounding`/`including` API is pretty difficult: transforming a point
-    // into the rotated rect's coordinates and then adjusting the rect to contain the point moves
-    // its center, which changes where the point would map to.
+    /// Approximates the rotated bounding rectangle that encompasses `points`.
+    ///
+    /// Returns `None` if `points` is an empty iterator.
+    pub fn bounding<I: IntoIterator<Item = (i32, i32)>>(radians: f32, points: I) -> Option<Self> {
+        let mut points = points.into_iter().peekable();
+
+        // Make sure we have at least 1 point.
+        points.peek()?;
+
+        // Approach: we rotate all points so that we can compute width, height, and center point of
+        // the rectangle, then we rotate the center back into the right coordinate system.
+        // Note that, since we rotate the center back into the original coordinate system before
+        // using it, it doesn't matter what point we rotate everything around. We pick the origin
+        // for convenience. Picking a point closer to the centroid of the points could potentially
+        // reduce rounding errors, but for now, this works fine.
+
+        let mut x_min = f32::MAX;
+        let mut x_max = f32::MIN;
+        let mut y_min = f32::MAX;
+        let mut y_max = f32::MIN;
+        for (x, y) in points {
+            let [x, y] = [x as f32, y as f32];
+
+            let [x, y] = [
+                x * (-radians).cos() - y * (-radians).sin(),
+                x * (-radians).sin() + y * (-radians).cos(),
+            ];
+
+            x_min = cmp::min(TotalF32(x_min), TotalF32(x)).0;
+            x_max = cmp::max(TotalF32(x_max), TotalF32(x)).0;
+            y_min = cmp::min(TotalF32(y_min), TotalF32(y)).0;
+            y_max = cmp::max(TotalF32(y_max), TotalF32(y)).0;
+        }
+
+        // Center in rotated frame.
+        let [cx, cy] = [(x_min + x_max) / 2.0, (y_min + y_max) / 2.0];
+
+        // Center in non-rotated frame (original coordinates).
+        let [cx, cy] = [
+            cx * radians.cos() - cy * radians.sin(),
+            cx * radians.sin() + cy * radians.cos(),
+        ];
+
+        // NOTE: Adds 1.0 because rectangles are integer-valued and would "round out" points otherwise.
+        let [w, h] = [x_max - x_min + 1.0, y_max - y_min + 1.0];
+
+        let [x, y] = [cx - w / 2.0, cy - h / 2.0];
+
+        Some(Self::new(
+            Rect::from_top_left(x as i32, y as i32, w.ceil() as u32, h.ceil() as u32),
+            radians,
+        ))
+    }
 
     /// Returns the rectangle's clockwise rotation in radians.
     #[inline]
@@ -482,6 +534,7 @@ impl RotatedRect {
             self.rect.height() as f32 / 2.0,
         ];
         // Offset by [0.5,0.5] to place us in pixel center.
+        // FIXME: this should be done in the integer functions only, not here
         let [x, y] = [x - cx + 0.5, y - cy + 0.5];
         let [x, y] = [
             x * self.cos - y * self.sin + cx - 0.5,
@@ -570,6 +623,10 @@ mod tests {
         assert_eq!(
             Rect::bounding([(1, 1), (2, 2)]).unwrap(),
             Rect::from_corners((1, 1), (2, 2)),
+        );
+        assert_eq!(
+            Rect::bounding([(0, 0), (10, 0)]).unwrap(),
+            Rect::from_top_left(0, 0, 11, 1),
         );
     }
 
@@ -681,5 +738,53 @@ mod tests {
         assert!(!rect.contains_point(10, -16));
         assert!(!rect.contains_point(11, 0));
         assert!(!rect.contains_point(9, 0));
+    }
+
+    #[test]
+    fn test_rotated_rect_bounding() {
+        #[track_caller]
+        fn bounding<I: IntoIterator<Item = (i32, i32)>>(radians: f32, points: I) -> RotatedRect
+        where
+            I::IntoIter: Clone,
+        {
+            let points = points.into_iter();
+            let rect = RotatedRect::bounding(radians, points.clone()).unwrap();
+
+            for (x, y) in points {
+                assert!(
+                    rect.contains_point(x, y),
+                    "{rect:?} does not contain {x},{y}"
+                );
+            }
+
+            rect
+        }
+
+        assert!(RotatedRect::bounding(0.0, []).is_none());
+
+        assert_eq!(
+            bounding(0.0, [(0, 0), (1, 1)]),
+            Rect::from_top_left(0, 0, 2, 2).into(),
+        );
+        assert_eq!(
+            bounding(0.0, [(0, 0), (10, 0)]),
+            Rect::from_top_left(0, 0, 11, 1).into(),
+        );
+        assert_eq!(
+            bounding(TAU / 2.0, [(0, 0), (1, 1)]),
+            RotatedRect::new(Rect::from_top_left(0, 0, 2, 2), TAU / 2.0),
+        );
+        assert_eq!(
+            bounding(TAU / 4.0, [(0, 0), (1, 1)]),
+            RotatedRect::new(Rect::from_top_left(0, 0, 2, 2), TAU / 4.0),
+        );
+        assert_eq!(
+            bounding(TAU / 4.0, [(0, 0), (9, 9)]),
+            RotatedRect::new(Rect::from_top_left(0, 0, 10, 10), TAU / 4.0),
+        );
+        assert_eq!(
+            bounding(TAU / 3.0, [(0, 0), (9, 9)]),
+            RotatedRect::new(Rect::from_top_left(2, -2, 5, 14), TAU / 3.0),
+        );
     }
 }
