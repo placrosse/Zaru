@@ -212,8 +212,13 @@ impl Detection {
         .color(Color::CYAN);
 
         image::draw_rect(image, rect).color(Color::CYAN);
-        image::draw_rotated_rect(image, RotatedRect::new(rect, self.rotation_radians()))
-            .color(Color::BLUE);
+
+        let rect = RotatedRect::bounding(
+            self.rotation_radians(),
+            ALL_KEYPOINTS.iter().map(|kp| self.keypoint(*kp)),
+        )
+        .unwrap();
+        image::draw_rotated_rect(image, rect).color(Color::BLUE);
 
         for (i, p) in self.raw.keypoints().iter().enumerate() {
             let (x, y) = point_to_img(p.x(), p.y(), &self.full_res);
@@ -223,7 +228,7 @@ impl Detection {
 
         let a = self.keypoint(Keypoint::MiddleFingerMcp);
         let b = self.keypoint(Keypoint::Wrist);
-        image::draw_line(image, a.0, a.1, b.0, b.1).color(Color::CYAN);
+        image::draw_line(image, a.0, a.1, b.0, b.1).color(Color::BLUE);
         image::draw_text(
             image,
             (a.0 + b.0) / 2,
@@ -246,6 +251,17 @@ pub enum Keypoint {
     ThumbCmc = 5,
     ThumbMcp = 6,
 }
+
+/// A list of all [`Keypoint`]s.
+pub const ALL_KEYPOINTS: &[Keypoint] = &[
+    Keypoint::Wrist,
+    Keypoint::IndexFingerMcp,
+    Keypoint::MiddleFingerMcp,
+    Keypoint::RingFingerMcp,
+    Keypoint::PinkyMcp,
+    Keypoint::ThumbCmc,
+    Keypoint::ThumbMcp,
+];
 
 pub trait PalmDetectionNetwork {
     fn cnn() -> &'static Cnn;

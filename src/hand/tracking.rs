@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    image::{Image, Rect},
+    image::{Image, RotatedRect},
     landmark::LandmarkTracker,
     pipeline::{promise, Promise, PromiseHandle, Receiver, Worker},
 };
@@ -147,6 +147,7 @@ impl HandTracker {
                     .roi
                     .lock()
                     .unwrap()
+                    .rect()
                     .iou(&det.bounding_rect().grow_rel(grow_by))
                     >= self.iou_thresh
                 {
@@ -159,7 +160,10 @@ impl HandTracker {
         });
 
         self.hands.extend(detections.iter().map(|det| {
-            let roi = det.bounding_rect().grow_rel(grow_by);
+            let roi = RotatedRect::new(
+                det.bounding_rect().grow_rel(grow_by),
+                det.rotation_radians(),
+            );
             let mut landmarker = self.landmarker.clone();
             let mut tracker =
                 LandmarkTracker::new(landmarker.input_resolution().aspect_ratio().unwrap());
@@ -175,11 +179,10 @@ impl HandTracker {
                                 *roi_arc2.lock().unwrap() = res.updated_roi();
 
                                 let mut lm = res.estimation().clone();
-                                lm.move_by(
-                                    res.view_rect().x() as f32,
-                                    res.view_rect().y() as f32,
-                                    0.0,
-                                );
+                                lm.map_positions(|[x, y, z]| {
+                                    let [x, y] = res.view_rect().transform_out_f32(x, y);
+                                    [x, y, z]
+                                });
                                 promise.fulfill(Some(lm));
                             }
                             None => {
@@ -212,7 +215,8 @@ impl HandTracker {
 
             for j in 0..i {
                 let other_roi = *self.hands[j].roi.lock().unwrap();
-                if roi.iou(&other_roi) >= self.iou_thresh {
+                // FIXME: IoU computation ignores rotation because hard
+                if roi.rect().iou(&other_roi.rect()) >= self.iou_thresh {
                     self.hands.swap_remove(i);
                     break;
                 }
@@ -233,7 +237,7 @@ impl HandTracker {
 
 struct TrackedHand {
     id: HandId,
-    roi: Arc<Mutex<Rect>>,
+    roi: Arc<Mutex<RotatedRect>>,
     worker: Worker<(Arc<Image>, Promise<Option<LandmarkResult>>)>,
     ph: PromiseHandle<Option<LandmarkResult>>,
     lm: Option<LandmarkResult>,
@@ -250,22 +254,25 @@ pub struct HandId(u64);
 pub struct HandData<'a> {
     id: HandId,
     lm: &'a LandmarkResult,
-    view_rect: Rect,
+    view_rect: RotatedRect,
 }
 
 impl<'a> HandData<'a> {
     /// Returns the unique ID of this hand.
+    #[inline]
     pub fn id(&self) -> HandId {
         self.id
     }
 
     /// Returns the hand landmarks, in global image coordinates.
+    #[inline]
     pub fn landmark_result(&self) -> &LandmarkResult {
         self.lm
     }
 
     /// Returns the hand's bounding rectangle in the original image.
-    pub fn view_rect(&self) -> Rect {
+    #[inline]
+    pub fn view_rect(&self) -> RotatedRect {
         self.view_rect
     }
 }

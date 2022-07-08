@@ -32,8 +32,9 @@ fn main() -> Result<(), zaru::Error> {
 
         let target = Arc::make_mut(&mut prev);
         for hand in tracker.hands() {
-            let rect = hand.view_rect();
-            image::draw_rect(target, rect);
+            let view = hand.view_rect();
+            let rect = view.rect();
+            image::draw_rotated_rect(target, view);
             image::draw_text(
                 target,
                 rect.center().0 as _,

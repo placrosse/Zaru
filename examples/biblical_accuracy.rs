@@ -48,16 +48,12 @@ fn main() -> Result<(), zaru::Error> {
         }
 
         if let Some(res) = tracker.track(&mut landmarker, &image) {
-            let left_rect = res
-                .estimation()
-                .left_eye()
-                .move_by(res.view_rect().x(), res.view_rect().y());
-            let right_rect = res
-                .estimation()
-                .right_eye()
-                .move_by(res.view_rect().x(), res.view_rect().y());
-            let left_eye = image.view(left_rect);
-            let right_eye = image.view(right_rect);
+            let face_image = image.view(res.view_rect());
+
+            let left_rect = res.estimation().left_eye();
+            let right_rect = res.estimation().right_eye();
+            let left_eye = face_image.view(left_rect);
+            let right_eye = face_image.view(right_rect);
 
             canvas.clear(Color::BLACK);
 

@@ -105,6 +105,12 @@ pub struct LandmarkResult {
 }
 
 impl LandmarkResult {
+    pub fn map_positions(&mut self, mut f: impl FnMut([f32; 3]) -> [f32; 3]) {
+        for pos in self.landmarks.positions_mut() {
+            *pos = f(*pos);
+        }
+    }
+
     pub fn move_by(&mut self, x: f32, y: f32, z: f32) {
         for pos in self.landmarks.positions_mut() {
             pos[0] += x;

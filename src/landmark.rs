@@ -4,7 +4,7 @@ use std::iter;
 
 use crate::{
     filter::Filter,
-    image::{AsImageView, Rect},
+    image::{AsImageView, RotatedRect},
     iter::zip_exact,
     resolution::AspectRatio,
 };
@@ -30,7 +30,7 @@ impl Landmarks {
         self.positions.len()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = Landmark> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = Landmark> + Clone + '_ {
         self.positions.iter().map(|&pos| Landmark { pos })
     }
 
@@ -181,7 +181,7 @@ pub trait Estimator {
 /// This requires a landmark estimator that outputs a confidence value via the, indicating whether the
 /// tracked object is still in view.
 pub struct LandmarkTracker {
-    roi: Option<Rect>,
+    roi: Option<RotatedRect>,
     loss_thresh: f32,
     roi_padding: f32,
     input_ratio: AspectRatio,
@@ -228,13 +228,18 @@ impl LandmarkTracker {
         self.roi_padding = padding;
     }
 
-    pub fn roi(&self) -> Option<&Rect> {
+    /// Returns the current region of interest.
+    pub fn roi(&self) -> Option<&RotatedRect> {
         self.roi.as_ref()
     }
 
     /// Sets the region of interest.
-    pub fn set_roi(&mut self, roi: Rect) {
-        self.roi = Some(roi);
+    ///
+    /// This can be passed either a [`Rect`][crate::image::Rect] or a [`RotatedRect`].
+    ///
+    /// Note that this does not apply RoI padding. The rectangle is used as-is
+    pub fn set_roi(&mut self, roi: impl Into<RotatedRect>) {
+        self.roi = Some(roi.into());
     }
 
     /// Performs landmark tracking on `full_image`.
@@ -258,7 +263,7 @@ impl LandmarkTracker {
         full_image: &V,
     ) -> Option<TrackingResult<'e, L>> {
         let roi = self.roi?;
-        let view_rect = roi.grow_to_fit_aspect(self.input_ratio);
+        let view_rect = roi.map(|rect| rect.grow_to_fit_aspect(self.input_ratio));
         let full_image = full_image.as_view();
         let view = full_image.view(view_rect);
         let estimation = estimator.estimate(&view);
@@ -273,16 +278,17 @@ impl LandmarkTracker {
             return None;
         }
 
-        let updated_roi = Rect::bounding(
-            estimation
-                .landmarks()
-                .iter()
-                .map(|lm| (lm.x() as _, lm.y() as _)),
+        let angle = roi.rotation_radians() + estimation.angle_radians().unwrap_or(0.0);
+        let updated_roi = RotatedRect::bounding(
+            angle,
+            estimation.landmarks().iter().map(|lm| {
+                let [x, y] = view_rect.transform_out_f32(lm.x(), lm.y());
+                (x.round() as i32, y.round() as i32)
+            }),
         )
-        .unwrap()
-        .grow_rel(self.roi_padding)
-        .move_by(view_rect.x(), view_rect.y());
-        self.roi = Some(updated_roi);
+        .unwrap();
+
+        self.roi = Some(updated_roi.map(|rect| rect.grow_rel(self.roi_padding)));
 
         Some(TrackingResult {
             view_rect,
@@ -294,9 +300,9 @@ impl LandmarkTracker {
 
 /// The result returned by [`LandmarkTracker::track`].
 pub struct TrackingResult<'a, L: Estimator> {
-    view_rect: Rect,
+    view_rect: RotatedRect,
     estimation: &'a L::Estimation,
-    updated_roi: Rect,
+    updated_roi: RotatedRect,
 }
 
 impl<'a, L: Estimator> TrackingResult<'a, L> {
@@ -304,16 +310,17 @@ impl<'a, L: Estimator> TrackingResult<'a, L> {
     /// used to compute the landmarks.
     ///
     /// Landmark positions are relative to this rectangle.
-    pub fn view_rect(&self) -> Rect {
+    pub fn view_rect(&self) -> RotatedRect {
         self.view_rect
     }
 
+    // FIXME: coordinates should be relative to the full image passed to the tracker
     pub fn estimation(&self) -> &'a L::Estimation {
         self.estimation
     }
 
     /// Returns the RoI that will be used in the next call to [`LandmarkTracker::track`].
-    pub fn updated_roi(&self) -> Rect {
+    pub fn updated_roi(&self) -> RotatedRect {
         self.updated_roi
     }
 }

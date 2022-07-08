@@ -118,7 +118,7 @@ fn main() -> Result<(), Error> {
                             break;
                         }
 
-                        image::draw_rect(&mut image, res.view_rect());
+                        image::draw_rotated_rect(&mut image, res.view_rect());
 
                         let mut face_image = image.view_mut(res.view_rect());
                         let (left, right) = extract_eye_images(
