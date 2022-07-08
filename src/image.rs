@@ -7,29 +7,6 @@
 //! - The [`AsImageView`] and [`AsImageViewMut`] traits to abstract over images and views.
 //! - A variety of freestanding `draw_*` functions to quickly visualize objects.
 //! - [`Rect`] and [`RotatedRect`], integer-valued rectangles representing parts of an image.
-//!
-//! # TODO
-//!
-//! ## Rotated Views
-//!
-//! Many neural nets require the object they act on to be oriented a certain way. We can implement
-//! this by replacing the [`Rect`] taken by `view` and `view_mut` with a [`RotatedRect`].
-//!
-//! Problem: this doesn't easily work with the out-of-bounds-reads-as-zero semantics image views
-//! have, since creating nested views can create arbitrarily complex bounding polygons that need to
-//! be checked, which can only be implemented by allocating, which I'd like to avoid. At the same
-//! time, allowing out-of-bounds reads has proven immensely useful, so I'd like to keep that.
-//!
-//! Solution 1: use a separate view type that allows rotation, but does not allow the creation of
-//! subviews. Drawbacks: requires 4 dedicated view types, and interacts badly with the
-//! view traits.
-//!
-//! Solution 2: forgo the out-of-bounds-reads-as-zero semantics, but only for subviews. Accessing an
-//! out-of-bounds pixel will work fine and yield the backing data of the underlying [`Image`] at the
-//! right position. Only accessing data that is fully out of bounds of the underlying [`Image`] will
-//! have the current read-as-zero-writes-ignored semantics. This also means that creating a larger
-//! view from a smaller view is possible (gives up monotonic property, rules out `split_at_mut`-like
-//! API for images).
 
 mod blend;
 mod draw;
@@ -222,7 +199,7 @@ impl Image {
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
     /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
     /// `rect`.
-    pub fn view(&self, rect: Rect) -> ImageView<'_> {
+    pub fn view(&self, rect: impl Into<RotatedRect>) -> ImageView<'_> {
         ImageView {
             image: self,
             data: ViewData::full(self).view(rect),
@@ -234,7 +211,7 @@ impl Image {
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
     /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
     /// `rect`.
-    pub fn view_mut(&mut self, rect: Rect) -> ImageViewMut<'_> {
+    pub fn view_mut(&mut self, rect: impl Into<RotatedRect>) -> ImageViewMut<'_> {
         ImageViewMut {
             data: ViewData::full(self).view(rect),
             image: self,
@@ -292,17 +269,29 @@ impl fmt::Debug for Image {
 #[derive(Debug, Clone, Copy)]
 struct ViewData {
     /// Rectangle in the root image's coordinates.
-    rect: Rect,
+    rect: RotatedRect,
 }
 
 impl ViewData {
     fn full(image: &Image) -> Self {
-        Self { rect: image.rect() }
+        Self {
+            rect: image.rect().into(),
+        }
     }
 
-    fn view(&self, rect: Rect) -> Self {
+    fn view(&self, rect: impl Into<RotatedRect>) -> Self {
+        let rect: RotatedRect = rect.into();
+        let radians = self.rect.rotation_radians() + rect.rotation_radians();
+
+        let (cx, cy) = rect.rect().center();
+        let [cx, cy] = self.rect.transform_out_f32(cx - 0.5, cy - 0.5);
+        let [x, y] = [
+            (cx + 0.5 - rect.rect().width() as f32 / 2.0).round() as i32,
+            (cy + 0.5 - rect.rect().height() as f32 / 2.0).round() as i32,
+        ];
+
         Self {
-            rect: rect.move_by(self.rect.x(), self.rect.y()),
+            rect: RotatedRect::new(rect.rect().move_to(x, y), radians),
         }
     }
 
@@ -311,16 +300,20 @@ impl ViewData {
     }
 
     fn width(&self) -> u32 {
-        self.rect.width()
+        self.rect.rect().width()
     }
 
     fn height(&self) -> u32 {
-        self.rect.height()
+        self.rect.rect().height()
     }
 
     fn image_coord(&self, x: u32, y: u32, image: &Image) -> Option<(u32, u32)> {
-        let x: u32 = (i64::from(x) + i64::from(self.rect.x())).try_into().ok()?;
-        let y: u32 = (i64::from(y) + i64::from(self.rect.y())).try_into().ok()?;
+        let [x, y] = self
+            .rect
+            .transform_out(x.try_into().ok()?, y.try_into().ok()?);
+
+        let x: u32 = x.try_into().ok()?;
+        let y: u32 = y.try_into().ok()?;
         if x >= image.width() || y >= image.height() {
             return None;
         }
@@ -404,7 +397,7 @@ impl<'a> ImageView<'a> {
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
     /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
     /// `rect`.
-    pub fn view(&self, rect: Rect) -> ImageView<'_> {
+    pub fn view(&self, rect: impl Into<RotatedRect>) -> ImageView<'_> {
         ImageView {
             image: self.image,
             data: self.data.view(rect),
@@ -597,7 +590,7 @@ impl<'a> ImageViewMut<'a> {
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
     /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
     /// `rect`.
-    pub fn view(&self, rect: Rect) -> ImageView<'_> {
+    pub fn view(&self, rect: impl Into<RotatedRect>) -> ImageView<'_> {
         ImageView {
             image: self.image,
             data: self.data.view(rect),
@@ -609,7 +602,7 @@ impl<'a> ImageViewMut<'a> {
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
     /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
     /// `rect`.
-    pub fn view_mut(&mut self, rect: Rect) -> ImageViewMut<'_> {
+    pub fn view_mut(&mut self, rect: impl Into<RotatedRect>) -> ImageViewMut<'_> {
         ImageViewMut {
             image: self.image,
             data: self.data.view(rect),

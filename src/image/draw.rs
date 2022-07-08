@@ -81,8 +81,8 @@ impl<'a> Drop for DrawRotatedRect<'a> {
     fn drop(&mut self) {
         let corners = self.rect.rotated_corners();
         for (start, end) in corners.into_iter().circular_tuple_windows().take(4) {
-            let (sx, sy) = ((start.0 + 0.5) as i32, (start.1 + 0.5) as i32);
-            let (ex, ey) = ((end.0 + 0.5) as i32, (end.1 + 0.5) as i32);
+            let (sx, sy) = (start.0.round() as i32, start.1.round() as i32);
+            let (ex, ey) = (end.0.round() as i32, end.1.round() as i32);
 
             match Line::new(Point::new(sx, sy), Point::new(ex, ey))
                 .into_styled(PrimitiveStyle::with_stroke(self.color, self.stroke_width))
