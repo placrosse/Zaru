@@ -10,16 +10,17 @@
 // eye and mouth landmarks. However, it uses custom ops, and so can't be converted to a
 // non-TensorFlow format.
 
+use itertools::Itertools;
 use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
 use crate::{
     filter::ema::Ema,
-    image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect},
+    image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, RotatedRect},
     iter::zip_exact,
     landmark::{self, LandmarkFilter, Landmarks},
     nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
-    num::sigmoid,
+    num::{sigmoid, TotalF32},
     resolution::Resolution,
     timer::Timer,
 };
@@ -200,9 +201,10 @@ impl LandmarkResult {
         Rotation2::rotation_between(&Vector2::x(), &left_to_right_eye).angle()
     }
 
-    /// Returns a [`Rect`] containing the left eye.
-    pub fn left_eye(&self) -> Rect {
-        Rect::bounding(
+    /// Returns a [`RotatedRect`] containing the left eye.
+    pub fn left_eye(&self) -> RotatedRect {
+        RotatedRect::bounding(
+            self.rotation_radians(),
             [
                 LandmarkIdx::LeftEyeBottom,
                 LandmarkIdx::LeftEyeLeftCorner,
@@ -218,9 +220,10 @@ impl LandmarkResult {
         .unwrap()
     }
 
-    /// Returns a [`Rect`] containing the right eye.
-    pub fn right_eye(&self) -> Rect {
-        Rect::bounding(
+    /// Returns a [`RotatedRect`] containing the right eye.
+    pub fn right_eye(&self) -> RotatedRect {
+        RotatedRect::bounding(
+            self.rotation_radians(),
             [
                 LandmarkIdx::RightEyeBottom,
                 LandmarkIdx::RightEyeLeftCorner,
@@ -256,14 +259,24 @@ impl LandmarkResult {
             0.5..=0.75 => Color::YELLOW,
             _ => Color::RED,
         };
-        let x = (image.width() / 2) as _;
+        let (x_min, x_max) = self
+            .landmark_positions()
+            .map(|(x, _, _)| TotalF32(x))
+            .minmax().into_option().unwrap();
+        let x = (x_min.0 + x_max.0) / 2.0;
+        let y = self
+            .landmark_positions()
+            .map(|(_, y, _)| TotalF32(y))
+            .min()
+            .unwrap()
+            .0;
         image::draw_text(
             image,
-            x,
-            0,
+            x as i32,
+            y as i32 - 3,
             &format!("lm_conf={:.01}", self.face_confidence()),
         )
-        .align_top()
+        .align_bottom()
         .color(color);
 
         let left_eye = self.landmark_position(LandmarkIdx::LeftEyeLeftCorner as _);

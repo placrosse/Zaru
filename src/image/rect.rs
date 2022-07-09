@@ -478,6 +478,25 @@ impl RotatedRect {
         self.rect.center()
     }
 
+    /// Grows this rectangle by adding a margin relative to width and height.
+    ///
+    /// `amount` is the relative amount of the rectangles width and height to add to each side.
+    #[must_use]
+    pub fn grow_rel(&self, amount: f32) -> Self {
+        self.map(|rect| rect.grow_rel(amount))
+    }
+
+    /// Symmetrically extends one dimension of `self` so that the resulting rectangle has the given
+    /// aspect ratio.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if `self` has a width or height of 0.
+    #[must_use]
+    pub fn grow_to_fit_aspect(&self, target_aspect: AspectRatio) -> Self {
+        self.map(|rect| rect.grow_to_fit_aspect(target_aspect))
+    }
+
     /// Returns the rotated rectangle's corners.
     ///
     /// The order is: top-left, top-right, bottom-right, bottom-left, as seen from the non-rotated
