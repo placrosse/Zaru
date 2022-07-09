@@ -48,24 +48,21 @@ fn main() -> Result<(), zaru::Error> {
         }
 
         if let Some(res) = tracker.track(&mut landmarker, &image) {
-            let face_image = image.view(res.view_rect());
-
             let left_rect = res.estimation().left_eye();
             let right_rect = res.estimation().right_eye();
-            let left_eye = face_image.view(left_rect);
-            let right_eye = face_image.view(right_rect);
+            let left_eye = image.view(left_rect);
+            let right_eye = image.view(right_rect);
 
             canvas.clear(Color::BLACK);
 
             blit_timer.time(|| {
                 for (x, y, right) in &positions {
                     let src_view = if *right { &right_eye } else { &left_eye };
-                    let src_rect = if *right { &right_rect } else { &left_rect };
                     let mut dest_view = canvas.view_mut(Rect::from_center(
                         *x,
                         *y,
-                        src_rect.width(),
-                        src_rect.height(),
+                        src_view.width(),
+                        src_view.height(),
                     ));
                     dest_view.blend_from(src_view);
                 }
