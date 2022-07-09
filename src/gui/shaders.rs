@@ -146,11 +146,11 @@ impl Shader {
             &mut frag_spv,
         )?;
 
-        let vert = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        let vert = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some(vert_name),
             source: wgpu::ShaderSource::SpirV(Cow::Borrowed(&vert_spv)),
         });
-        let frag = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        let frag = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some(frag_name),
             source: wgpu::ShaderSource::SpirV(Cow::Borrowed(&frag_spv)),
         });

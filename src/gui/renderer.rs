@@ -263,11 +263,11 @@ impl RenderPipelines {
             fragment: Some(wgpu::FragmentState {
                 module: &shaders.textured_quad.frag,
                 entry_point: "main",
-                targets: &[wgpu::ColorTargetState {
+                targets: &[Some(wgpu::ColorTargetState {
                     format: surface_format,
                     write_mask: ColorWrites::ALL,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                }],
+                })],
             }),
             primitive: wgpu::PrimitiveState {
                 topology: PrimitiveTopology::TriangleStrip,
@@ -339,8 +339,9 @@ impl Renderer {
     }
 
     fn with_surface(window: Window, gpu: Rc<Gpu>, shaders: Shaders, surface: Surface) -> Self {
-        let surface_format = surface
-            .get_preferred_format(&gpu.adapter)
+        let surface_format = *surface
+            .get_supported_formats(&gpu.adapter)
+            .get(0)
             .expect("adapter cannot render to window surface");
 
         let shared_bind_group_layout =
@@ -439,7 +440,7 @@ impl Renderer {
             };
             let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: None,
-                color_attachments: &[color_attachment],
+                color_attachments: &[Some(color_attachment)],
                 depth_stencil_attachment: None,
             });
 
@@ -475,9 +476,10 @@ impl Renderer {
     }
 
     fn recreate_swapchain(&mut self) {
-        let surface_format = self
+        let surface_format = *self
             .surface()
-            .get_preferred_format(&self.gpu.adapter)
+            .get_supported_formats(&self.gpu.adapter)
+            .get(0)
             .expect("adapter cannot render to window surface");
         let res = self.window.win.inner_size();
         log::debug!(
