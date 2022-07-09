@@ -214,7 +214,9 @@ impl Detection {
         for (i, lm) in self.raw.keypoints().iter().enumerate() {
             let (x, y) = point_to_img(lm.x(), lm.y(), &self.full_res);
             image::draw_marker(image, x, y).color(Color::GREEN);
-            image::draw_text(image, x, y - 5, &i.to_string()).color(Color::GREEN);
+            image::draw_text(image, x, y - 3, &i.to_string())
+                .align_bottom()
+                .color(Color::GREEN);
         }
     }
 }

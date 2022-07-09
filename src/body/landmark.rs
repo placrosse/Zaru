@@ -137,8 +137,15 @@ impl LandmarkResult {
     }
 
     fn draw_impl(&self, target: &mut ImageViewMut<'_>) {
+        for (a, b) in COARSE_CONNECTIVITY {
+            let a = &self.landmarks[*a as usize];
+            let b = &self.landmarks[*b as usize];
+            image::draw_line(target, a.x() as _, a.y() as _, b.x() as _, b.y() as _)
+                .stroke_width(3);
+        }
+
         for lm in self.pose_landmarks() {
-            image::draw_marker(target, lm.x() as _, lm.y() as _);
+            image::draw_marker(target, lm.x() as _, lm.y() as _).size(9);
         }
         for lm in self.aux_landmarks() {
             image::draw_marker(target, lm.x() as _, lm.y() as _).color(Color::YELLOW);
@@ -182,6 +189,25 @@ pub enum LandmarkIdx {
     LeftFootIndex = 31,
     RightFootIndex = 32,
 }
+
+const COARSE_CONNECTIVITY: &[(LandmarkIdx, LandmarkIdx)] = {
+    use LandmarkIdx::*;
+    &[
+        (LeftShoulder, RightShoulder),
+        (LeftShoulder, LeftElbow),
+        (LeftElbow, LeftWrist),
+        (RightShoulder, RightElbow),
+        (RightElbow, RightWrist),
+        (LeftShoulder, LeftHip),
+        (LeftHip, LeftAnkle),
+        (LeftAnkle, LeftHeel),
+        (LeftAnkle, LeftFootIndex),
+        (RightShoulder, RightHip),
+        (RightHip, RightAnkle),
+        (RightAnkle, RightHeel),
+        (RightAnkle, RightFootIndex),
+    ]
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Landmark {
