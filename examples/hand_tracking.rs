@@ -8,7 +8,7 @@ use zaru::{
     webcam::Webcam,
 };
 
-const USE_FULL_DETECTION_NETWORK: bool = false;
+const USE_FULL_DETECTION_NETWORK: bool = true;
 const USE_FULL_LANDMARK_NETWORK: bool = true;
 
 fn main() -> Result<(), zaru::Error> {

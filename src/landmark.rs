@@ -140,7 +140,7 @@ pub trait Estimation {
     ///
     /// The landmark coordinates must be the the coordinate system of the image passed to
     /// [`Estimator::estimate`].
-    fn landmarks(&self) -> &Landmarks;
+    fn landmarks_mut(&mut self) -> &mut Landmarks;
 
     /// Returns the estimated clockwise object rotation in radians.
     ///
@@ -169,7 +169,7 @@ pub trait Estimator {
     /// This trait requires that the estimation result is allocated within `self` and returned by
     /// reference to avoid unnecessary copies. Once Rust has GATs, the design should be changed to
     /// be more flexible with this.
-    fn estimate<V: AsImageView>(&mut self, image: &V) -> &Self::Estimation;
+    fn estimate<V: AsImageView>(&mut self, image: &V) -> &mut Self::Estimation;
 }
 
 /// Tracks a region of interest (RoI) across subsequent frames by tracking the movement of estimated
@@ -279,12 +279,18 @@ impl LandmarkTracker {
         }
 
         let angle = roi.rotation_radians() + estimation.angle_radians().unwrap_or(0.0);
+
+        // Map all landmarks to the image coordinate system.
+        for [x, y, _] in estimation.landmarks_mut().positions_mut() {
+            [*x, *y] = view_rect.transform_out_f32(*x, *y);
+        }
+
         let updated_roi = RotatedRect::bounding(
             angle,
-            estimation.landmarks().iter().map(|lm| {
-                let [x, y] = view_rect.transform_out_f32(lm.x(), lm.y());
-                (x.round() as i32, y.round() as i32)
-            }),
+            estimation
+                .landmarks_mut()
+                .iter()
+                .map(|lm| (lm.x().round() as i32, lm.y().round() as i32)),
         )
         .unwrap();
 
@@ -308,13 +314,13 @@ pub struct TrackingResult<'a, L: Estimator> {
 impl<'a, L: Estimator> TrackingResult<'a, L> {
     /// Returns the rectangle inside the full image passed to [`LandmarkTracker::track`] that was
     /// used to compute the landmarks.
-    ///
-    /// Landmark positions are relative to this rectangle.
     pub fn view_rect(&self) -> RotatedRect {
         self.view_rect
     }
 
-    // FIXME: coordinates should be relative to the full image passed to the tracker
+    /// Returns the estimation result, including landmarks.
+    ///
+    /// Landmark coordinates are in terms of the full image passed to [`LandmarkTracker::track`].
     pub fn estimation(&self) -> &'a L::Estimation {
         self.estimation
     }

@@ -16,7 +16,7 @@ use std::{
 
 use crossbeam::channel::{RecvError, SendError};
 
-use crate::drop::DropBomb;
+use crate::drop::{defer, DropBomb};
 
 /// Creates a channel suitable for sending data between pipeline stages.
 ///
@@ -211,6 +211,7 @@ impl<T> PromiseHandle<T> {
     /// without blocking.
     pub fn is_fulfilled(&self) -> bool {
         // FIXME: this returns `false` when the promise is dropped, should really return `true` instead!
+        // (rename to `will_block`?)
         !self.recv.is_empty()
     }
 }
@@ -247,10 +248,12 @@ impl<I: Send + 'static> Worker<I> {
         N: Into<String>,
         F: FnOnce(Receiver<I>) + Send + 'static,
     {
+        let name = name.into();
         let (sender, recv) = channel();
-        let handle = thread::Builder::new()
-            .name(name.into())
-            .spawn(|| handler(recv.activate()))?;
+        let handle = thread::Builder::new().name(name.clone()).spawn(move || {
+            let _guard = defer(|| log::trace!("worker '{name}' exiting"));
+            handler(recv.activate())
+        })?;
 
         Ok(Self {
             sender: Some(sender.activate()),

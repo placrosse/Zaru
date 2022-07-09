@@ -41,11 +41,11 @@ impl Landmarker {
     }
 
     /// Computes hand landmarks in `image`.
-    pub fn compute<V: AsImageView>(&mut self, image: &V) -> &LandmarkResult {
+    pub fn compute<V: AsImageView>(&mut self, image: &V) -> &mut LandmarkResult {
         self.compute_impl(image.as_view())
     }
 
-    fn compute_impl(&mut self, image: ImageView<'_>) -> &LandmarkResult {
+    fn compute_impl(&mut self, image: ImageView<'_>) -> &mut LandmarkResult {
         let input_res = self.input_resolution();
         let full_res = image.resolution();
         let aspect_ratio = full_res.aspect_ratio().unwrap();
@@ -88,7 +88,7 @@ impl Landmarker {
             out[2] = z;
         }
 
-        &self.result_buffer
+        &mut self.result_buffer
     }
 
     pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
@@ -243,8 +243,8 @@ impl Estimation for LandmarkResult {
         self.presence()
     }
 
-    fn landmarks(&self) -> &crate::landmark::Landmarks {
-        &self.landmarks
+    fn landmarks_mut(&mut self) -> &mut Landmarks {
+        &mut self.landmarks
     }
 
     fn angle_radians(&self) -> Option<f32> {
@@ -255,7 +255,7 @@ impl Estimation for LandmarkResult {
 impl Estimator for Landmarker {
     type Estimation = LandmarkResult;
 
-    fn estimate<V: AsImageView>(&mut self, image: &V) -> &Self::Estimation {
+    fn estimate<V: AsImageView>(&mut self, image: &V) -> &mut Self::Estimation {
         self.compute(image)
     }
 }

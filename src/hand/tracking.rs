@@ -178,11 +178,7 @@ impl HandTracker {
                             Some(res) => {
                                 *roi_arc2.lock().unwrap() = res.updated_roi();
 
-                                let mut lm = res.estimation().clone();
-                                lm.map_positions(|[x, y, z]| {
-                                    let [x, y] = res.view_rect().transform_out_f32(x, y);
-                                    [x, y, z]
-                                });
+                                let lm = res.estimation().clone();
                                 promise.fulfill(Some(lm));
                             }
                             None => {

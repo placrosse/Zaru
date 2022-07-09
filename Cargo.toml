@@ -41,7 +41,9 @@ fastrand = "1.7.0"
 
 [profile.dev]
 debug = 0
+panic = "abort"
 
 [profile.release]
 incremental = true
 opt-level = 2
+panic = "abort"

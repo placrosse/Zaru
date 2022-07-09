@@ -61,7 +61,6 @@ impl Landmarker {
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             result_buffer: LandmarkResult {
-                full_res: Resolution::new(1, 1),
                 landmarks: Landmarks::new(Self::NUM_LANDMARKS),
                 face_flag: 0.0,
             },
@@ -88,11 +87,11 @@ impl Landmarker {
     ///
     /// [`Detector`]: super::detection::Detector
     /// [`Detection::bounding_rect_loose`]: super::detection::Detection::bounding_rect_loose
-    pub fn compute<V: AsImageView>(&mut self, image: &V) -> &LandmarkResult {
+    pub fn compute<V: AsImageView>(&mut self, image: &V) -> &mut LandmarkResult {
         self.compute_impl(image.as_view())
     }
 
-    fn compute_impl(&mut self, image: ImageView<'_>) -> &LandmarkResult {
+    fn compute_impl(&mut self, image: ImageView<'_>) -> &mut LandmarkResult {
         let input_res = self.model.input_resolution();
         let full_res = image.resolution();
         let orig_aspect = full_res.aspect_ratio().unwrap();
@@ -106,7 +105,6 @@ impl Landmarker {
         let result = self.t_infer.time(|| self.model.estimate(&image)).unwrap();
         log::trace!("inference result: {:?}", result);
 
-        self.result_buffer.full_res = full_res;
         self.result_buffer.face_flag = sigmoid(result[1].index([0, 0, 0, 0]).as_singular());
         for (coords, out) in zip_exact(
             result[0].index([0, 0, 0]).as_slice().chunks(3),
@@ -134,7 +132,7 @@ impl Landmarker {
             pos[1] = y;
         }
 
-        &self.result_buffer
+        &mut self.result_buffer
     }
 
     /// Returns profiling timers for image resizing and neural inference.
@@ -146,7 +144,7 @@ impl Landmarker {
 impl landmark::Estimator for Landmarker {
     type Estimation = LandmarkResult;
 
-    fn estimate<V: AsImageView>(&mut self, image: &V) -> &Self::Estimation {
+    fn estimate<V: AsImageView>(&mut self, image: &V) -> &mut Self::Estimation {
         self.compute(image)
     }
 }
@@ -154,7 +152,6 @@ impl landmark::Estimator for Landmarker {
 /// Landmark results returned by [`Landmarker::compute`].
 #[derive(Clone)]
 pub struct LandmarkResult {
-    full_res: Resolution,
     landmarks: Landmarks,
     face_flag: f32,
 }
@@ -250,12 +247,6 @@ impl LandmarkResult {
     }
 
     fn draw_impl(&self, image: &mut ImageViewMut<'_>) {
-        assert_eq!(
-            image.resolution(),
-            self.full_res,
-            "attempted to draw face landmarks onto canvas with mismatched size",
-        );
-
         for (x, y, _z) in self.landmark_positions() {
             image::draw_marker(image, x as _, y as _).size(3);
         }
@@ -301,8 +292,8 @@ impl landmark::Estimation for LandmarkResult {
         self.face_confidence()
     }
 
-    fn landmarks(&self) -> &Landmarks {
-        self.raw_landmarks()
+    fn landmarks_mut(&mut self) -> &mut Landmarks {
+        &mut self.landmarks
     }
 
     fn angle_radians(&self) -> Option<f32> {

@@ -120,9 +120,8 @@ fn main() -> Result<(), Error> {
 
                         image::draw_rotated_rect(&mut image, res.view_rect());
 
-                        let mut face_image = image.view_mut(res.view_rect());
                         let (left, right) = extract_eye_images(
-                            face_image.as_view(),
+                            image.as_view(),
                             res.estimation(),
                             eye_landmark_input_aspect,
                         );
@@ -147,14 +146,13 @@ fn main() -> Result<(), Error> {
                             )
                         });
 
-                        res.estimation().draw(&mut face_image);
+                        res.estimation().draw(&mut image);
 
-                        let cx = (face_image.width() / 2) as i32;
-                        let cy = (face_image.height() / 2) as i32;
+                        let (cx, cy) = res.view_rect().center();
                         image::draw_quaternion(
-                            &mut face_image,
-                            cx,
-                            cy,
+                            &mut image,
+                            cx as i32,
+                            cy as i32,
                             procrustes_result.rotation_as_quaternion(),
                         );
 

@@ -474,6 +474,10 @@ impl RotatedRect {
         self
     }
 
+    pub fn center(&self) -> (f32, f32) {
+        self.rect.center()
+    }
+
     /// Returns the rotated rectangle's corners.
     ///
     /// The order is: top-left, top-right, bottom-right, bottom-left, as seen from the non-rotated
