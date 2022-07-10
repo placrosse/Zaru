@@ -144,7 +144,7 @@ pub trait Estimation {
 
     /// Returns the estimated clockwise object rotation in radians.
     ///
-    /// This can be used by a [`LandmarkTracker`] to automatically rotate the object before passing
+    /// This will be used by [`LandmarkTracker`] to automatically rotate the object before passing
     /// it to the [`Estimator`]. This helps some estimators that expect the object to be in a
     /// certain orientation.
     ///
