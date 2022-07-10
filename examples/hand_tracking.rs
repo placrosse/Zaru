@@ -3,13 +3,17 @@ use std::sync::Arc;
 use zaru::{
     gui,
     hand::{detection, landmark, tracking::HandTracker},
-    image,
+    image::{self, Image},
     timer::FpsCounter,
     webcam::Webcam,
 };
 
 const USE_FULL_DETECTION_NETWORK: bool = true;
 const USE_FULL_LANDMARK_NETWORK: bool = true;
+
+/// If `true`, the hand tracking data is drawn on an empty image instead of the camera input. This
+/// can make things easier to see.
+const DRAW_ON_BLANK_IMAGE: bool = false;
 
 fn main() -> Result<(), zaru::Error> {
     zaru::init_logger!();
@@ -30,7 +34,12 @@ fn main() -> Result<(), zaru::Error> {
         let image = Arc::new(webcam.read()?);
         tracker.track(image.clone());
 
-        let target = Arc::make_mut(&mut prev);
+        let mut blank_image = Image::new(image.width(), image.height());
+        let target = if DRAW_ON_BLANK_IMAGE {
+            &mut blank_image
+        } else {
+            Arc::make_mut(&mut prev)
+        };
         for hand in tracker.hands() {
             let view = hand.view_rect();
             let rect = view.rect();
