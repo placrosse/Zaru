@@ -212,6 +212,9 @@ impl<'a> Loader<'a> {
     ///
     /// If this method is called and the GPU backend does not support the network, [`Loader::load`]
     /// will return an error.
+    ///
+    /// Note that the GPU backend [`wonnx`] is still in early stages and does not support most of the
+    /// networks used in this project.
     pub fn with_gpu_support(mut self) -> Self {
         self.enable_gpu = true;
         self

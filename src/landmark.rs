@@ -178,8 +178,10 @@ pub trait Estimator {
 /// Once seeded with a region of interest, the tracker will adjust its RoI based on the bounding
 /// rectangle of the estimated landmarks.
 ///
-/// This requires a landmark estimator that outputs a confidence value via the, indicating whether the
-/// tracked object is still in view.
+/// This requires a landmark estimator that outputs a confidence value via the [`Estimator`] trait,
+/// indicating whether the tracked object is still in view.
+///
+/// If the [`Estimator`] supports it, the tracking will also track the object's rotation.
 pub struct LandmarkTracker {
     roi: Option<RotatedRect>,
     loss_thresh: f32,

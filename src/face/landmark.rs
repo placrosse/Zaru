@@ -70,6 +70,9 @@ impl Landmarker {
     }
 
     /// Returns the expected input resolution of the internal neural network.
+    ///
+    /// If an image is passed that has a different resolution, it will first be resized (while
+    /// adding black bars to retain the original aspect ratio).
     pub fn input_resolution(&self) -> Resolution {
         self.model.input_resolution()
     }
@@ -117,6 +120,7 @@ impl Landmarker {
             out[2] = z;
         }
 
+        // Importantly, the filter uses the network's coordinates.
         self.filter.filter(&mut self.result_buffer.landmarks);
 
         // Map landmark coordinates back into the input image.
@@ -262,7 +266,9 @@ impl LandmarkResult {
         let (x_min, x_max) = self
             .landmark_positions()
             .map(|(x, _, _)| TotalF32(x))
-            .minmax().into_option().unwrap();
+            .minmax()
+            .into_option()
+            .unwrap();
         let x = (x_min.0 + x_max.0) / 2.0;
         let y = self
             .landmark_positions()
