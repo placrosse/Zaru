@@ -29,7 +29,6 @@ pub use rect::*;
 #[allow(dead_code)]
 enum JpegBackend {
     JpegDecoder,
-    Mozjpeg,
     ZuneJpeg,
 }
 
@@ -92,14 +91,6 @@ impl Image {
         let buf = match JPEG_BACKEND {
             JpegBackend::JpegDecoder => {
                 image::load_from_memory_with_format(data, image::ImageFormat::Jpeg)?.to_rgba8()
-            }
-            JpegBackend::Mozjpeg => {
-                let decompressor = mozjpeg::Decompress::new_mem(data)?;
-                let mut decomp = decompressor.rgba()?;
-                let buf = decomp.read_scanlines_flat().unwrap();
-                let buf = ImageBuffer::from_raw(decomp.width() as u32, decomp.height() as u32, buf)
-                    .expect("failed to create ImageBuffer");
-                buf
             }
             JpegBackend::ZuneJpeg => {
                 let mut decomp = zune_jpeg::Decoder::new();
