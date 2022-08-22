@@ -21,13 +21,9 @@ Note that files may have been converted from other formats.
 | `onnx/pose_detection.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/pose_landmark_full.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/pose_landmark_lite.onnx` | [MediaPipe] | Apache-2.0
-| `image/plead-base.png` | [Twemoji] | CC BY 4.0
-| `image/plead-eye.png` | [Twemoji] | CC BY 4.0
-| `image/plead-mask.png` | [Twemoji] | CC BY 4.0
 
 [MediaPipe]: https://github.com/google/mediapipe
 [InsightFace_Pytorch]: https://github.com/TreB1eN/InsightFace_Pytorch
-[Twemoji]: https://twemoji.twitter.com/
 
 ## Neural Network conversion
 
