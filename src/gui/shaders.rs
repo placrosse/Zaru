@@ -1,6 +1,6 @@
 //! Shader loading, compilation and hot reloading.
 
-use std::{borrow::Cow, fs};
+use std::borrow::Cow;
 
 use anyhow::Context;
 use itertools::Itertools;
@@ -28,17 +28,13 @@ impl Shaders {
         let loader = &mut Loader::new()?;
 
         macro_rules! shader {
-            ($vert:literal, $frag:literal) => {
-                if cfg!(debug_assertions) {
-                    Shader::load_path(device, loader, $vert, $frag)?
-                } else {
-                    static VERT: &str =
-                        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/shaders/", $vert));
-                    static FRAG: &str =
-                        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/shaders/", $frag));
-                    Shader::load_source(device, loader, $vert, $frag, VERT, FRAG)?
-                }
-            };
+            ($vert:literal, $frag:literal) => {{
+                static VERT: &str =
+                    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/shaders/", $vert));
+                static FRAG: &str =
+                    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/shaders/", $frag));
+                Shader::load_source(device, loader, $vert, $frag, VERT, FRAG)?
+            }};
         }
 
         Ok(Self {
@@ -89,44 +85,11 @@ impl Loader {
 
         self.writer.write(&module, &info, None, dest)?;
 
-        if cfg!(debug_assertions) {
-            // Also dump the compiled SPIR-V to disk to allow inspection and debugging.
-            let spv_dest = format!("shaders/{}.spv", path);
-            let bytes = dest
-                .iter()
-                .flat_map(|word| word.to_ne_bytes())
-                .collect::<Vec<_>>();
-            fs::write(spv_dest, bytes)?;
-        }
-
         Ok(())
     }
 }
 
 impl Shader {
-    fn load_path(
-        device: &Device,
-        loader: &mut Loader,
-        vert_name: &str,
-        frag_name: &str,
-    ) -> anyhow::Result<Self> {
-        log::trace!("loading vertex shader {}", vert_name);
-        let vert_source = fs::read_to_string(format!("shaders/{}", vert_name))
-            .with_context(|| format!("failed to load shader {}", vert_name))?;
-        log::trace!("loading fragment shader {}", frag_name);
-        let frag_source = fs::read_to_string(format!("shaders/{}", frag_name))
-            .with_context(|| format!("failed to load shader {}", frag_name))?;
-
-        Self::load_source(
-            device,
-            loader,
-            vert_name,
-            frag_name,
-            &vert_source,
-            &frag_source,
-        )
-    }
-
     fn load_source(
         device: &Device,
         loader: &mut Loader,
