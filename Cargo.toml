@@ -19,7 +19,7 @@ serde = { version = "1.0.136", features = ["derive"] }
 # neural nets
 tract-onnx = "0.17.0"
 tinyvec = { version = "1.6.0", features = ["alloc"] }
-wonnx = "0.3.0"
+wonnx = { git = "https://github.com/webonnx/wonnx.git", rev = "aa92e550f15078ab936539f4225fbcb3f5b6895f" }
 
 # image processing
 image = { version = "0.24.0", default-features = false, features = ["jpeg", "png", "gif"] }

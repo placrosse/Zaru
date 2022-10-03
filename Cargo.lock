@@ -2804,8 +2804,7 @@ dependencies = [
 [[package]]
 name = "wonnx"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "429db24588a8769f325b26ae2b777b31aaffe6394b93c4c663d4e7b496a4bc1a"
+source = "git+https://github.com/webonnx/wonnx.git?rev=aa92e550f15078ab936539f4225fbcb3f5b6895f#aa92e550f15078ab936539f4225fbcb3f5b6895f"
 dependencies = [
  "bytemuck",
  "futures-intrusive",
