@@ -11,7 +11,7 @@ use std::{
 use crate::{
     image::{Image, RotatedRect},
     landmark::LandmarkTracker,
-    pipeline::{promise, Promise, PromiseHandle, Receiver, Worker},
+    worker::{promise, Promise, PromiseHandle, Worker},
 };
 
 use super::{
@@ -50,11 +50,9 @@ impl HandTracker {
             next_hand_id: HandId(0),
             detector: Worker::spawn(
                 "palm detector",
-                move |recv: Receiver<(Arc<Image>, Promise<Vec<Detection>>)>| {
-                    for (image, promise) in recv {
-                        let detections = palm_detector.detect(&*image);
-                        promise.fulfill(detections.to_vec());
-                    }
+                move |(image, promise): (Arc<Image>, Promise<Vec<Detection>>)| {
+                    let detections = palm_detector.detect(&*image);
+                    promise.fulfill(detections.to_vec());
                 },
             )
             .unwrap(),
@@ -123,10 +121,7 @@ impl HandTracker {
                     hand.lm = Some(lm);
                     true
                 }
-                None => {
-                    promise.fulfill(None); // defuse promise
-                    false
-                }
+                None => false,
             }
         });
 
@@ -172,21 +167,18 @@ impl HandTracker {
             let roi_arc2 = roi_arc.clone();
             let mut worker = Worker::spawn(
                 "hand tracker",
-                move |recv: Receiver<(Arc<Image>, Promise<_>)>| {
-                    for (image, promise) in recv {
-                        match tracker.track(&mut landmarker, &*image) {
-                            Some(res) => {
-                                *roi_arc2.lock().unwrap() = res.updated_roi();
+                move |(image, promise): (Arc<Image>, Promise<_>)| match tracker
+                    .track(&mut landmarker, &*image)
+                {
+                    Some(res) => {
+                        *roi_arc2.lock().unwrap() = res.updated_roi();
 
-                                let lm = res.estimation().clone();
-                                promise.fulfill(Some(lm));
-                            }
-                            None => {
-                                log::trace!("tracking lost, exiting worker thread");
-                                promise.fulfill(None);
-                                break;
-                            }
-                        }
+                        let lm = res.estimation().clone();
+                        promise.fulfill(Some(lm));
+                    }
+                    None => {
+                        log::trace!("tracking lost");
+                        promise.fulfill(None);
                     }
                 },
             )
