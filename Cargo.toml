@@ -17,14 +17,14 @@ crossbeam = "0.8.1"
 serde = { version = "1.0.136", features = ["derive"] }
 
 # neural nets
-tract-onnx = "0.17.0"
+tract-onnx = "0.18.0"
 tinyvec = { version = "1.6.0", features = ["alloc"] }
 wonnx = { git = "https://github.com/webonnx/wonnx.git", rev = "aa92e550f15078ab936539f4225fbcb3f5b6895f" }
 
 # image processing
 image = { version = "0.24.0", default-features = false, features = ["jpeg", "png", "gif"] }
 embedded-graphics = "0.7.1"
-zune-jpeg = "0.1.3"
+zune-jpeg = "0.2.0"
 linuxvideo = "0.1.0"
 
 # linear algebra
@@ -36,6 +36,9 @@ wgpu = { version = "0.13.1", features = ["spirv"] }
 pollster = "0.2.5"
 naga = { version = "0.9.0", features = ["glsl-in"] }
 bytemuck = { version = "1.7.3", features = ["derive"] }
+
+[patch.crates-io]
+zune-jpeg = { path = "../zune-jpeg" }
 
 [dev-dependencies]
 rayon = "1.5.1"

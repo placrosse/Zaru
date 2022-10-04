@@ -48,6 +48,8 @@ impl Gui {
                 Event::UserEvent(msg) => match msg {
                     Msg::Image { key, res, data } => {
                         let renderer = self.windows.entry(key.clone()).or_insert_with(|| {
+                            log::debug!("creating window for image '{key}' at {res}");
+
                             let win = Window::open(&target, &key, res).unwrap();
                             let win_id = win.win.id();
                             let renderer = Renderer::new(win, self.gpu.clone()).unwrap();

@@ -15,7 +15,7 @@ mod rect;
 #[cfg(test)]
 mod tests;
 
-use std::{fmt, ops::Index, path::Path};
+use std::{fmt, num::NonZeroU32, ops::Index, path::Path};
 
 use embedded_graphics::{pixelcolor::raw::RawU32, prelude::PixelColor};
 use image::{GenericImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
@@ -93,9 +93,11 @@ impl Image {
                 image::load_from_memory_with_format(data, image::ImageFormat::Jpeg)?.to_rgba8()
             }
             JpegBackend::ZuneJpeg => {
-                let mut decomp = zune_jpeg::Decoder::new();
-                decomp.set_num_threads(1)?;
-                decomp.rgba();
+                let mut decomp = zune_jpeg::Decoder::new_with_options(
+                    zune_jpeg::ZuneJpegOptions::new()
+                        .set_num_threads(NonZeroU32::new(1).unwrap())
+                        .set_out_colorspace(zune_jpeg::ColorSpace::RGBA),
+                );
                 let buf = decomp.decode_buffer(data)?;
                 let width = u32::from(decomp.width());
                 let height = u32::from(decomp.height());
