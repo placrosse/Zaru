@@ -127,7 +127,7 @@ impl HandTracker {
         });
 
         let mut detections = match &self.detections_handle {
-            Some(handle) if handle.is_fulfilled() => {
+            Some(handle) if !handle.will_block() => {
                 self.detections_handle.take().unwrap().block().unwrap()
             }
             _ => Vec::new(),
