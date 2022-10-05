@@ -77,6 +77,62 @@ pub struct PromiseDropped {
     _priv: (),
 }
 
+/// A builder object that can be used to configure and spawn a [`Worker`].
+#[derive(Clone)]
+pub struct WorkerBuilder {
+    name: Option<String>,
+    capacity: usize,
+}
+
+impl WorkerBuilder {
+    /// Sets the name of the [`Worker`] thread.
+    pub fn name<N: Into<String>>(self, name: N) -> Self {
+        Self {
+            name: Some(name.into()),
+            ..self
+        }
+    }
+
+    /// Sets the channel capacity of the [`Worker`].
+    ///
+    /// By default, a capacity of 0 is used, which means that [`Worker::send`] will block until the
+    /// worker has finished processing any preceding message.
+    ///
+    /// When a pipeline of [`Worker`]s is used, the capacity of later [`Worker`]s may be increased
+    /// to allow the processing of multiple input messages at once.
+    pub fn capacity(self, capacity: usize) -> Self {
+        Self { capacity, ..self }
+    }
+
+    /// Spawns a [`Worker`] thread that uses `handler` to process incoming messages.
+    pub fn spawn<I, F>(self, mut handler: F) -> io::Result<Worker<I>>
+    where
+        I: Send + 'static,
+        F: FnMut(I) + Send + 'static,
+    {
+        let (sender, recv) = crossbeam::channel::bounded(self.capacity);
+        let mut builder = thread::Builder::new();
+        if let Some(name) = self.name.clone() {
+            builder = builder.name(name);
+        }
+        let handle = builder.spawn(move || {
+            let _guard;
+            if let Some(name) = self.name {
+                log::trace!("worker '{name}' starting");
+                _guard = defer(move || log::trace!("worker '{name}' exiting"));
+            }
+            for message in recv {
+                handler(message);
+            }
+        })?;
+
+        Ok(Worker {
+            sender: Some(sender),
+            handle: Some(handle),
+        })
+    }
+}
+
 /// A handle to a worker thread that processes messages of type `I`.
 ///
 /// When dropped, the channel to the thread will be dropped and the thread will be joined. If the
@@ -95,27 +151,18 @@ impl<I: Send + 'static> Drop for Worker<I> {
     }
 }
 
-impl<I: Send + 'static> Worker<I> {
-    pub fn spawn<N, F>(name: N, mut handler: F) -> io::Result<Self>
-    where
-        N: Into<String>,
-        F: FnMut(I) + Send + 'static,
-    {
-        let name = name.into();
-        let (sender, recv) = crossbeam::channel::bounded(0);
-        let handle = thread::Builder::new().name(name.clone()).spawn(move || {
-            let _guard = defer(|| log::trace!("worker '{name}' exiting"));
-            for message in recv {
-                handler(message);
-            }
-        })?;
-
-        Ok(Self {
-            sender: Some(sender),
-            handle: Some(handle),
-        })
+impl Worker<()> {
+    /// Returns a builder that can be used to configure and spawn a [`Worker`].
+    #[inline]
+    pub fn builder() -> WorkerBuilder {
+        WorkerBuilder {
+            name: None,
+            capacity: 0,
+        }
     }
+}
 
+impl<I: Send + 'static> Worker<I> {
     fn wait_for_exit(&mut self) {
         // Wait for it to exit and propagate its panic if it panicked.
         if let Some(handle) = self.handle.take() {
@@ -136,7 +183,7 @@ impl<I: Send + 'static> Worker<I> {
     ///
     /// If the worker has panicked, this will propagate the panic to the calling thread.
     pub fn send(&mut self, msg: I) {
-        match self.sender.as_mut().unwrap().send(msg) {
+        match self.sender.as_ref().unwrap().send(msg) {
             Ok(()) => {}
             Err(_) => {
                 self.wait_for_exit();
@@ -157,14 +204,29 @@ mod tests {
 
     #[test]
     fn worker_propagates_panic_on_drop() {
-        let worker = Worker::spawn("panic", |_: ()| silent_panic("worker panic".into())).unwrap();
+        let mut worker = Worker::builder()
+            .spawn(|_: ()| silent_panic("worker panic".into()))
+            .unwrap();
+        worker.send(());
         catch_unwind(AssertUnwindSafe(|| drop(worker))).unwrap_err();
     }
 
     #[test]
     fn worker_propagates_panic_on_send() {
-        let mut worker = Worker::spawn("panic", |_| silent_panic("worker panic".into())).unwrap();
+        let mut worker = Worker::builder()
+            .spawn(|_| silent_panic("worker panic".into()))
+            .unwrap();
+        worker.send(());
         catch_unwind(AssertUnwindSafe(|| worker.send(()))).unwrap_err();
         catch_unwind(AssertUnwindSafe(|| drop(worker))).unwrap();
+    }
+
+    #[test]
+    fn promise_is_fulfilled() {
+        let (promise, handle) = promise();
+        assert!(!handle.is_fulfilled());
+        promise.fulfill(());
+        assert!(handle.is_fulfilled());
+        handle.block().unwrap();
     }
 }

@@ -48,14 +48,15 @@ impl HandTracker {
         Self {
             hands: Vec::new(),
             next_hand_id: HandId(0),
-            detector: Worker::spawn(
-                "palm detector",
-                move |(image, promise): (Arc<Image>, Promise<Vec<Detection>>)| {
-                    let detections = palm_detector.detect(&*image);
-                    promise.fulfill(detections.to_vec());
-                },
-            )
-            .unwrap(),
+            detector: Worker::builder()
+                .name("palm detector")
+                .spawn(
+                    move |(image, promise): (Arc<Image>, Promise<Vec<Detection>>)| {
+                        let detections = palm_detector.detect(&*image);
+                        promise.fulfill(detections.to_vec());
+                    },
+                )
+                .unwrap(),
             detections_handle: None,
             next_det: Instant::now(),
             det_interval: Self::DEFAULT_REDETECT_INTERVAL,
@@ -165,24 +166,23 @@ impl HandTracker {
             tracker.set_roi(roi);
             let roi_arc = Arc::new(Mutex::new(roi));
             let roi_arc2 = roi_arc.clone();
-            let mut worker = Worker::spawn(
-                "hand tracker",
-                move |(image, promise): (Arc<Image>, Promise<_>)| match tracker
-                    .track(&mut landmarker, &*image)
-                {
-                    Some(res) => {
-                        *roi_arc2.lock().unwrap() = res.updated_roi();
+            let mut worker = Worker::builder()
+                .name("hand tracker")
+                .spawn(move |(image, promise): (Arc<Image>, Promise<_>)| {
+                    match tracker.track(&mut landmarker, &*image) {
+                        Some(res) => {
+                            *roi_arc2.lock().unwrap() = res.updated_roi();
 
-                        let lm = res.estimation().clone();
-                        promise.fulfill(Some(lm));
+                            let lm = res.estimation().clone();
+                            promise.fulfill(Some(lm));
+                        }
+                        None => {
+                            log::trace!("tracking lost");
+                            promise.fulfill(None);
+                        }
                     }
-                    None => {
-                        log::trace!("tracking lost");
-                        promise.fulfill(None);
-                    }
-                },
-            )
-            .unwrap();
+                })
+                .unwrap();
 
             let id = self.next_hand_id;
             self.next_hand_id.0 += 1;

@@ -26,7 +26,6 @@ pub mod iter;
 pub mod landmark;
 pub mod nn;
 pub mod num;
-pub mod pipeline;
 pub mod procrustes;
 pub mod resolution;
 pub mod timer;

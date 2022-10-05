@@ -83,7 +83,7 @@ impl Landmark {
 /// filter parameters require tuning that depends on the input image size, which may vary across
 /// invocations.
 pub struct LandmarkFilter {
-    filter: Box<dyn FnMut(&mut Landmarks)>,
+    filter: Box<dyn FnMut(&mut Landmarks) + Send>,
 }
 
 impl LandmarkFilter {
@@ -94,7 +94,10 @@ impl LandmarkFilter {
     /// - `filter` is the set of filter parameters to use.
     /// - `num_landmarks` is the number of landmarks that will be filtered with this filter in each
     ///   batch.
-    pub fn new<F: Filter<f32> + 'static>(filter: F, num_landmarks: usize) -> Self {
+    pub fn new<F: Filter<f32> + Send + 'static>(filter: F, num_landmarks: usize) -> Self
+    where
+        F::State: Send,
+    {
         let mut states = iter::repeat_with(|| {
             [
                 F::State::default(),
