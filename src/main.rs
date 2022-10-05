@@ -2,6 +2,7 @@ mod facetracking;
 
 use std::io;
 
+use pawawwewism::{promise, Promise, PromiseHandle, Worker};
 use zaru::face::detection::Detector;
 use zaru::face::eye::{EyeLandmarker, EyeLandmarks};
 use zaru::face::landmark::{self, LandmarkResult, Landmarker};
@@ -12,7 +13,6 @@ use zaru::procrustes::ProcrustesAnalyzer;
 use zaru::resolution::AspectRatio;
 use zaru::timer::{FpsCounter, Timer};
 use zaru::webcam::Webcam;
-use zaru::worker::{promise, Promise, PromiseHandle, Worker};
 use zaru::{gui, image, Error};
 
 fn main() -> Result<(), Error> {
