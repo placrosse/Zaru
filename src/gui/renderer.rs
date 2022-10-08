@@ -506,6 +506,7 @@ impl Renderer {
             width: self.window.resolution.width(),
             height: self.window.resolution.height(),
             present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
         };
 
         self.surface().configure(&self.gpu.device, &config);

@@ -12,8 +12,8 @@ use std::{
 use once_cell::sync::OnceCell;
 use winit::{
     event::Event,
-    event_loop::{ControlFlow, EventLoop, EventLoopClosed, EventLoopProxy},
-    platform::unix::EventLoopExtUnix,
+    event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopClosed, EventLoopProxy},
+    platform::unix::EventLoopBuilderExtUnix,
     window::WindowId,
 };
 
@@ -90,7 +90,9 @@ fn start_gui() -> EventLoopProxy<Msg> {
     std::thread::Builder::new()
         .name("gui".into())
         .spawn(move || {
-            let event_loop = EventLoop::new_any_thread();
+            let event_loop = EventLoopBuilder::with_user_event()
+                .with_any_thread(true)
+                .build();
             let proxy = event_loop.create_proxy();
             sender.send(proxy).unwrap();
 
