@@ -86,6 +86,15 @@ pub struct LandmarkFilter {
     filter: Box<dyn FnMut(&mut Landmarks) + Send>,
 }
 
+/// The default [`LandmarkFilter`] does not perform any filtering.
+impl Default for LandmarkFilter {
+    fn default() -> Self {
+        Self {
+            filter: Box::new(|_| ()),
+        }
+    }
+}
+
 impl LandmarkFilter {
     /// Creates a new landmark filter.
     ///

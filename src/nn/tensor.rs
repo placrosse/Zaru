@@ -46,6 +46,13 @@ impl Layout {
         &self.0[self.0.len() / 2..]
     }
 
+    fn shape_and_strides(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        self.shape()
+            .iter()
+            .copied()
+            .zip(self.strides().iter().copied())
+    }
+
     fn remove_prefix(&self, num: usize) -> Layout {
         assert!(num <= self.shape().len());
 
@@ -246,7 +253,13 @@ impl Tensor {
         );
 
         let mut data = &*self.data;
-        for (&stride, &index) in self.layout.strides().iter().zip(&indices) {
+        for ((length, stride), index) in self.layout.shape_and_strides().zip(indices) {
+            assert!(
+                index < length,
+                "attempted to index tensor of shape {:?} with {:?}",
+                self.shape(),
+                indices
+            );
             data = &data[index * stride..(index + 1) * stride];
         }
         TensorView {

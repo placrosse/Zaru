@@ -5,7 +5,7 @@ use std::io;
 use pawawwewism::{promise, Promise, PromiseHandle, Worker};
 use zaru::face::detection::Detector;
 use zaru::face::eye::{EyeLandmarker, EyeLandmarks};
-use zaru::face::landmark::{self, LandmarkResult, Landmarker};
+use zaru::face::landmark::mediapipe_facemesh::{self, LandmarkResult, Landmarker};
 use zaru::image::Image;
 use zaru::landmark::LandmarkTracker;
 use zaru::num::TotalF32;
@@ -87,7 +87,8 @@ fn face_track_worker(eye_input_aspect: AspectRatio) -> Result<Worker<FaceTrackPa
     let mut t_total = Timer::new("total");
     let mut t_procrustes = Timer::new("procrustes");
 
-    let mut procrustes_analyzer = ProcrustesAnalyzer::new(landmark::reference_positions());
+    let mut procrustes_analyzer =
+        ProcrustesAnalyzer::new(mediapipe_facemesh::reference_positions());
     let mut detector = Detector::default();
     let mut landmarker = Landmarker::new();
     let mut tracker = LandmarkTracker::new(landmarker.input_resolution().aspect_ratio().unwrap());

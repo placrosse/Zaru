@@ -15,15 +15,19 @@ Note that files may have been converted from other formats.
 | `onnx/hand_landmark_full.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/hand_landmark_lite.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/iris_landmark.onnx` | [MediaPipe] | Apache-2.0
+| `onnx/landmarks_68_pfld.onnx` | [FaceONNX] | MIT
 | `onnx/mobilefacenet.onnx` | [InsightFace_PyTorch] | MIT
 | `onnx/palm_detection_full.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/palm_detection_lite.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/pose_detection.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/pose_landmark_full.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/pose_landmark_lite.onnx` | [MediaPipe] | Apache-2.0
+| `onnx/slim_160_latest.onnx` | [Peppa-Facial-Landmark-PyTorch] | Apache-2.0
 
 [MediaPipe]: https://github.com/google/mediapipe
 [InsightFace_Pytorch]: https://github.com/TreB1eN/InsightFace_Pytorch
+[FaceONNX]: https://github.com/FaceONNX/FaceONNX.Models
+[Peppa-Facial-Landmark-PyTorch]: https://github.com/ainrichman/Peppa-Facial-Landmark-PyTorch
 
 ## Neural Network conversion
 

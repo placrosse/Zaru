@@ -1,7 +1,7 @@
 //! Biblically accurate texture blitting benchmark.
 
 use zaru::{
-    face::{detection::Detector, landmark::Landmarker},
+    face::{detection::Detector, landmark::mediapipe_facemesh::Landmarker},
     gui,
     image::{Color, Image, Rect},
     landmark::LandmarkTracker,
