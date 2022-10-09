@@ -24,6 +24,7 @@ wonnx = { git = "https://github.com/webonnx/wonnx.git", rev = "aa92e550f15078ab9
 image = { version = "0.24.0", default-features = false, features = ["jpeg", "png", "gif"] }
 embedded-graphics = "0.7.1"
 zune-jpeg = "0.2.0"
+mozjpeg = "0.9.4"
 linuxvideo = "0.1.0"
 
 # linear algebra

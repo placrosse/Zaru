@@ -26,13 +26,18 @@ pub use blend::*;
 pub use draw::*;
 pub use rect::*;
 
+/// Because computers, we support several different JPEG decoding backends.
 #[allow(dead_code)]
 enum JpegBackend {
+    /// Uses the `jpeg-decoder` crate, a robust but slow pure-Rust JPEG decoder.
     JpegDecoder,
+    /// Uses the `mozjpeg` crate, a wrapper around Mozilla's libjpeg fork. Robust and fast, but C.
+    MozJpeg,
+    /// Uses the `zune-jpeg` crate, a fragile (panics on many inputs) but fast pure-Rust JPEG decoder.
     ZuneJpeg,
 }
 
-const JPEG_BACKEND: JpegBackend = JpegBackend::ZuneJpeg;
+const JPEG_BACKEND: JpegBackend = JpegBackend::MozJpeg;
 
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
@@ -92,6 +97,18 @@ impl Image {
             JpegBackend::JpegDecoder => {
                 image::load_from_memory_with_format(data, image::ImageFormat::Jpeg)?.to_rgba8()
             }
+            JpegBackend::MozJpeg => {
+                let mut decompress = mozjpeg::Decompress::new_mem(data)?.rgba()?;
+                let buf = decompress
+                    .read_scanlines_flat()
+                    .ok_or_else(|| "failed to decode image")?;
+                ImageBuffer::from_raw(
+                    decompress.width().try_into().unwrap(),
+                    decompress.height().try_into().unwrap(),
+                    buf,
+                )
+                .expect("failed to create ImageBuffer")
+            }
             JpegBackend::ZuneJpeg => {
                 let mut decomp = zune_jpeg::Decoder::new_with_options(
                     zune_jpeg::ZuneJpegOptions::new()
@@ -101,9 +118,7 @@ impl Image {
                 let buf = decomp.decode_buffer(data)?;
                 let width = u32::from(decomp.width());
                 let height = u32::from(decomp.height());
-                let buf = ImageBuffer::from_raw(width, height, buf)
-                    .expect("failed to create ImageBuffer");
-                buf
+                ImageBuffer::from_raw(width, height, buf).expect("failed to create ImageBuffer")
             }
         };
 
