@@ -170,18 +170,21 @@ impl EyeLandmarks {
         }
     }
 
+    /// FIXME: use `Landmarks` instead and remove this gunk
+    pub fn map(&mut self, mut map: impl FnMut([f32; 2]) -> [f32; 2]) {
+        for pos in self.eye_contour.iter_mut().chain(&mut self.iris_contour) {
+            let mapped = map([pos.0, pos.1]);
+            pos.0 = mapped[0];
+            pos.1 = mapped[1];
+        }
+    }
+
     /// Draws the eye landmarks onto an image.
     pub fn draw<I: AsImageViewMut>(&self, image: &mut I) {
         self.draw_impl(image.as_view_mut());
     }
 
     fn draw_impl(&self, mut image: ImageViewMut<'_>) {
-        assert_eq!(
-            image.resolution(),
-            self.full_res,
-            "attempted to draw eye landmarks onto canvas with mismatched size",
-        );
-
         for (x, y) in self.eye_contour().iter().take(16) {
             image::draw_marker(&mut image, *x as _, *y as _)
                 .size(1)

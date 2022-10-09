@@ -47,6 +47,24 @@ impl Landmarks {
     pub fn positions_mut(&mut self) -> &mut [Position] {
         &mut self.positions
     }
+
+    pub fn average(&self) -> Position {
+        let mut center = [0.0; 3];
+        for pos in self.positions() {
+            center[0] += pos[0] / self.positions().len() as f32;
+            center[1] += pos[1] / self.positions().len() as f32;
+            center[2] += pos[2] / self.positions().len() as f32;
+        }
+        center
+    }
+
+    pub fn apply_offset(&mut self, offset: Position) {
+        for pos in self.positions_mut() {
+            pos[0] += offset[0];
+            pos[1] += offset[1];
+            pos[2] += offset[2];
+        }
+    }
 }
 
 /// A landmark in 3D space.
