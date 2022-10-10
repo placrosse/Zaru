@@ -3,13 +3,195 @@
 //! Currently, only V4L2 `VIDEO_CAPTURE` devices yielding JFIF JPEG or Motion JPEG frames are
 //! supported.
 
+use std::cmp::Reverse;
+
 use linuxvideo::{
-    format::{PixFormat, Pixelformat},
+    format::{FrameIntervals, FrameSizes, PixFormat, Pixelformat},
     stream::ReadStream,
-    CapabilityFlags, Device,
+    BufType, CapabilityFlags, Device, Fract,
 };
 
-use crate::{image::Image, timer::Timer};
+use crate::{image::Image, resolution::Resolution, timer::Timer};
+
+/// Indicates whether to prefer a higher resolution or frame rate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ParamPreference {
+    /// Prefer increased resolution over higher frame rates.
+    Resolution,
+    /// Prefer higher frame rate over higher image resolution.
+    Framerate,
+}
+
+impl Default for ParamPreference {
+    fn default() -> Self {
+        Self::Resolution
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+struct FramePrefs {
+    resolution: Option<Resolution>,
+    fps: Option<u32>,
+    pref: ParamPreference,
+}
+
+/// Format negotiation options.
+#[derive(Default)]
+pub struct WebcamOptions {
+    name: Option<String>,
+    frame: FramePrefs,
+}
+
+impl WebcamOptions {
+    /// Sets the name of the webcam device to open.
+    ///
+    /// If no webcam with the given name can be found, opening the webcam will result in an error.
+    #[inline]
+    pub fn name(self, name: impl Into<String>) -> Self {
+        Self {
+            name: Some(name.into()),
+            ..self
+        }
+    }
+
+    /// Sets the desired image resolution.
+    ///
+    /// A lower resolution might be selected if the webcam cannot deliver the desired resolution.
+    #[inline]
+    pub fn resolution(mut self, resolution: Resolution) -> Self {
+        self.frame.resolution = Some(resolution);
+        self
+    }
+
+    /// Sets the desired frame rate.
+    ///
+    /// A lower frame rate might be selected if the webcam cannot deliver the desired resolution.
+    #[inline]
+    pub fn fps(mut self, fps: u32) -> Self {
+        self.frame.fps = Some(fps);
+        self
+    }
+
+    /// Selects whether to prefer a higher resolution or frame rate.
+    ///
+    /// When the camera cannot deliver the desired frame rate or resolution, this parameter controls
+    /// which one will be maintained.
+    ///
+    /// If the camera *can* deliver the desired frame rate and resolution, this parameter controls
+    /// which camera parameter will be maximized while keeping the other at its desired
+    /// configuration value.
+    #[inline]
+    pub fn prefer(mut self, pref: ParamPreference) -> Self {
+        self.frame.pref = pref;
+        self
+    }
+}
+
+#[derive(Clone, Copy)]
+struct FrameFormat {
+    resolution: Resolution,
+    frame_interval: Fract,
+}
+
+fn negotiate_format(device: &Device, mut prefs: FramePrefs) -> crate::Result<(PixFormat, Fract)> {
+    let mut pixel_format = None;
+    for format in device.formats(BufType::VIDEO_CAPTURE) {
+        let format = format?;
+        if format.pixelformat() == Pixelformat::JPEG || format.pixelformat() == Pixelformat::MJPG {
+            pixel_format = Some(format.pixelformat());
+            break;
+        }
+    }
+
+    let pixel_format = match pixel_format {
+        Some(fmt) => fmt,
+        None => return Err("no supported pixel format found".into()),
+    };
+
+    let mut formats = Vec::new();
+    match device.frame_sizes(pixel_format)? {
+        FrameSizes::Discrete(sizes) => {
+            for size in sizes {
+                let intervals =
+                    match device.frame_intervals(pixel_format, size.width(), size.height())? {
+                        FrameIntervals::Discrete(intervals) => intervals,
+                        FrameIntervals::Stepwise(_) | FrameIntervals::Continuous(_) => {
+                            return Err(
+                                "stepwise or continuous frame rates are not supported".into()
+                            )
+                        }
+                    };
+                for rate in intervals {
+                    formats.push(FrameFormat {
+                        resolution: Resolution::new(size.width(), size.height()),
+                        frame_interval: *rate.fract(),
+                    });
+                }
+            }
+        }
+        FrameSizes::Stepwise(_) | FrameSizes::Continuous(_) => {
+            return Err("stepwise or continuous resolutions are not supported".into())
+        }
+    }
+
+    loop {
+        if let Some(fmt) = negotiate_format_step(&formats, prefs) {
+            return Ok((
+                PixFormat::new(
+                    fmt.resolution.width(),
+                    fmt.resolution.height(),
+                    pixel_format,
+                ),
+                fmt.frame_interval,
+            ));
+        }
+
+        log::debug!("failed to negotiate format with prefs {:?}", prefs);
+        match prefs.pref {
+            ParamPreference::Resolution => {
+                if prefs.resolution.take().is_none() {
+                    if prefs.fps.take().is_none() {
+                        break;
+                    }
+                }
+            }
+            ParamPreference::Framerate => {
+                if prefs.fps.take().is_none() {
+                    if prefs.resolution.take().is_none() {
+                        break;
+                    }
+                }
+            }
+        }
+        log::debug!("retrying with new prefs {:?}", prefs);
+    }
+
+    Err("failed to negotiate a webcam format".into())
+}
+
+fn negotiate_format_step(formats: &[FrameFormat], prefs: FramePrefs) -> Option<FrameFormat> {
+    let eligible = formats
+        .iter()
+        .filter(|fmt| {
+            prefs.resolution.map_or(true, |res| {
+                fmt.resolution.width() >= res.width() && fmt.resolution.height() >= res.height()
+            }) && prefs.fps.map_or(true, |fps| {
+                (1.0 / fmt.frame_interval.as_f32()).round() >= fps as f32
+            })
+        })
+        .copied();
+    let mut formats = eligible.collect::<Vec<_>>();
+    match prefs.pref {
+        ParamPreference::Resolution => {
+            formats.sort_by_key(|fmt| (fmt.resolution.num_pixels(), Reverse(fmt.frame_interval)))
+        }
+        ParamPreference::Framerate => {
+            formats.sort_by_key(|fmt| (Reverse(fmt.frame_interval), fmt.resolution.num_pixels()))
+        }
+    }
+    formats.last().copied()
+}
 
 /// A webcam yielding a stream of [`Image`]s.
 pub struct Webcam {
@@ -25,10 +207,10 @@ impl Webcam {
     ///
     /// This function can block for a significant amount of time while the webcam initializes (on
     /// the order of hundreds of milliseconds).
-    pub fn open() -> Result<Self, crate::Error> {
+    pub fn open(options: WebcamOptions) -> Result<Self, crate::Error> {
         for res in linuxvideo::list()? {
             match res {
-                Ok(dev) => match Self::open_impl(dev) {
+                Ok(dev) => match Self::open_impl(dev, &options) {
                     Ok(Some(webcam)) => return Ok(webcam),
                     Ok(None) => {}
                     Err(e) => {
@@ -44,7 +226,13 @@ impl Webcam {
         Err("no supported webcam device found".into())
     }
 
-    fn open_impl(dev: Device) -> Result<Option<Self>, crate::Error> {
+    fn open_impl(dev: Device, options: &WebcamOptions) -> Result<Option<Self>, crate::Error> {
+        if let Some(name) = &options.name {
+            if dev.capabilities()?.card() != name {
+                return Ok(None);
+            }
+        }
+
         let caps = dev.capabilities()?.device_capabilities();
         let path = dev.path()?;
         log::debug!("device {} capabilities: {:?}", path.display(), caps);
@@ -53,18 +241,15 @@ impl Webcam {
             return Ok(None);
         }
 
-        // TODO do actual format negotiation
-        let capture = dev.video_capture(PixFormat::new(1920, 1080, Pixelformat::MJPG))?;
+        let (pixfmt, fract) = negotiate_format(&dev, options.frame)?;
+
+        let capture = dev.video_capture(pixfmt)?;
 
         let format = capture.format();
         let width = format.width();
         let height = format.height();
-        match format.pixelformat() {
-            Pixelformat::JPEG | Pixelformat::MJPG => {}
-            e => return Err(format!("unsupported pixel format {}", e).into()),
-        }
 
-        let actual = capture.set_frame_interval(linuxvideo::Fract::new(1, 200))?;
+        let actual = capture.set_frame_interval(fract)?;
 
         log::info!(
             "opened {}, {}x{} @ {:.1}Hz",
@@ -100,6 +285,8 @@ impl Webcam {
                     // a silicon bug in the webcam's MJPG encoder, which is a possibility I chose to
                     // ignore for the sake of my own sanity).
                     log::error!("webcam decode error: {}", e);
+
+                    //std::fs::write("error.jpg", &*buf).ok();
 
                     // Hand back a blank image. The alternative would be to skip the image, which
                     // causes 2x latency spikes (OTOH, a blank image isn't going to result in any

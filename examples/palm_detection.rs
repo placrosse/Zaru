@@ -2,7 +2,7 @@ use zaru::{
     gui,
     hand::detection::{self, PalmDetector},
     timer::FpsCounter,
-    webcam::Webcam,
+    webcam::{Webcam, WebcamOptions},
 };
 
 const USE_FULL_DETECTION_NETWORK: bool = true;
@@ -17,7 +17,7 @@ fn main() -> Result<(), zaru::Error> {
     };
 
     let mut fps = FpsCounter::new("hand tracker");
-    let mut webcam = Webcam::open()?;
+    let mut webcam = Webcam::open(WebcamOptions::default())?;
 
     loop {
         let mut image = webcam.read()?;

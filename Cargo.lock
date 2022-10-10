@@ -1123,9 +1123,7 @@ checksum = "292a948cd991e376cf75541fe5b97a1081d713c618b4f1b9500f8844e49eb565"
 
 [[package]]
 name = "linuxvideo"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7839e4e634ac0dfec3f342da03b262b19795054da3d5537d447b1db75c73a5fa"
+version = "0.1.1"
 dependencies = [
  "bitflags",
  "log",

@@ -5,7 +5,7 @@ use std::fmt;
 use crate::image::Rect;
 
 /// Resolution (`width x height`) of an image, window, camera, or display.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Resolution {
     width: u32,
     height: u32,
@@ -39,6 +39,11 @@ impl Resolution {
     #[inline]
     pub fn height(&self) -> u32 {
         self.height
+    }
+
+    #[inline]
+    pub fn num_pixels(&self) -> u64 {
+        u64::from(self.width) * u64::from(self.height)
     }
 
     /// Computes the [`AspectRatio`] of this [`Resolution`].

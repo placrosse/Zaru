@@ -12,7 +12,7 @@ use zaru::num::TotalF32;
 use zaru::procrustes::ProcrustesAnalyzer;
 use zaru::resolution::{AspectRatio, Resolution};
 use zaru::timer::{FpsCounter, Timer};
-use zaru::webcam::Webcam;
+use zaru::webcam::{ParamPreference, Webcam, WebcamOptions};
 use zaru::{gui, image, Error};
 
 fn main() -> Result<(), Error> {
@@ -28,7 +28,12 @@ fn main() -> Result<(), Error> {
     let mut right_eye_worker = eye_worker(Eye::Right)?;
     let mut assembler = assembler()?;
 
-    let mut webcam = Webcam::open()?;
+    let mut webcam = Webcam::open(
+        WebcamOptions::default()
+            .resolution(Resolution::RES_1080P)
+            .fps(60)
+            .prefer(ParamPreference::Framerate),
+    )?;
 
     let mut fps = FpsCounter::new("webcam");
     loop {

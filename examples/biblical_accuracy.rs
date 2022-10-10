@@ -7,7 +7,7 @@ use zaru::{
     landmark::LandmarkTracker,
     num::TotalF32,
     timer::{FpsCounter, Timer},
-    webcam::Webcam,
+    webcam::{ParamPreference, Webcam, WebcamOptions},
 };
 
 const W: u32 = 512;
@@ -33,7 +33,7 @@ fn main() -> Result<(), zaru::Error> {
 
     let mut fps = FpsCounter::new("FPS");
     let mut blit_timer = Timer::new("blit");
-    let mut webcam = Webcam::open()?;
+    let mut webcam = Webcam::open(WebcamOptions::default().prefer(ParamPreference::Resolution))?;
     loop {
         let image = webcam.read()?;
 

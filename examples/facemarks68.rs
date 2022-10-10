@@ -8,7 +8,7 @@ use zaru::{
     gui,
     image::{self, Color},
     timer::FpsCounter,
-    webcam::Webcam,
+    webcam::{Webcam, WebcamOptions},
 };
 
 struct Algo {
@@ -36,7 +36,7 @@ fn main() -> Result<(), zaru::Error> {
         Algo::new(multipie68::FaceOnnx, Color::RED),
     ];
 
-    let webcam = Webcam::open()?;
+    let webcam = Webcam::open(WebcamOptions::default())?;
     for image in webcam {
         let mut image = image?;
         if let Some(det) = detector.detect(&image).first() {

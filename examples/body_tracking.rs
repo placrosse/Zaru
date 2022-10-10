@@ -10,7 +10,7 @@ use zaru::{
     image::{self, Color, Image, Rect},
     num::TotalF32,
     timer::FpsCounter,
-    webcam::Webcam,
+    webcam::{Webcam, WebcamOptions},
 };
 
 const USE_FULL_NETWORK: bool = false;
@@ -43,7 +43,7 @@ fn main() -> Result<(), zaru::Error> {
                 Box::new(iter::repeat(image).map(Ok))
             }
         },
-        None => Box::new(Webcam::open()?.into_iter()),
+        None => Box::new(Webcam::open(WebcamOptions::default())?.into_iter()),
     };
 
     let mut detector = PoseDetector::new();

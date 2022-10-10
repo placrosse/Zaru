@@ -2,7 +2,7 @@ use zaru::{
     face::detection::{Detector, FullRangeNetwork, ShortRangeNetwork},
     gui,
     timer::FpsCounter,
-    webcam::Webcam,
+    webcam::{Webcam, WebcamOptions},
 };
 
 const FULL_RANGE: bool = false;
@@ -18,7 +18,7 @@ fn main() -> Result<(), zaru::Error> {
     let input_ratio = detector.input_resolution().aspect_ratio().unwrap();
 
     let mut fps = FpsCounter::new("face detector");
-    let mut webcam = Webcam::open()?;
+    let mut webcam = Webcam::open(WebcamOptions::default())?;
     loop {
         let mut image = webcam.read()?;
 

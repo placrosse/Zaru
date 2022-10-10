@@ -1,4 +1,9 @@
-use zaru::{body::detection::PoseDetector, gui, timer::FpsCounter, webcam::Webcam};
+use zaru::{
+    body::detection::PoseDetector,
+    gui,
+    timer::FpsCounter,
+    webcam::{Webcam, WebcamOptions},
+};
 
 fn main() -> Result<(), zaru::Error> {
     zaru::init_logger!();
@@ -6,7 +11,7 @@ fn main() -> Result<(), zaru::Error> {
     let mut detector = PoseDetector::new();
 
     let mut fps = FpsCounter::new("body detection");
-    for result in Webcam::open()? {
+    for result in Webcam::open(WebcamOptions::default())? {
         let mut image = result?;
 
         let detections = detector.detect(&image);

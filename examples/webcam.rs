@@ -1,9 +1,13 @@
-use zaru::{timer::FpsCounter, webcam::Webcam, gui};
+use zaru::{
+    gui,
+    timer::FpsCounter,
+    webcam::{Webcam, WebcamOptions},
+};
 
 fn main() -> Result<(), zaru::Error> {
     zaru::init_logger!();
 
-    let mut webcam = Webcam::open()?;
+    let mut webcam = Webcam::open(WebcamOptions::default())?;
     let mut fps = FpsCounter::new("webcam");
     loop {
         let image = webcam.read()?;
