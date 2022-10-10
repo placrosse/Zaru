@@ -1124,6 +1124,8 @@ checksum = "292a948cd991e376cf75541fe5b97a1081d713c618b4f1b9500f8844e49eb565"
 [[package]]
 name = "linuxvideo"
 version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4aa44dd8da067adf7699ee275ef17ac481a8478919913be253d6c9ab52b8f87"
 dependencies = [
  "bitflags",
  "log",
@@ -3242,6 +3244,8 @@ dependencies = [
 [[package]]
 name = "zune-jpeg"
 version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93ae8cde2c8ecd69c969064c02650c1a7572d3579e2457e92c1d8740d2b2953c"
 dependencies = [
  "log",
  "scoped_threadpool",

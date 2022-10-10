@@ -41,8 +41,6 @@ bytemuck = { version = "1.7.3", features = ["derive"] }
 serde = { version = "1.0.136", features = ["derive"] }
 
 [patch.crates-io]
-zune-jpeg = { path = "../zune-jpeg" }
-linuxvideo = { path = "../LinuxVideo" }
 
 [dev-dependencies]
 rayon = "1.5.1"
