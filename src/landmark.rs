@@ -65,6 +65,12 @@ impl Landmarks {
             pos[2] += offset[2];
         }
     }
+
+    pub fn map_positions(&mut self, mut f: impl FnMut(Position) -> Position) {
+        for pos in self.positions_mut() {
+            *pos = f(*pos);
+        }
+    }
 }
 
 /// A landmark in 3D space.

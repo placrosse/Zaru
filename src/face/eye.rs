@@ -10,6 +10,7 @@ use once_cell::sync::Lazy;
 use crate::{
     image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut},
     iter::zip_exact,
+    landmark::Landmarks,
     nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
     resolution::Resolution,
     timer::Timer,
@@ -48,8 +49,7 @@ impl EyeLandmarker {
             t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             result_buf: EyeLandmarks {
-                eye_contour: [(0.0, 0.0); 71],
-                iris_contour: [(0.0, 0.0); 5],
+                landmarks: Landmarks::new(76),
                 full_res: Resolution::new(1, 1),
             },
         }
@@ -86,9 +86,9 @@ impl EyeLandmarker {
         let iris_contour = &result[1];
 
         self.result_buf.full_res = full_res;
-        for (coords, (out_x, out_y)) in zip_exact(
+        for (coords, [out_x, out_y, out_z]) in zip_exact(
             eye_contour.index([0]).as_slice().chunks(3), // x, y, and z coordinates
-            &mut self.result_buf.eye_contour,
+            self.result_buf.landmarks.positions_mut()[5..].iter_mut(),
         ) {
             let (x, y) = (coords[0], coords[1]);
             let x = x / input_res.width() as f32;
@@ -96,11 +96,12 @@ impl EyeLandmarker {
             let (x, y) = unadjust_aspect_ratio(x, y, orig_aspect);
             *out_x = x * full_res.width() as f32;
             *out_y = y * full_res.height() as f32;
+            *out_z = coords[2];
         }
 
-        for (coords, (out_x, out_y)) in zip_exact(
+        for (coords, [out_x, out_y, out_z]) in zip_exact(
             iris_contour.index([0]).as_slice().chunks(3), // x, y, and z coordinates
-            &mut self.result_buf.iris_contour,
+            self.result_buf.landmarks.positions_mut()[..5].iter_mut(),
         ) {
             let (x, y) = (coords[0], coords[1]);
             let x = x / input_res.width() as f32;
@@ -108,6 +109,7 @@ impl EyeLandmarker {
             let (x, y) = unadjust_aspect_ratio(x, y, orig_aspect);
             *out_x = x * full_res.width() as f32;
             *out_y = y * full_res.height() as f32;
+            *out_z = coords[2];
         }
 
         &mut self.result_buf
@@ -125,58 +127,52 @@ impl EyeLandmarker {
 /// [`EyeLandmarker::compute`].
 #[derive(Clone)]
 pub struct EyeLandmarks {
-    eye_contour: [(f32, f32); 71],
-    iris_contour: [(f32, f32); 5],
+    landmarks: Landmarks,
     full_res: Resolution,
 }
 
 impl EyeLandmarks {
+    pub fn landmarks(&self) -> &Landmarks {
+        &self.landmarks
+    }
+
+    pub fn landmarks_mut(&mut self) -> &mut Landmarks {
+        &mut self.landmarks
+    }
+
     /// Returns the center coordinates of the iris.
-    pub fn iris_center(&self) -> (f32, f32) {
-        self.iris_contour[0]
+    pub fn iris_center(&self) -> [f32; 3] {
+        self.landmarks.positions()[0]
     }
 
     /// Returns the outer landmarks of the iris.
-    pub fn iris_contour(&self) -> &[(f32, f32)] {
-        &self.iris_contour[1..]
+    pub fn iris_contour(&self) -> impl Iterator<Item = [f32; 3]> + '_ {
+        self.landmarks.positions()[1..=4].iter().copied()
     }
 
     /// Computes the iris diameter from the landmarks.
     pub fn iris_diameter(&self) -> f32 {
-        let (cx, cy) = self.iris_center();
+        let [cx, cy, _] = self.iris_center();
         let center = Point2::new(cx, cy);
 
         // Average data from all landmarks.
         let mut acc_radius = 0.0;
-        for (x, y) in self.iris_contour() {
-            acc_radius += nalgebra::distance(&center, &Point2::new(*x, *y));
+        for [x, y, _] in self.iris_contour() {
+            acc_radius += nalgebra::distance(&center, &Point2::new(x, y));
         }
-        let diameter = acc_radius / self.iris_contour().len() as f32 * 2.0;
+        let diameter = acc_radius / self.iris_contour().count() as f32 * 2.0;
         diameter
     }
 
-    pub fn eye_contour(&self) -> &[(f32, f32)] {
-        &self.eye_contour
+    pub fn eye_contour(&self) -> impl Iterator<Item = [f32; 3]> + '_ {
+        self.landmarks.positions()[5..].iter().copied()
     }
 
     /// Flips all landmark coordinates along the X axis.
     pub fn flip_horizontal_in_place(&mut self) {
         let half_width = self.full_res.width() as f32 / 2.0;
-        for (x, _) in &mut self.eye_contour {
-            *x = -(*x - half_width) + half_width;
-        }
-        for (x, _) in &mut self.iris_contour {
-            *x = -(*x - half_width) + half_width;
-        }
-    }
-
-    /// FIXME: use `Landmarks` instead and remove this gunk
-    pub fn map(&mut self, mut map: impl FnMut([f32; 2]) -> [f32; 2]) {
-        for pos in self.eye_contour.iter_mut().chain(&mut self.iris_contour) {
-            let mapped = map([pos.0, pos.1]);
-            pos.0 = mapped[0];
-            pos.1 = mapped[1];
-        }
+        self.landmarks
+            .map_positions(|[x, y, z]| [-(x - half_width) + half_width, y, z]);
     }
 
     /// Draws the eye landmarks onto an image.
@@ -185,19 +181,22 @@ impl EyeLandmarks {
     }
 
     fn draw_impl(&self, mut image: ImageViewMut<'_>) {
-        for (x, y) in self.eye_contour().iter().take(16) {
-            image::draw_marker(&mut image, *x as _, *y as _)
+        let [x, y, _] = self.iris_center();
+        image::draw_marker(&mut image, x as _, y as _)
+            .size(3)
+            .color(Color::CYAN);
+        image::draw_circle(&mut image, x as _, y as _, self.iris_diameter() as u32)
+            .color(Color::CYAN);
+
+        for [x, y, _] in self.eye_contour().take(16) {
+            image::draw_marker(&mut image, x as _, y as _)
                 .size(1)
                 .color(Color::MAGENTA);
         }
-        for (x, y) in self.eye_contour().iter().skip(16) {
-            image::draw_marker(&mut image, *x as _, *y as _)
+        for [x, y, _] in self.eye_contour().skip(16) {
+            image::draw_marker(&mut image, x as _, y as _)
                 .size(1)
                 .color(Color::GREEN);
         }
-
-        let (x, y) = self.iris_center();
-        image::draw_circle(&mut image, x as _, y as _, self.iris_diameter() as u32)
-            .color(Color::CYAN);
     }
 }

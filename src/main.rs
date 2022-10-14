@@ -241,7 +241,10 @@ fn eye_worker(eye: Eye) -> Result<Worker<EyeParams>, io::Error> {
                 }
             };
 
-            marks.map(|[x, y]| rect.transform_out_f32(x, y));
+            marks.landmarks_mut().map_positions(|[x, y, z]| {
+                let [x, y] = rect.transform_out_f32(x, y);
+                [x, y, z]
+            });
             landmarks.fulfill(marks.clone());
 
             fps.tick_with(landmarker.timers());
