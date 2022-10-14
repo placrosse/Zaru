@@ -172,10 +172,7 @@ impl Detection {
             .to_rect(&self.full_res)
     }
 
-    /// Returns the confidence of this detection.
-    ///
-    /// Typically, values >1.5 indicate a decent detection, values >0.5 indicate a partially
-    /// occluded face, and anything below that is unlikely to be a valid detection at all.
+    /// Returns the confidence of this detection (in range 0 to 1).
     pub fn confidence(&self) -> f32 {
         self.raw.confidence()
     }
@@ -379,4 +376,24 @@ impl DetectionNetwork for FullRangeNetwork {
     }
 
     fn __private_dont_implement() {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test;
+
+    #[test]
+    fn detects_face() {
+        let mut det = Detector::new(ShortRangeNetwork);
+        let detections = det.detect(test::sad_linus_full());
+        assert_eq!(detections.len(), 1);
+
+        let detection = &detections[0];
+        assert!(detection.confidence() >= 0.9, "{}", detection.confidence());
+        let angle = detection.rotation_radians().to_degrees();
+        assert!(angle < 5.0, "{angle}");
+
+        assert!(detection.left_eye().0 < detection.right_eye().0);
+    }
 }

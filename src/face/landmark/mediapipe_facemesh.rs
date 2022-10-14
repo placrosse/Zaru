@@ -195,8 +195,8 @@ impl LandmarkResult {
     }
 
     pub fn rotation_radians(&self) -> f32 {
-        let left_eye = self.landmark_position(LandmarkIdx::LeftEyeLeftCorner as _);
-        let right_eye = self.landmark_position(LandmarkIdx::RightEyeRightCorner as _);
+        let left_eye = self.landmark_position(LandmarkIdx::LeftEyeOuterCorner as _);
+        let right_eye = self.landmark_position(LandmarkIdx::RightEyeOuterCorner as _);
         let left_to_right_eye = Vector2::new(
             (right_eye.0 - left_eye.0) as f32,
             (right_eye.1 - left_eye.1) as f32,
@@ -210,8 +210,8 @@ impl LandmarkResult {
             self.rotation_radians(),
             [
                 LandmarkIdx::LeftEyeBottom,
-                LandmarkIdx::LeftEyeLeftCorner,
-                LandmarkIdx::LeftEyeRightCorner,
+                LandmarkIdx::LeftEyeOuterCorner,
+                LandmarkIdx::LeftEyeInnerCorner,
                 LandmarkIdx::LeftEyeTop,
             ]
             .into_iter()
@@ -229,8 +229,8 @@ impl LandmarkResult {
             self.rotation_radians(),
             [
                 LandmarkIdx::RightEyeBottom,
-                LandmarkIdx::RightEyeLeftCorner,
-                LandmarkIdx::RightEyeRightCorner,
+                LandmarkIdx::RightEyeInnerCorner,
+                LandmarkIdx::RightEyeOuterCorner,
                 LandmarkIdx::RightEyeTop,
             ]
             .into_iter()
@@ -284,8 +284,8 @@ impl LandmarkResult {
         .align_bottom()
         .color(color);
 
-        let left_eye = self.landmark_position(LandmarkIdx::LeftEyeLeftCorner as _);
-        let right_eye = self.landmark_position(LandmarkIdx::RightEyeRightCorner as _);
+        let left_eye = self.landmark_position(LandmarkIdx::LeftEyeOuterCorner as _);
+        let right_eye = self.landmark_position(LandmarkIdx::RightEyeOuterCorner as _);
         image::draw_line(
             image,
             left_eye.0 as _,
@@ -344,21 +344,40 @@ pub enum LandmarkIdx {
     MouthRight = 308,
     MouthTop = 13,
     MouthBottom = 14,
-    LeftEyeLeftCorner = 33,
-    LeftEyeRightCorner = 133,
+    LeftEyeOuterCorner = 33,
+    LeftEyeInnerCorner = 133,
     LeftEyeTop = 159,
     LeftEyeBottom = 145,
-    RightEyeLeftCorner = 362,
-    RightEyeRightCorner = 263,
+    RightEyeInnerCorner = 362,
+    RightEyeOuterCorner = 263,
     RightEyeTop = 386,
     RightEyeBottom = 374,
-    RightEyebrowLeftCorner = 295,
-    LeftEyebrowRightCorner = 65,
+    RightEyebrowInnerCorner = 295,
+    LeftEyebrowInnerCorner = 65,
 }
+// FIXME: these are swapped or otherwise messed up
 
 impl Into<usize> for LandmarkIdx {
     #[inline]
     fn into(self) -> usize {
         self as usize
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test;
+
+    #[test]
+    fn estimates_landmarks() {
+        let mut lm = Landmarker::new();
+        let landmarks = lm.compute(test::sad_linus_cropped());
+        assert!(landmarks.face_confidence() > 0.9);
+        assert!(landmarks.rotation_radians().to_degrees() < 5.0);
+        assert!(landmarks.left_eye().rotation_radians().to_degrees() < 5.0);
+        assert!(landmarks.right_eye().rotation_radians().to_degrees() < 5.0);
+
+        assert!(landmarks.left_eye().center().0 < landmarks.right_eye().center().0);
     }
 }

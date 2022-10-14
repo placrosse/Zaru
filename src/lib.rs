@@ -31,17 +31,16 @@ pub mod resolution;
 pub mod timer;
 pub mod webcam;
 
+#[cfg(test)]
+mod test;
+
 pub type Error = Box<dyn std::error::Error + Sync + Send>;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// macro-use only, not part of public API.
 #[doc(hidden)]
 pub fn init_logger(calling_crate: &'static str) {
-    let log_level = if cfg!(debug_assertions) {
-        LevelFilter::Trace
-    } else {
-        LevelFilter::Debug
-    };
+    let log_level = LevelFilter::Debug;
     env_logger::Builder::new()
         .filter(Some(calling_crate), log_level)
         .filter(Some(env!("CARGO_PKG_NAME")), log_level)
