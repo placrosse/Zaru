@@ -263,7 +263,8 @@ impl Image {
     }
 
     #[inline]
-    pub(crate) fn data(&self) -> &[u8] {
+    pub fn data(&self) -> &[u8] {
+        // FIXME: useful method, but maybe should take a callback
         self.buf.as_raw()
     }
 }
