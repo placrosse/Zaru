@@ -98,7 +98,7 @@ fn assembler() -> Result<Worker<AssemblerParams>, io::Error> {
             };
 
             let procrustes_result = t_procrustes.time(|| {
-                procrustes_analyzer.analyze(face_landmark.raw_landmarks().positions().iter().map(
+                procrustes_analyzer.analyze(face_landmark.landmarks().positions().iter().map(
                     |&[x, y, z]| {
                         // Flip Y to bring us to canonical 3D coordinates (where Y points up).
                         // Only rotation matters, so we don't have to correct for the added
@@ -117,7 +117,7 @@ fn assembler() -> Result<Worker<AssemblerParams>, io::Error> {
                 Err(_) => return,
             };
 
-            let center = face_landmark.raw_landmarks().average();
+            let center = face_landmark.landmarks().average();
             image::draw_quaternion(
                 &mut image,
                 center[0] as i32,

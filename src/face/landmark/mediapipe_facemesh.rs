@@ -177,10 +177,14 @@ impl LandmarkResult {
         self.landmarks.len()
     }
 
-    /// Returns a reference to the raw landmarks, unadjusted for the input image resolution.
     #[inline]
-    pub fn raw_landmarks(&self) -> &Landmarks {
+    pub fn landmarks(&self) -> &Landmarks {
         &self.landmarks
+    }
+
+    #[inline]
+    pub fn landmarks_mut(&mut self) -> &mut Landmarks {
+        &mut self.landmarks
     }
 
     /// Returns the confidence that the input image contains a proper face.

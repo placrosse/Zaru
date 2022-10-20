@@ -14,6 +14,9 @@ use linuxvideo::{
 use crate::{image::Image, resolution::Resolution, timer::Timer};
 
 /// Indicates whether to prefer a higher resolution or frame rate.
+///
+/// By default, [`ParamPreference::Resolution`] is used, selecting the maximum resolution at the
+/// desired frame rate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ParamPreference {
