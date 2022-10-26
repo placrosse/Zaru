@@ -3,7 +3,7 @@
 //! Currently, only V4L2 `VIDEO_CAPTURE` devices yielding JFIF JPEG or Motion JPEG frames are
 //! supported.
 
-use std::cmp::Reverse;
+use std::{cmp::Reverse, env};
 
 use linuxvideo::{
     format::{FrameIntervals, FrameSizes, PixFormat, Pixelformat},
@@ -205,12 +205,21 @@ pub struct Webcam {
     t_decode: Timer,
 }
 
+const ENV_VAR_WEBCAM_NAME: &str = "ZARU_WEBCAM_NAME";
+
 impl Webcam {
     /// Opens the first supported webcam found.
     ///
     /// This function can block for a significant amount of time while the webcam initializes (on
     /// the order of hundreds of milliseconds).
     pub fn open(options: WebcamOptions) -> Result<Self, crate::Error> {
+        if let Ok(name) = env::var(ENV_VAR_WEBCAM_NAME) {
+            log::debug!(
+                "webcam override: `{}` is set to '{}'",
+                ENV_VAR_WEBCAM_NAME,
+                name,
+            );
+        }
         for res in linuxvideo::list()? {
             match res {
                 Ok(dev) => match Self::open_impl(dev, &options) {
@@ -230,8 +239,9 @@ impl Webcam {
     }
 
     fn open_impl(dev: Device, options: &WebcamOptions) -> Result<Option<Self>, crate::Error> {
-        if let Some(name) = &options.name {
-            if dev.capabilities()?.card() != name {
+        let cam_name_from_env = env::var(ENV_VAR_WEBCAM_NAME).ok();
+        if let Some(name) = &options.name.as_deref().or(cam_name_from_env.as_deref()) {
+            if dev.capabilities()?.card() != *name {
                 return Ok(None);
             }
         }
