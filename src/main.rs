@@ -92,10 +92,7 @@ fn assembler() -> Result<Worker<AssemblerParams>, io::Error> {
               }| {
             let mut image = Image::new(image_size.width(), image_size.height());
 
-            let face_landmark = match landmarks.block() {
-                Ok(lms) => lms,
-                Err(_) => return,
-            };
+            let Ok(face_landmark) = landmarks.block() else { return };
 
             let procrustes_result = t_procrustes.time(|| {
                 procrustes_analyzer.analyze(face_landmark.landmarks().positions().iter().map(
@@ -108,14 +105,8 @@ fn assembler() -> Result<Worker<AssemblerParams>, io::Error> {
                 ))
             });
 
-            let left = match left_eye.block() {
-                Ok(eye) => eye,
-                Err(_) => return,
-            };
-            let right = match right_eye.block() {
-                Ok(eye) => eye,
-                Err(_) => return,
-            };
+            let Ok(left) = left_eye.block() else { return };
+            let Ok(right) = right_eye.block() else { return };
 
             let center = face_landmark.landmarks().average();
             image::draw_quaternion(
@@ -228,10 +219,7 @@ fn eye_worker(eye: Eye) -> Result<Worker<EyeParams>, io::Error> {
                   eye_image,
                   landmarks,
               }| {
-            let (image, rect) = match eye_image.block() {
-                Ok(v) => v,
-                Err(_) => return,
-            };
+            let Ok((image, rect)) = eye_image.block() else { return };
             let marks = match eye {
                 Eye::Left => landmarker.compute(&image),
                 Eye::Right => {
