@@ -15,9 +15,8 @@ use crate::iter::zip_exact;
 /// of points passed to [`ProcrustesAnalyzer::analyze`].
 #[derive(Clone)]
 pub struct ProcrustesAnalyzer {
-    /// Transform to apply to the reference data to remove its translation and scaling, yielding
-    /// "base" data.
-    ref_to_base_transform: Matrix4<f32>,
+    ref_centroid: Vector3<f32>,
+    ref_scale: f32,
 
     buf: Vec<Vector3<f32>>,
     /// `Q` matrix for Kabsch algorithm, computed from reference points.
@@ -50,21 +49,24 @@ impl ProcrustesAnalyzer {
         let scale = remove_scale(&mut reference);
         log::trace!("ref scale: {scale}, ref centroid: {centroid:?}");
 
-        let ref_to_base_transform = Matrix4::identity()
-            .append_translation(&-centroid)
-            .append_scaling(1.0 / scale);
-
         let q = Matrix::from_fn_generic(Dynamic::new(reference.len()), Const, |row, col| {
             reference[row][col]
         });
         let p_t = Matrix::zeros_generic(Const, Dynamic::new(reference.len()));
 
         Self {
-            ref_to_base_transform,
+            ref_centroid: centroid,
+            ref_scale: scale,
             buf: Vec::new(),
             q,
             p_t,
         }
+    }
+
+    /// Returns the centroid of the reference data.
+    #[inline]
+    pub fn reference_centroid(&self) -> Vector3<f32> {
+        self.ref_centroid
     }
 
     /// Performs procrustes analysis on `points`.
@@ -106,27 +108,33 @@ impl ProcrustesAnalyzer {
 
         log::trace!("data scale: {scale}, data centroid: {centroid:?}, rotation: {rotation:?}");
 
-        // Scaling the data with 0.0 collapses it onto a plane, line, or point, in which case the
-        // rotation cannot be recovered.
+        // Scaling the data with 0.0 collapses it onto a point, in which case the rotation cannot be
+        // recovered.
         if scale == 0.0 {
             rotation = Matrix3::identity();
         }
 
-        // For assembling the result, we need to keep in mind that the reference data also had its
-        // translation and scaling removed (but has not been rotated).
-        let mut rot4 = Matrix4::identity();
-        rot4.slice_mut((0, 0), (3, 3)).copy_from(&rotation);
+        debug_assert!(rotation.is_special_orthogonal(0.001));
 
-        // NB: `A*B` does B, then A (must be some upstream bug in maths)
-        let final_transform = Matrix4::identity()
-            .append_scaling(scale)
-            .append_translation(&centroid)
-            * rot4
-            * self.ref_to_base_transform;
+        let rotation =
+            UnitQuaternion::from_rotation_matrix(&Rotation3::from_matrix_unchecked(rotation));
+
+        // Scale of the analyzed data compared to the reference data.
+        let scale = scale / self.ref_scale;
+
+        // Translation from reference data to analyzed data.
+        // Since the centroid of the reference data can be offset from the origin, it can be moved
+        // around by rotation and scaling, so those have to be applied to the centroids to get the
+        // "real" translation.
+        let centroid_offset = rotation * self.ref_centroid * scale;
+        let translation = centroid - centroid_offset;
 
         AnalysisResult {
-            transform: final_transform,
-            rotation: Rotation3::from_matrix(&rotation),
+            centroid,
+            ref_centroid: self.ref_centroid,
+            translation,
+            scale,
+            rotation,
         }
     }
 
@@ -192,24 +200,56 @@ fn remove_scale(points: &mut [Vector3<f32>]) -> f32 {
 /// Result of procrustes analysis as returned by [`ProcrustesAnalyzer::analyze`].
 #[derive(Debug, Clone, Copy)]
 pub struct AnalysisResult {
-    transform: Matrix4<f32>,
-    rotation: Rotation3<f32>,
+    /// Centroid of the analyzed data. Rotation and scaling happens around this point.
+    centroid: Vector3<f32>,
+    ref_centroid: Vector3<f32>,
+    translation: Vector3<f32>,
+    scale: f32,
+    rotation: UnitQuaternion<f32>,
 }
 
 impl AnalysisResult {
-    /// Returns the computed transformation matrix.
+    /// Returns the centroid of the analyzed data.
+    ///
+    /// Scaling and rotation happens around this point.
     #[inline]
-    pub fn transformation_matrix(&self) -> Matrix4<f32> {
-        self.transform
+    pub fn centroid(&self) -> Vector3<f32> {
+        self.centroid
     }
 
+    /// Returns the translation that was applied to the analyzed data, relative to the reference
+    /// data.
+    ///
+    /// Unlike [`AnalysisResult::centroid`], this translation value is computed while taking
+    /// rotation and scaling already into account. That means, if a rotation or scaling offsets the
+    /// centroid of the reference data, that offset *will* be reflected in the centroid, but *not*
+    /// in the translation returned by this method. Only true translation is returned.
     #[inline]
-    pub fn rotation(&self) -> Rotation3<f32> {
+    pub fn translation(&self) -> Vector3<f32> {
+        self.translation
+    }
+
+    /// Returns the computed rotation as a unit quaternion.
+    ///
+    /// This describes how the reference data was rotated around its centroid to reach the analyzed
+    /// data.
+    #[inline]
+    pub fn rotation(&self) -> UnitQuaternion<f32> {
         self.rotation
     }
 
-    pub fn rotation_as_quaternion(&self) -> UnitQuaternion<f32> {
-        UnitQuaternion::from_rotation_matrix(&self.rotation)
+    /// Returns the uniform scaling of the analyzed data compared to the reference data.
+    #[inline]
+    pub fn scale(&self) -> f32 {
+        self.scale
+    }
+
+    /// Computes the recovered transformation that was applied to the reference data.
+    pub fn transform(&self) -> Matrix4<f32> {
+        // Move reference data to the origin, rotate and scale it, then move it to `self.centroid`.
+        let ref_to_origin = Matrix4::new_translation(&-self.ref_centroid);
+        let rot = self.rotation.to_homogeneous();
+        Matrix4::new_translation(&self.centroid) * rot * ref_to_origin.append_scaling(self.scale)
     }
 }
 
@@ -217,11 +257,13 @@ impl AnalysisResult {
 mod tests {
     use std::f32::consts::PI;
 
+    use approx::assert_relative_eq;
     use nalgebra::{Point3, Rotation3};
+    use once_cell::sync::Lazy;
 
     use super::*;
 
-    const RIGHT_ARROW: &[(f32, f32, f32)] = &[
+    const REFERENCE_POINTS: &[(f32, f32, f32)] = &[
         (-1.0, 1.0, 0.0),
         (1.0, 1.0, 0.0),
         (1.0, 1.5, 0.0),
@@ -229,12 +271,16 @@ mod tests {
         (1.0, -1.5, 0.0),
         (1.0, -1.0, 0.0),
         (-1.0, -1.0, 0.0),
+        (1.0, 1.0, 5.0),
     ];
+    static ANALYZER: Lazy<ProcrustesAnalyzer> =
+        Lazy::new(|| ProcrustesAnalyzer::new(REFERENCE_POINTS.iter().copied()));
 
     const LOG: bool = false;
-    const MAX_DELTA: f32 = 0.01;
+    const MAX_DELTA: f32 = 0.00001;
+    const MAX_TRANSLATION_DELTA: f32 = 0.001;
 
-    fn analyze(orig: &[(f32, f32, f32)], transform: Matrix4<f32>) -> AnalysisResult {
+    fn analyze(transform: Matrix4<f32>) -> AnalysisResult {
         if LOG {
             env_logger::builder()
                 .filter_module(env!("CARGO_CRATE_NAME"), log::LevelFilter::Trace)
@@ -242,18 +288,19 @@ mod tests {
                 .ok();
         }
 
-        let mut analysis = ProcrustesAnalyzer::new(orig.iter().copied());
-        analysis.analyze(orig.iter().map(|&(x, y, z)| {
-            let pt = transform.transform_point(&Point3::new(x, y, z));
-            (pt.x, pt.y, pt.z)
-        }))
+        ANALYZER
+            .clone()
+            .analyze(REFERENCE_POINTS.iter().map(|&(x, y, z)| {
+                let pt = transform.transform_point(&Point3::new(x, y, z));
+                (pt.x, pt.y, pt.z)
+            }))
     }
 
     /// Applies `transform` to `orig`, then applies procrustes analysis and checks if we get
     /// approximately `transform` back.
-    fn test(orig: &[(f32, f32, f32)], transform: Matrix4<f32>) {
-        let recovered_transform = analyze(orig, transform);
-        let recovered_transform = recovered_transform.transformation_matrix();
+    fn test_recover_transform(transform: Matrix4<f32>) {
+        let recovered_transform = analyze(transform);
+        let recovered_transform = recovered_transform.transform();
 
         for (a, b) in zip_exact(transform.iter(), recovered_transform.iter()) {
             assert!(!a.is_nan(), "NaN in reference transform");
@@ -268,23 +315,46 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_identity() {
-        test(RIGHT_ARROW, Matrix4::identity());
-
-        let res = analyze(RIGHT_ARROW, Matrix4::identity());
-        let rot = res.rotation();
-        let rot_id = Rotation3::<f32>::identity();
-        for (a, b) in zip_exact(rot.matrix().iter(), rot_id.matrix().iter()) {
-            if (a - b).abs() > MAX_DELTA {
-                panic!(
-                    "failed to recover transformation; original transform: {}, recovered transform: {}",
-                    rot.matrix(), rot_id.matrix()
-                );
-            }
+    fn test_z_rotation(scaling: f32, translation: Vector3<f32>) {
+        fn clamp_degrees(degrees: i32) -> i32 {
+            ((degrees + 180) % 360) - 180
         }
 
-        let quat = res.rotation_as_quaternion();
+        let range = -180..=360;
+        let expected = range.clone().map(clamp_degrees).collect::<Vec<_>>();
+        let recovered = range
+            .clone()
+            .map(|deg| {
+                let angle = (deg as f32).to_radians();
+                let result = analyze(
+                    Matrix4::new_translation(&translation).prepend_scaling(scaling)
+                        * Matrix4::from(Rotation3::new(Vector3::new(0.0, 0.0, 1.0) * angle)),
+                );
+
+                assert_relative_eq!(result.scale(), scaling, epsilon = MAX_DELTA);
+                assert_relative_eq!(
+                    result.translation(),
+                    translation,
+                    epsilon = MAX_TRANSLATION_DELTA
+                );
+
+                let (roll, pitch, yaw) = result.rotation().euler_angles();
+                assert_relative_eq!(roll, 0.0, epsilon = MAX_DELTA);
+                assert_relative_eq!(pitch, 0.0, epsilon = MAX_DELTA);
+                clamp_degrees(yaw.to_degrees().round() as i32)
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(expected, recovered);
+    }
+
+    #[test]
+    fn test_identity() {
+        test_recover_transform(Matrix4::identity());
+
+        let res = analyze(Matrix4::identity());
+
+        let quat = res.rotation();
         let quat_id = UnitQuaternion::identity();
         assert!(
             quat.angle_to(&quat_id) <= MAX_DELTA,
@@ -296,73 +366,126 @@ mod tests {
     #[test]
     fn test_translate() {
         // First, along the unrelated Z axis (all points are in the XY plane).
-        test(
-            RIGHT_ARROW,
+        test_recover_transform(
             Matrix4::identity().append_translation(&Vector3::new(0.0, 0.0, 1.0)),
         );
 
-        test(
-            RIGHT_ARROW,
+        test_recover_transform(
             Matrix4::identity().append_translation(&Vector3::new(0.0, -4.0, 0.0)),
         );
 
-        test(
-            RIGHT_ARROW,
+        test_recover_transform(
             Matrix4::identity().append_translation(&Vector3::new(2.0, -4.0, -0.5)),
         );
     }
 
     #[test]
     fn test_uniform_scaling() {
-        test(RIGHT_ARROW, Matrix4::identity().append_scaling(4.0));
-        test(RIGHT_ARROW, Matrix4::identity().append_scaling(0.2));
+        test_recover_transform(Matrix4::identity().append_scaling(4.0));
+        test_recover_transform(Matrix4::identity().append_scaling(0.2));
         // Scaling by 0 collapses all points into the origin. This makes deriving any rotational
         // component impossible, but the rest of the algorithm should still work.
-        test(RIGHT_ARROW, Matrix4::identity().append_scaling(0.0));
+        test_recover_transform(Matrix4::identity().append_scaling(0.0));
+
+        let res = analyze(Matrix4::identity().append_scaling(2.0));
+        assert_eq!(res.scale(), 2.0);
+        assert_relative_eq!(
+            res.rotation(),
+            UnitQuaternion::identity(),
+            epsilon = MAX_DELTA
+        );
+        assert_relative_eq!(res.translation(), Vector3::zeros(), epsilon = MAX_DELTA);
+
+        let res = analyze(Matrix4::identity().append_scaling(0.5));
+        assert_eq!(res.scale(), 0.5);
+        assert_relative_eq!(
+            res.rotation(),
+            UnitQuaternion::identity(),
+            epsilon = MAX_DELTA
+        );
+        assert_relative_eq!(res.translation(), Vector3::zeros(), epsilon = MAX_DELTA);
     }
 
     #[test]
     fn test_rotation() {
-        test(
-            RIGHT_ARROW,
-            Rotation3::new(Vector3::new(0.0, 0.0, 1.0) * 2.0).into(),
-        );
-        test(
-            RIGHT_ARROW,
-            Rotation3::new(Vector3::new(0.0, 0.0, -1.0) * 2.0).into(),
-        );
-        test(
-            RIGHT_ARROW,
-            Rotation3::new(Vector3::new(0.5, 1.0, -1.0) * PI).into(),
-        );
-        test(
-            RIGHT_ARROW,
-            Rotation3::new(Vector3::new(0.5, 1.0, -1.0) * -PI).into(),
-        );
+        test_recover_transform(Rotation3::new(Vector3::new(0.0, 0.0, 1.0) * 2.0).into());
+        test_recover_transform(Rotation3::new(Vector3::new(0.0, 0.0, -1.0) * 2.0).into());
+        test_recover_transform(Rotation3::new(Vector3::new(0.5, 1.0, -1.0) * PI).into());
+        test_recover_transform(Rotation3::new(Vector3::new(0.5, 1.0, -1.0) * -PI).into());
     }
 
     #[test]
     fn test_combinations() {
-        test(
-            RIGHT_ARROW,
+        test_recover_transform(
             Matrix4::from(Rotation3::new(Vector3::new(0.5, 1.0, -1.0) * PI))
                 .append_translation(&Vector3::new(1.0, 0.5, 2.0))
                 .append_scaling(2.0),
         );
-        test(
-            RIGHT_ARROW,
+        test_recover_transform(
             Matrix4::from(Rotation3::new(Vector3::new(0.5, 1.0, -1.0) * PI))
                 * Matrix4::identity()
                     .append_translation(&Vector3::new(1.0, 0.5, 2.0))
                     .append_scaling(2.0),
         );
-        test(
-            RIGHT_ARROW,
+        test_recover_transform(
             Matrix4::from(Rotation3::new(Vector3::new(0.5, 1.0, -1.0) * PI))
                 * Matrix4::identity()
                     .append_scaling(0.3)
                     .append_translation(&Vector3::new(-1.0, -0.5, 2.0))
                     .append_scaling(2.1),
         );
+        test_recover_transform(
+            Matrix4::from(Rotation3::new(Vector3::new(0.5, 1.0, -1.0) * 2.3))
+                * Matrix4::identity()
+                    .append_scaling(0.3)
+                    .append_translation(&Vector3::new(-1.0, -0.5, 2.0))
+                    .append_scaling(2.1),
+        );
+    }
+
+    #[test]
+    fn test_rot_around_z() {
+        test_z_rotation(1.0, Vector3::zeros());
+        test_z_rotation(2.0, Vector3::zeros());
+        test_z_rotation(0.5, Vector3::zeros());
+
+        test_z_rotation(1.0, Vector3::new(10.0, 0.0, 0.0));
+        test_z_rotation(1.0, Vector3::new(-10.0, 7.0, 3.0));
+
+        test_z_rotation(0.5, Vector3::new(10.0, 0.0, 0.0));
+        test_z_rotation(2.0, Vector3::new(-10.0, 7.0, 3.0));
+    }
+
+    #[test]
+    fn large_scale_and_move() {
+        test_z_rotation(500.0, Vector3::new(0.5, 300.0, -1.0));
+    }
+
+    #[test]
+    fn jitter() {
+        let (expected_roll, expected_pitch, expected_yaw) = (3.0, -1.0, 2.0);
+        let rot = UnitQuaternion::from_euler_angles(expected_roll, expected_pitch, expected_yaw);
+        let offset = Vector3::new(50.0, 200.0, -20.0);
+        let rng = fastrand::Rng::new();
+        let res = ANALYZER
+            .clone()
+            .analyze(REFERENCE_POINTS.iter().map(|&(x, y, z)| {
+                let rotated = rot * Vector3::new(x, y, z);
+                (
+                    rotated.x * 100.0 + offset.x + rng.f32() - 0.5,
+                    rotated.y * 100.0 + offset.y + rng.f32() - 0.5,
+                    rotated.z * 100.0 + offset.z + rng.f32() - 0.5,
+                )
+            }));
+        assert_relative_eq!(res.scale(), 100.0, epsilon = 0.1);
+        assert_relative_eq!(res.translation(), offset, epsilon = 0.5);
+        let (roll, pitch, yaw) = res.rotation().euler_angles();
+        assert_relative_eq!(roll.to_degrees(), expected_roll.to_degrees(), epsilon = 0.1);
+        assert_relative_eq!(
+            pitch.to_degrees(),
+            expected_pitch.to_degrees(),
+            epsilon = 0.1
+        );
+        assert_relative_eq!(yaw.to_degrees(), expected_yaw.to_degrees(), epsilon = 0.1);
     }
 }

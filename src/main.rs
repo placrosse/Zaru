@@ -113,7 +113,7 @@ fn assembler() -> Result<Worker<AssemblerParams>, io::Error> {
                 &mut image,
                 center[0] as i32,
                 center[1] as i32,
-                procrustes_result.rotation_as_quaternion(),
+                procrustes_result.rotation(),
             );
 
             face_landmark.draw(&mut image);

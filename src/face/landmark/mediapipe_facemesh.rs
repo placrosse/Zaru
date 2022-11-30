@@ -371,17 +371,60 @@ impl Into<usize> for LandmarkIdx {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test;
+    use crate::{procrustes::ProcrustesAnalyzer, test};
+
+    #[track_caller]
+    fn check_angle(expected_radians: f32, actual_radians: f32) {
+        let expected_degrees = expected_radians.to_degrees();
+        let actual_degrees = actual_radians.to_degrees();
+        assert!(
+            (actual_degrees - expected_degrees).abs() < 5.0,
+            "expected angle: {}°, actual angle: {}°",
+            expected_degrees,
+            actual_degrees,
+        );
+    }
+
+    fn check_landmarks(image: ImageView<'_>, degrees: f32) {
+        let expected_radians = degrees.to_radians();
+
+        let mut lm = Landmarker::new();
+        let landmarks = lm.compute(&image);
+        assert!(landmarks.face_confidence() > 0.9);
+        check_angle(expected_radians, landmarks.rotation_radians());
+        check_angle(expected_radians, landmarks.left_eye().rotation_radians());
+        check_angle(expected_radians, landmarks.right_eye().rotation_radians());
+
+        if degrees <= 45.0f32 {
+            assert!(landmarks.left_eye().center().0 < landmarks.right_eye().center().0);
+        }
+
+        let mut pa = ProcrustesAnalyzer::new(reference_positions());
+
+        let res = pa.analyze(landmarks.landmarks().positions().iter().map(|&[x, y, z]| {
+            // Flip Y to bring us to canonical 3D coordinates (where Y points up).
+            // Only rotation matters, so we don't have to correct for the added
+            // translation.
+            (x, -y, z)
+        }));
+        let (roll, pitch, yaw) = res.rotation().euler_angles();
+        check_angle(0.0, yaw);
+        check_angle(0.0, pitch);
+        check_angle(expected_radians, roll);
+    }
 
     #[test]
-    fn estimates_landmarks() {
-        let mut lm = Landmarker::new();
-        let landmarks = lm.compute(test::sad_linus_cropped());
-        assert!(landmarks.face_confidence() > 0.9);
-        assert!(landmarks.rotation_radians().to_degrees() < 5.0);
-        assert!(landmarks.left_eye().rotation_radians().to_degrees() < 5.0);
-        assert!(landmarks.right_eye().rotation_radians().to_degrees() < 5.0);
+    fn estimates_landmarks_upright() {
+        check_landmarks(test::sad_linus_cropped().as_view(), 0.0);
+    }
 
-        assert!(landmarks.left_eye().center().0 < landmarks.right_eye().center().0);
+    #[test]
+    #[ignore = "image rotation does not result in the expected quaternion rotation"]
+    fn estimates_landmarks_rotated() {
+        let image = test::sad_linus_cropped();
+        check_landmarks(
+            image.view(RotatedRect::new(image.rect(), 10.0f32.to_radians())),
+            -10.0,
+        );
     }
 }

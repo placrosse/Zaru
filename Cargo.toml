@@ -45,6 +45,7 @@ serde = { version = "1.0.136", features = ["derive"] }
 [dev-dependencies]
 rayon = "1.5.1"
 fastrand = "1.7.0"
+approx = "0.5.1"
 
 [profile.dev]
 debug = 0
