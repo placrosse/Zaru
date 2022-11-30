@@ -31,6 +31,10 @@ pub struct HandTracker {
     iou_thresh: f32,
 }
 
+/// We use a custom padding for the [`LandmarkTracker`] since the default loses tracking when the
+/// hand is closed.
+const ROI_PADDING: f32 = 0.4;
+
 impl HandTracker {
     /// Default intersection-over-union threshold for deduplicating tracking regions.
     pub const DEFAULT_IOU_THRESH: f32 = 0.3;
@@ -163,6 +167,7 @@ impl HandTracker {
             let mut landmarker = self.landmarker.clone();
             let mut tracker =
                 LandmarkTracker::new(landmarker.input_resolution().aspect_ratio().unwrap());
+            tracker.set_roi_padding(ROI_PADDING);
             tracker.set_roi(roi);
             let roi_arc = Arc::new(Mutex::new(roi));
             let roi_arc2 = roi_arc.clone();

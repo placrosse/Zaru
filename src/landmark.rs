@@ -217,7 +217,7 @@ pub trait Estimator {
 /// This requires a landmark estimator that outputs a confidence value via the [`Estimator`] trait,
 /// indicating whether the tracked object is still in view.
 ///
-/// If the [`Estimator`] supports it, the tracking will also track the object's rotation.
+/// If the [`Estimator`] supports it, the tracker will also track the object's rotation.
 pub struct LandmarkTracker {
     roi: Option<RotatedRect>,
     loss_thresh: f32,
@@ -243,7 +243,7 @@ impl LandmarkTracker {
     /// Sets the tracking loss threshold.
     ///
     /// If the confidence value of the predicted landmarks falls below this value, tracking is
-    /// considered lost: the RoI is cleared, [`LandmarkTracker::track`] will return `None`, and
+    /// considered lost: the RoI is cleared, [`LandmarkTracker::track`] will return [`None`], and
     /// tracking has to be re-seeded by calling [`LandmarkTracker::set_roi`].
     ///
     /// By default, [`LandmarkTracker::DEFAULT_LOSS_THRESHOLD`] is used.
@@ -262,11 +262,18 @@ impl LandmarkTracker {
     /// to its left and right sides.
     ///
     /// By default, [`LandmarkTracker::DEFAULT_ROI_PADDING`] is used.
+    ///
+    /// # Panics
+    ///
+    /// This method panics when `padding` is less than 0.0 or when it is NaN.
     pub fn set_roi_padding(&mut self, padding: f32) {
+        assert!(padding >= 0.0);
         self.roi_padding = padding;
     }
 
     /// Returns the current region of interest.
+    ///
+    /// If no region of interest is being tracked, or tracking was lost, returns [`None`].
     pub fn roi(&self) -> Option<&RotatedRect> {
         self.roi.as_ref()
     }
@@ -275,7 +282,7 @@ impl LandmarkTracker {
     ///
     /// This can be passed either a [`Rect`][crate::image::Rect] or a [`RotatedRect`].
     ///
-    /// Note that this does not apply RoI padding. The rectangle is used as-is
+    /// Note that this does not apply RoI padding. The rectangle is used as-is.
     pub fn set_roi(&mut self, roi: impl Into<RotatedRect>) {
         self.roi = Some(roi.into());
     }
