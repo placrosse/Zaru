@@ -408,9 +408,9 @@ mod tests {
             (x, -y, z)
         }));
         let (roll, pitch, yaw) = res.rotation().euler_angles();
-        check_angle(0.0, yaw);
+        check_angle(0.0, roll);
         check_angle(0.0, pitch);
-        check_angle(expected_radians, roll);
+        check_angle(-expected_radians, yaw); // we've flipped the Y coord, so this flips too
     }
 
     #[test]
@@ -419,12 +419,20 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "image rotation does not result in the expected quaternion rotation"]
     fn estimates_landmarks_rotated() {
         let image = test::sad_linus_cropped();
         check_landmarks(
             image.view(RotatedRect::new(image.rect(), 10.0f32.to_radians())),
             -10.0,
+        );
+    }
+
+    #[test]
+    fn estimates_landmarks_rotated2() {
+        let image = test::sad_linus_cropped();
+        check_landmarks(
+            image.view(RotatedRect::new(image.rect(), -10.0f32.to_radians())),
+            10.0,
         );
     }
 }

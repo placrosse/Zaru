@@ -10,7 +10,7 @@ description = "Neural Network powered machine perception and computer vision lib
 # generic deps
 anyhow = "1.0.53"
 log = "0.4.14"
-env_logger = "0.9.0"
+env_logger = "0.10.0"
 itertools = "0.10.3"
 once_cell = "1.9.0"
 pawawwewism = "0.1.0"
@@ -18,7 +18,7 @@ pawawwewism = "0.1.0"
 # neural nets
 tract-onnx = "0.18.0"
 tinyvec = { version = "1.6.0", features = ["alloc"] }
-wonnx = { git = "https://github.com/webonnx/wonnx.git", rev = "aa92e550f15078ab936539f4225fbcb3f5b6895f" }
+wonnx = { git = "https://github.com/webonnx/wonnx.git", rev = "315d66a318515f1cc5e42684ddb8bd22ec01d378" }
 
 # image processing
 image = { version = "0.24.0", default-features = false, features = ["jpeg", "png", "gif"] }
