@@ -74,7 +74,7 @@ impl landmark::Network for MediaPipeFaceMesh {
     }
 }
 
-/// Landmark results returned by [`Landmarker::compute`].
+/// Landmark results estimated by [`MediaPipeFaceMesh`].
 #[derive(Clone)]
 pub struct LandmarkResult {
     landmarks: Landmarks,
@@ -263,10 +263,10 @@ include!(concat!(
 /// Returns an iterator over the vertices of the reference face model.
 ///
 /// Each point yielded by the returned iterator corresponds to the same point in the sequence
-/// of landmarks output by [`Landmarker`], but the scale and coordinate system does not: The points
+/// of landmarks in the [`LandmarkResult`], but the scale and coordinate system does not: The points
 /// returned by this function have Y pointing up, and X and Y are in a smaller range around `(0,0)`,
-/// while [`Landmarker`] yields points that have Y point down, and X and Y are in term of the input
-/// image's coordinates.
+/// while [`LandmarkResult`] contains points that have Y point down, and X and Y are in term of the
+/// input image's coordinates.
 pub fn reference_positions() -> impl Iterator<Item = (f32, f32, f32)> {
     REFERENCE_POSITIONS.iter().copied()
 }

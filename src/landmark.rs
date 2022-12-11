@@ -193,7 +193,7 @@ pub trait Confidence {
     fn confidence(&self) -> f32;
 }
 
-/// Trait wrapper types around neural networks that estimate landmarks.
+/// Trait implemented by wrapper types around neural networks that estimate landmarks.
 pub trait Network: Send + Sync + 'static {
     /// Type representing the predicted landmarks.
     type Output: Estimation;

@@ -71,10 +71,7 @@ impl Network for EyeNetwork {
     }
 }
 
-/// Computed landmarks of an eye and its iris.
-///
-/// All coordinates use the coordinate system of the input image passed to
-/// [`EyeLandmarker::compute`].
+/// Landmarks of an eye and its iris, estimated by [`EyeNetwork`].
 #[derive(Clone)]
 pub struct EyeLandmarks {
     landmarks: Landmarks,

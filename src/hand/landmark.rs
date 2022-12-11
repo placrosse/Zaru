@@ -10,7 +10,7 @@ use crate::{
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
 };
 
-/// Landmark results returned by [`Landmarker::compute`].
+/// Landmark results estimated by [`LiteNetwork`] and [`FullNetwork`].
 #[derive(Clone)]
 pub struct LandmarkResult {
     landmarks: Landmarks,
