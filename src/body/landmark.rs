@@ -84,15 +84,13 @@ impl Landmarker {
 
         self.result_buffer.pose_presence = pose_flag.index([0, 0]).as_singular();
 
-        for (coords, out) in zip_exact(
+        for (&[x, y, z, visibility, presence], out) in zip_exact(
             screen_landmarks
                 .index([0])
                 .as_slice()
                 .array_chunks_exact::<5>(),
             &mut self.result_buffer.landmarks,
         ) {
-            let (x, y, z) = (coords[0], coords[1], coords[2]);
-
             let (x, y) = unadjust_aspect_ratio(
                 x / input_res.width() as f32,
                 y / input_res.height() as f32,
@@ -103,8 +101,8 @@ impl Landmarker {
             out.x = x;
             out.y = y;
             out.z = z;
-            out.visibility = coords[3];
-            out.presence = coords[4];
+            out.visibility = visibility;
+            out.presence = presence;
         }
 
         &self.result_buffer
