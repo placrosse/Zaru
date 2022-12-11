@@ -4,97 +4,11 @@ use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
 use crate::{
-    image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut},
+    image::{self, AsImageViewMut, Color, ImageViewMut},
     iter::zip_exact,
-    landmark::{Estimation, Estimator, Landmarks},
-    nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
-    resolution::Resolution,
-    timer::Timer,
+    landmark::{Confidence, Estimation, Landmarks, Network},
+    nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
 };
-
-#[derive(Clone)]
-pub struct Landmarker {
-    cnn: &'static Cnn,
-    t_resize: Timer,
-    t_infer: Timer,
-    result_buffer: LandmarkResult,
-}
-
-impl Landmarker {
-    pub fn new<N: LandmarkNetwork>(network: N) -> Self {
-        drop(network);
-        Self {
-            cnn: N::cnn(),
-            t_resize: Timer::new("resize"),
-            t_infer: Timer::new("infer"),
-            result_buffer: LandmarkResult {
-                landmarks: Landmarks::new(21),
-                presence: 0.0,
-                raw_handedness: 0.0,
-            },
-        }
-    }
-
-    /// Returns the expected input resolution of the internal neural network.
-    pub fn input_resolution(&self) -> Resolution {
-        self.cnn.input_resolution()
-    }
-
-    /// Computes hand landmarks in `image`.
-    pub fn compute<V: AsImageView>(&mut self, image: &V) -> &mut LandmarkResult {
-        self.compute_impl(image.as_view())
-    }
-
-    fn compute_impl(&mut self, image: ImageView<'_>) -> &mut LandmarkResult {
-        let input_res = self.input_resolution();
-        let full_res = image.resolution();
-        let aspect_ratio = full_res.aspect_ratio().unwrap();
-
-        let mut image = image;
-        let resized;
-        if image.resolution() != input_res {
-            resized = self.t_resize.time(|| image.aspect_aware_resize(input_res));
-            image = resized.as_view();
-        }
-        let outputs = self.t_infer.time(|| self.cnn.estimate(&image)).unwrap();
-        log::trace!("cnn outputs: {:?}", outputs);
-
-        let screen_landmarks = &outputs[0];
-        let presence_flag = &outputs[1];
-        let handedness = &outputs[2];
-        let metric_landmarks = &outputs[3];
-
-        assert_eq!(screen_landmarks.shape(), &[1, 63]);
-        assert_eq!(presence_flag.shape(), &[1, 1]);
-        assert_eq!(handedness.shape(), &[1, 1]);
-        assert_eq!(metric_landmarks.shape(), &[1, 63]);
-
-        self.result_buffer.presence = presence_flag.index([0, 0]).as_singular();
-        self.result_buffer.raw_handedness = handedness.index([0, 0]).as_singular();
-        for (coords, out) in zip_exact(
-            screen_landmarks.index([0]).as_slice().chunks(3),
-            self.result_buffer.landmarks.positions_mut(),
-        ) {
-            let [x, y, z] = [coords[0], coords[1], coords[2]];
-            let (x, y) = unadjust_aspect_ratio(
-                x / input_res.width() as f32,
-                y / input_res.height() as f32,
-                aspect_ratio,
-            );
-            let (x, y) = (x * full_res.width() as f32, y * full_res.height() as f32);
-
-            out[0] = x;
-            out[1] = y;
-            out[2] = z;
-        }
-
-        &mut self.result_buffer
-    }
-
-    pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
-        [&self.t_resize, &self.t_infer].into_iter()
-    }
-}
 
 /// Landmark results returned by [`Landmarker::compute`].
 #[derive(Clone)]
@@ -102,6 +16,16 @@ pub struct LandmarkResult {
     landmarks: Landmarks,
     presence: f32,
     raw_handedness: f32,
+}
+
+impl Default for LandmarkResult {
+    fn default() -> Self {
+        LandmarkResult {
+            landmarks: Landmarks::new(21),
+            presence: 0.0,
+            raw_handedness: 0.0,
+        }
+    }
 }
 
 impl LandmarkResult {
@@ -239,10 +163,6 @@ impl LandmarkResult {
 }
 
 impl Estimation for LandmarkResult {
-    fn confidence(&self) -> f32 {
-        self.presence()
-    }
-
     fn landmarks_mut(&mut self) -> &mut Landmarks {
         &mut self.landmarks
     }
@@ -252,11 +172,9 @@ impl Estimation for LandmarkResult {
     }
 }
 
-impl Estimator for Landmarker {
-    type Estimation = LandmarkResult;
-
-    fn estimate<V: AsImageView>(&mut self, image: &V) -> &mut Self::Estimation {
-        self.compute(image)
+impl Confidence for LandmarkResult {
+    fn confidence(&self) -> f32 {
+        self.presence()
     }
 }
 
@@ -349,18 +267,17 @@ const CONNECTIVITY: &[(LandmarkIdx, LandmarkIdx)] = {
     ]
 };
 
-pub trait LandmarkNetwork {
-    fn cnn() -> &'static Cnn;
-}
-
 /// A lightweight but fairly inaccurate landmark estimation network.
 ///
 /// Takes a bit over 20ms to run on my machine, so it can't hit 60 FPS, but it is faster than
 /// [`FullNetwork`].
+#[derive(Clone, Copy)]
 pub struct LiteNetwork;
 
-impl LandmarkNetwork for LiteNetwork {
-    fn cnn() -> &'static Cnn {
+impl Network for LiteNetwork {
+    type Output = LandmarkResult;
+
+    fn cnn(&self) -> &Cnn {
         const MODEL_DATA: &[u8] = include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/3rdparty/onnx/hand_landmark_lite.onnx"
@@ -380,14 +297,21 @@ impl LandmarkNetwork for LiteNetwork {
 
         &MODEL
     }
+
+    fn extract(&self, outputs: &Outputs, estimation: &mut Self::Output) {
+        extract(outputs, estimation);
+    }
 }
 
 /// A somewhat more accurate landmark estimation network that takes about 25-30% longer to infer
 /// than [`LiteNetwork`] (on CPU).
+#[derive(Clone, Copy)]
 pub struct FullNetwork;
 
-impl LandmarkNetwork for FullNetwork {
-    fn cnn() -> &'static Cnn {
+impl Network for FullNetwork {
+    type Output = LandmarkResult;
+
+    fn cnn(&self) -> &Cnn {
         const MODEL_DATA: &[u8] = include_bytes!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/3rdparty/onnx/hand_landmark_full.onnx"
@@ -406,5 +330,33 @@ impl LandmarkNetwork for FullNetwork {
         });
 
         &MODEL
+    }
+
+    fn extract(&self, outputs: &Outputs, estimation: &mut Self::Output) {
+        extract(outputs, estimation);
+    }
+}
+
+fn extract(outputs: &Outputs, estimation: &mut LandmarkResult) {
+    let screen_landmarks = &outputs[0];
+    let presence_flag = &outputs[1];
+    let handedness = &outputs[2];
+    let metric_landmarks = &outputs[3];
+
+    assert_eq!(screen_landmarks.shape(), &[1, 63]);
+    assert_eq!(presence_flag.shape(), &[1, 1]);
+    assert_eq!(handedness.shape(), &[1, 1]);
+    assert_eq!(metric_landmarks.shape(), &[1, 63]);
+
+    estimation.presence = presence_flag.index([0, 0]).as_singular();
+    estimation.raw_handedness = handedness.index([0, 0]).as_singular();
+    for (coords, out) in zip_exact(
+        screen_landmarks.index([0]).as_slice().chunks(3),
+        estimation.landmarks.positions_mut(),
+    ) {
+        let [x, y, z] = [coords[0], coords[1], coords[2]];
+        out[0] = x;
+        out[1] = y;
+        out[2] = z;
     }
 }

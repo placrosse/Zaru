@@ -5,9 +5,9 @@ use std::io;
 use pawawwewism::{promise, Promise, PromiseHandle, Worker};
 use zaru::face::detection::Detector;
 use zaru::face::eye::{EyeLandmarker, EyeLandmarks};
-use zaru::face::landmark::mediapipe_facemesh::{self, LandmarkResult, Landmarker};
+use zaru::face::landmark::mediapipe_facemesh::{self, LandmarkResult, MediaPipeFaceMesh};
 use zaru::image::{Image, RotatedRect};
-use zaru::landmark::LandmarkTracker;
+use zaru::landmark::{Estimator, LandmarkTracker};
 use zaru::num::TotalF32;
 use zaru::procrustes::ProcrustesAnalyzer;
 use zaru::resolution::{AspectRatio, Resolution};
@@ -138,8 +138,8 @@ fn face_track_worker(eye_input_aspect: AspectRatio) -> Result<Worker<FaceTrackPa
     let mut t_total = Timer::new("total");
 
     let mut detector = Detector::default();
-    let mut landmarker = Landmarker::new();
-    let mut tracker = LandmarkTracker::new(landmarker.input_resolution().aspect_ratio().unwrap());
+    let mut estimator = Estimator::new(MediaPipeFaceMesh);
+    let mut tracker = LandmarkTracker::new(estimator.input_resolution().aspect_ratio().unwrap());
     let input_ratio = detector.input_resolution().aspect_ratio().unwrap();
 
     Worker::builder().name("face tracker").spawn(
@@ -171,7 +171,7 @@ fn face_track_worker(eye_input_aspect: AspectRatio) -> Result<Worker<FaceTrackPa
                 }
             }
 
-            if let Some(res) = tracker.track(&mut landmarker, &image) {
+            if let Some(res) = tracker.track(&mut estimator, &image) {
                 landmarks.fulfill(res.estimation().clone());
 
                 let left = res.estimation().left_eye();
@@ -190,7 +190,7 @@ fn face_track_worker(eye_input_aspect: AspectRatio) -> Result<Worker<FaceTrackPa
                 [&t_total]
                     .into_iter()
                     .chain(detector.timers())
-                    .chain(landmarker.timers()),
+                    .chain(estimator.timers()),
             );
         },
     )

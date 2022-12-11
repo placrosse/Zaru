@@ -14,16 +14,14 @@ use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
 use crate::{
-    filter::ema::Ema,
-    image::{self, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, RotatedRect},
+    image::{self, AsImageViewMut, Color, ImageViewMut, RotatedRect},
     iter::zip_exact,
-    landmark::{self, LandmarkFilter, Landmarks},
-    nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
+    landmark::{self, Landmarks},
+    nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
     num::{sigmoid, TotalF32},
-    resolution::Resolution,
-    timer::Timer,
 };
 
+const NUM_LANDMARKS: usize = 468;
 const MODEL_DATA: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/3rdparty/onnx/face_landmark.onnx"
@@ -41,115 +39,38 @@ static MODEL: Lazy<Cnn> = Lazy::new(|| {
     .unwrap()
 });
 
-/// A neural network based facial landmark predictor.
-pub struct Landmarker {
-    model: &'static Cnn,
-    t_resize: Timer,
-    t_infer: Timer,
-    /// Large, so keep one around and return by ref.
-    result_buffer: LandmarkResult,
-    filter: LandmarkFilter,
-}
+/// Estimates facial landmarks using the MediaPipe Face Mesh network.
+///
+/// The input image must be a cropped image of a face. When using [`Detector`], the
+/// rectangle returned by [`Detection::bounding_rect_loose`] produces good results.
+///
+/// The image should depict a face that is mostly upright. Results will be poor if the face is
+/// rotated too much. A [`LandmarkTracker`] can be used to automatically follow the rotation of a
+/// face and pass an upright view to the network.
+///
+/// [`Detector`]: super::super::detection::Detector
+/// [`Detection::bounding_rect_loose`]: super::super::detection::Detection::bounding_rect_loose
+/// [`LandmarkTracker`]: crate::landmark::LandmarkTracker
+pub struct MediaPipeFaceMesh;
 
-impl Landmarker {
-    const NUM_LANDMARKS: usize = 468;
+impl landmark::Network for MediaPipeFaceMesh {
+    type Output = LandmarkResult;
 
-    /// Creates a new facial landmark calculator.
-    pub fn new() -> Self {
-        Self {
-            model: &MODEL,
-            t_resize: Timer::new("resize"),
-            t_infer: Timer::new("infer"),
-            result_buffer: LandmarkResult {
-                landmarks: Landmarks::new(Self::NUM_LANDMARKS),
-                face_flag: 0.0,
-            },
-            filter: LandmarkFilter::new(Ema::new(0.5), Self::NUM_LANDMARKS),
-        }
+    fn cnn(&self) -> &Cnn {
+        &MODEL
     }
 
-    /// Returns the expected input resolution of the internal neural network.
-    ///
-    /// If an image is passed that has a different resolution, it will first be resized (while
-    /// adding black bars to retain the original aspect ratio).
-    pub fn input_resolution(&self) -> Resolution {
-        self.model.input_resolution()
-    }
-
-    pub fn set_filter(&mut self, filter: LandmarkFilter) {
-        self.filter = filter;
-    }
-
-    /// Computes facial landmarks in `image`.
-    ///
-    /// `image` must be a cropped image of a face. When using [`Detector`], the
-    /// rectangle returned by [`Detection::bounding_rect_loose`] produces good results.
-    ///
-    /// The image should depict a face that is mostly upright. Results will be poor if the face is
-    /// rotated too much.
-    ///
-    /// [`Detector`]: super::detection::Detector
-    /// [`Detection::bounding_rect_loose`]: super::detection::Detection::bounding_rect_loose
-    pub fn compute<V: AsImageView>(&mut self, image: &V) -> &mut LandmarkResult {
-        self.compute_impl(image.as_view())
-    }
-
-    fn compute_impl(&mut self, image: ImageView<'_>) -> &mut LandmarkResult {
-        let input_res = self.model.input_resolution();
-        let full_res = image.resolution();
-        let orig_aspect = full_res.aspect_ratio().unwrap();
-
-        let mut image = image;
-        let resized;
-        if image.resolution() != input_res {
-            resized = self.t_resize.time(|| image.aspect_aware_resize(input_res));
-            image = resized.as_view();
-        }
-        let result = self.t_infer.time(|| self.model.estimate(&image)).unwrap();
-        log::trace!("inference result: {:?}", result);
-
-        self.result_buffer.face_flag = sigmoid(result[1].index([0, 0, 0, 0]).as_singular());
+    fn extract(&self, output: &Outputs, estimation: &mut Self::Output) {
+        estimation.face_flag = sigmoid(output[1].index([0, 0, 0, 0]).as_singular());
         for (coords, out) in zip_exact(
-            result[0].index([0, 0, 0]).as_slice().chunks(3),
-            self.result_buffer.landmarks.positions_mut(),
+            output[0].index([0, 0, 0]).as_slice().chunks(3),
+            estimation.landmarks.positions_mut(),
         ) {
             let [x, y, z] = [coords[0], coords[1], coords[2]];
             out[0] = x;
             out[1] = y;
             out[2] = z;
         }
-
-        // Importantly, the filter uses the network's coordinates.
-        self.filter.filter(&mut self.result_buffer.landmarks);
-
-        // Map landmark coordinates back into the input image.
-        for pos in self.result_buffer.landmarks.positions_mut() {
-            let [x, y] = [pos[0], pos[1]];
-            let (x, y) = unadjust_aspect_ratio(
-                x / input_res.width() as f32,
-                y / input_res.height() as f32,
-                orig_aspect,
-            );
-            let (x, y) = (x * full_res.width() as f32, y * full_res.height() as f32);
-
-            pos[0] = x;
-            pos[1] = y;
-        }
-
-        &mut self.result_buffer
-    }
-
-    /// Returns profiling timers for image resizing and neural inference.
-    pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
-        [&self.t_resize, &self.t_infer].into_iter()
-    }
-}
-
-impl landmark::Estimator for Landmarker {
-    type Estimation = LandmarkResult;
-
-    fn estimate<V: AsImageView>(&mut self, image: &V) -> &mut Self::Estimation {
-        self.compute(image)
     }
 }
 
@@ -158,6 +79,15 @@ impl landmark::Estimator for Landmarker {
 pub struct LandmarkResult {
     landmarks: Landmarks,
     face_flag: f32,
+}
+
+impl Default for LandmarkResult {
+    fn default() -> Self {
+        Self {
+            landmarks: Landmarks::new(NUM_LANDMARKS),
+            face_flag: 0.0,
+        }
+    }
 }
 
 impl LandmarkResult {
@@ -310,16 +240,18 @@ impl LandmarkResult {
 }
 
 impl landmark::Estimation for LandmarkResult {
-    fn confidence(&self) -> f32 {
-        self.face_confidence()
-    }
-
     fn landmarks_mut(&mut self) -> &mut Landmarks {
         &mut self.landmarks
     }
 
     fn angle_radians(&self) -> Option<f32> {
         Some(self.rotation_radians())
+    }
+}
+
+impl landmark::Confidence for LandmarkResult {
+    fn confidence(&self) -> f32 {
+        self.face_confidence()
     }
 }
 
@@ -371,7 +303,12 @@ impl Into<usize> for LandmarkIdx {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{procrustes::ProcrustesAnalyzer, test};
+    use crate::{
+        image::{AsImageView, ImageView},
+        landmark::Estimator,
+        procrustes::ProcrustesAnalyzer,
+        test,
+    };
 
     #[track_caller]
     fn check_angle(expected_radians: f32, actual_radians: f32) {
@@ -388,14 +325,14 @@ mod tests {
     fn check_landmarks(image: ImageView<'_>, degrees: f32) {
         let expected_radians = degrees.to_radians();
 
-        let mut lm = Landmarker::new();
-        let landmarks = lm.compute(&image);
+        let mut lm = Estimator::new(MediaPipeFaceMesh);
+        let landmarks = lm.estimate(&image);
         assert!(landmarks.face_confidence() > 0.9);
         check_angle(expected_radians, landmarks.rotation_radians());
         check_angle(expected_radians, landmarks.left_eye().rotation_radians());
         check_angle(expected_radians, landmarks.right_eye().rotation_radians());
 
-        if degrees <= 45.0f32 {
+        if degrees.abs() <= 45.0f32 {
             assert!(landmarks.left_eye().center().0 < landmarks.right_eye().center().0);
         }
 

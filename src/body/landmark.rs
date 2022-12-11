@@ -1,5 +1,7 @@
 //! Body pose landmark prediction. Not yet fully implemented.
 
+// TODO: port to the new `landmark` module
+
 use once_cell::sync::Lazy;
 
 use crate::{

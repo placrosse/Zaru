@@ -11,12 +11,12 @@ use std::{
 
 use crate::{
     image::{Image, RotatedRect},
-    landmark::LandmarkTracker,
+    landmark::{Estimator, LandmarkTracker, Network},
 };
 
 use super::{
     detection::{self, Detection, PalmDetector},
-    landmark::{self, LandmarkResult, Landmarker},
+    landmark::LandmarkResult,
 };
 
 /// Self-contained hand detector, tracker, and landmarker.
@@ -27,7 +27,7 @@ pub struct HandTracker {
     detections_handle: Option<PromiseHandle<Vec<Detection>>>,
     next_det: Instant,
     det_interval: Duration,
-    landmarker: Landmarker,
+    make_estimator: Box<dyn Fn() -> Estimator<LandmarkResult>>,
     iou_thresh: f32,
 }
 
@@ -46,7 +46,7 @@ impl HandTracker {
     pub fn new<D, L>(detector: D, landmarker: L) -> Self
     where
         D: detection::PalmDetectionNetwork,
-        L: landmark::LandmarkNetwork,
+        L: Network<Output = LandmarkResult> + Clone + 'static,
     {
         let mut palm_detector = PalmDetector::new(detector);
         Self {
@@ -64,7 +64,7 @@ impl HandTracker {
             detections_handle: None,
             next_det: Instant::now(),
             det_interval: Self::DEFAULT_REDETECT_INTERVAL,
-            landmarker: Landmarker::new(landmarker),
+            make_estimator: Box::new(move || Estimator::new(landmarker.clone())),
             iou_thresh: Self::DEFAULT_IOU_THRESH,
         }
     }
@@ -164,9 +164,9 @@ impl HandTracker {
                 det.bounding_rect().grow_rel(grow_by),
                 det.rotation_radians(),
             );
-            let mut landmarker = self.landmarker.clone();
+            let mut estimator = (self.make_estimator)();
             let mut tracker =
-                LandmarkTracker::new(landmarker.input_resolution().aspect_ratio().unwrap());
+                LandmarkTracker::new(estimator.input_resolution().aspect_ratio().unwrap());
             tracker.set_roi_padding(ROI_PADDING);
             tracker.set_roi(roi);
             let roi_arc = Arc::new(Mutex::new(roi));
@@ -174,7 +174,7 @@ impl HandTracker {
             let mut worker = Worker::builder()
                 .name("hand tracker")
                 .spawn(move |(image, promise): (Arc<Image>, Promise<_>)| {
-                    match tracker.track(&mut landmarker, &*image) {
+                    match tracker.track(&mut estimator, &*image) {
                         Some(res) => {
                             *roi_arc2.lock().unwrap() = res.updated_roi();
 

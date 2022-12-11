@@ -4,9 +4,11 @@ use std::iter;
 
 use crate::{
     filter::Filter,
-    image::{AsImageView, RotatedRect},
+    image::{AsImageView, ImageView, RotatedRect},
     iter::zip_exact,
-    resolution::AspectRatio,
+    nn::{unadjust_aspect_ratio, Cnn, Outputs},
+    resolution::{AspectRatio, Resolution},
+    timer::Timer,
 };
 
 type Position = [f32; 3];
@@ -164,18 +166,8 @@ impl LandmarkFilter {
 }
 
 /// Trait for landmark estimation results returned by [`Estimator::estimate`].
-pub trait Estimation {
-    /// Confidence value indicating whether the tracked object is in view.
-    ///
-    /// By convention, this is in range 0.0 to 1.0, with anything above 0.5 indicating that the
-    /// tracked object is probably still in view. If a different range is used, the tracking loss
-    /// threshold probably needs adjusting.
-    fn confidence(&self) -> f32;
-
+pub trait Estimation: Send + Sync + 'static {
     /// Returns the predicted [`Landmarks`].
-    ///
-    /// The landmark coordinates must be the the coordinate system of the image passed to
-    /// [`Estimator::estimate`].
     fn landmarks_mut(&mut self) -> &mut Landmarks;
 
     /// Returns the estimated clockwise object rotation in radians.
@@ -191,21 +183,124 @@ pub trait Estimation {
     }
 }
 
-/// Trait for landmark estimators.
-///
-/// Implementing this trait allows using a landmark estimator with [`LandmarkTracker`].
-pub trait Estimator {
+/// Trait for network inference results that contain a confidence value.
+pub trait Confidence {
+    /// Confidence value indicating whether the tracked object is in view.
+    ///
+    /// By convention, this is in range 0.0 to 1.0, with anything above 0.5 indicating that the
+    /// tracked object is probably still in view. If a different range is used, the tracking loss
+    /// threshold probably needs adjusting.
+    fn confidence(&self) -> f32;
+}
+
+/// Trait wrapper types around neural networks that estimate landmarks.
+pub trait Network: Send + Sync + 'static {
     /// Type representing the predicted landmarks.
-    type Estimation: Estimation;
+    type Output: Estimation;
+
+    /// Returns the [`Cnn`] to use for landmark estimation.
+    fn cnn(&self) -> &Cnn;
+
+    /// Extracts the network outputs and writes them to the [`Estimation`] type of this network
+    /// wrapper.
+    ///
+    /// The landmark positions are expected to be in the coordinate system of the network's input.
+    fn extract(&self, outputs: &Outputs, estimation: &mut Self::Output);
+}
+
+/// Neural-network based landmark estimator.
+///
+/// This estimator processes an input image and yields an [`Estimation`] of type `E`, containing the
+/// derived [`Landmarks`] and other data (depending on the network).
+pub struct Estimator<E: Estimation> {
+    network: Box<dyn Network<Output = E>>,
+    estimation: E,
+    t_resize: Timer,
+    t_infer: Timer,
+    filter: LandmarkFilter,
+}
+
+impl<E: Estimation + Default> Estimator<E> {
+    pub fn new<N: Network<Output = E>>(network: N) -> Self {
+        Self {
+            network: Box::new(network),
+            estimation: E::default(),
+            t_resize: Timer::new("resize"),
+            t_infer: Timer::new("infer"),
+            filter: LandmarkFilter::default(),
+        }
+    }
+}
+
+impl<E: Estimation> Estimator<E> {
+    /// Returns the expected input resolution of the internal neural network.
+    ///
+    /// If an image is passed that has a different resolution, it will first be resized (while
+    /// adding black bars to retain the original aspect ratio).
+    pub fn input_resolution(&self) -> Resolution {
+        self.network.cnn().input_resolution()
+    }
+
+    /// Returns profiling timers for this landmark estimator.
+    pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
+        [&self.t_resize, &self.t_infer].into_iter()
+    }
+
+    /// Sets the [`LandmarkFilter`] to apply to all landmark positions.
+    ///
+    /// The filter will be applied after inference, but before adjusting landmark coordinates back
+    /// to the input image's coordinates.
+    ///
+    /// This should only be used if the estimator is fed subsequent frames from an animation or
+    /// video feed.
+    pub fn set_filter(&mut self, filter: LandmarkFilter) {
+        self.filter = filter;
+    }
 
     /// Performs landmark estimation on `image`.
-    ///
-    /// This method has to accept images of arbitrary resolution and aspect ratio.
-    ///
-    /// This trait requires that the estimation result is allocated within `self` and returned by
-    /// reference to avoid unnecessary copies. Once Rust has GATs, the design should be changed to
-    /// be more flexible with this.
-    fn estimate<V: AsImageView>(&mut self, image: &V) -> &mut Self::Estimation;
+    pub fn estimate<V: AsImageView>(&mut self, image: &V) -> &mut E {
+        self.estimate_impl(image.as_view())
+    }
+
+    fn estimate_impl(&mut self, image: ImageView<'_>) -> &mut E {
+        let cnn = self.network.cnn();
+        let input_res = cnn.input_resolution();
+        let full_res = image.resolution();
+        let orig_aspect = full_res.aspect_ratio().unwrap();
+
+        // FIXME: we can just create an oversized view, `aspect_aware_resize` is pretty obsolete.
+        // Needs a change to allow CNNs to consume any size of input view
+        let mut image = image;
+        let resized;
+        if image.resolution() != input_res {
+            resized = self.t_resize.time(|| image.aspect_aware_resize(input_res));
+            image = resized.as_view();
+        }
+        let outputs = self.t_infer.time(|| cnn.estimate(&image)).unwrap();
+        log::trace!("inference result: {:?}", outputs);
+
+        self.network.extract(&outputs, &mut self.estimation);
+
+        // Importantly, the filter uses the network's coordinates, which makes filter parameters
+        // independent of the image's dimensions.
+        self.filter.filter(self.estimation.landmarks_mut());
+
+        // Map landmark coordinates back into the input image.
+        for pos in self.estimation.landmarks_mut().positions_mut() {
+            let [x, y] = [pos[0], pos[1]];
+            let (x, y) = unadjust_aspect_ratio(
+                x / input_res.width() as f32,
+                y / input_res.height() as f32,
+                orig_aspect,
+            );
+            let (x, y) = (x * full_res.width() as f32, y * full_res.height() as f32);
+
+            pos[0] = x;
+            pos[1] = y;
+        }
+
+        &mut self.estimation
+    }
 }
 
 /// Tracks a region of interest (RoI) across subsequent frames by tracking the movement of estimated
@@ -302,11 +397,15 @@ impl LandmarkTracker {
     /// `track` always has to be called on images of the same size, otherwise the tracking window
     /// won't match between frames. The same estimator should also be used to ensure that landmark
     /// and confidence value meanings stay the same across subsequent frames.
-    pub fn track<'e, L: Estimator, V: AsImageView>(
+    pub fn track<'e, E, V>(
         &mut self,
-        estimator: &'e mut L,
+        estimator: &'e mut Estimator<E>,
         full_image: &V,
-    ) -> Option<TrackingResult<'e, L>> {
+    ) -> Option<TrackingResult<'e, E>>
+    where
+        E: Estimation + Confidence + Default,
+        V: AsImageView,
+    {
         let roi = self.roi?;
         let view_rect = roi.map(|rect| rect.grow_to_fit_aspect(self.input_ratio));
         let full_image = full_image.as_view();
@@ -350,13 +449,13 @@ impl LandmarkTracker {
 }
 
 /// The result returned by [`LandmarkTracker::track`].
-pub struct TrackingResult<'a, L: Estimator> {
+pub struct TrackingResult<'a, E: Estimation> {
     view_rect: RotatedRect,
-    estimation: &'a L::Estimation,
+    estimation: &'a E,
     updated_roi: RotatedRect,
 }
 
-impl<'a, L: Estimator> TrackingResult<'a, L> {
+impl<'a, E: Estimation> TrackingResult<'a, E> {
     /// Returns the rectangle inside the full image passed to [`LandmarkTracker::track`] that was
     /// used to compute the landmarks.
     pub fn view_rect(&self) -> RotatedRect {
@@ -366,7 +465,7 @@ impl<'a, L: Estimator> TrackingResult<'a, L> {
     /// Returns the estimation result, including landmarks.
     ///
     /// Landmark coordinates are in terms of the full image passed to [`LandmarkTracker::track`].
-    pub fn estimation(&self) -> &'a L::Estimation {
+    pub fn estimation(&self) -> &'a E {
         self.estimation
     }
 
