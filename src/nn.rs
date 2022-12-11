@@ -48,17 +48,23 @@ impl Cnn {
         let input_res = Self::get_input_res(&nn, shape)?;
         let (h, w) = (input_res.height() as usize, input_res.width() as usize);
 
+        fn sample(view: &ImageView<'_>, u: f32, v: f32) -> Color {
+            let x = (u * view.resolution().width() as f32).round() as u32;
+            let y = (v * view.resolution().height() as f32).round() as u32;
+            view.get(x, y)
+        }
+
         // Box a closure that maps the whole input image to a tensor. That way we avoid dynamic
         // dispatch as much as possible.
         let image_map: Arc<dyn Fn(ImageView<'_>) -> _ + Send + Sync> = match shape {
             CnnInputShape::NCHW => Arc::new(move |view| {
                 Tensor::from_array_shape_fn([1, 3, h, w], |[_, c, y, x]| {
-                    color_map(view.get(x as _, y as _))[c]
+                    color_map(sample(&view, x as f32 / w as f32, y as f32 / h as f32))[c]
                 })
             }),
             CnnInputShape::NHWC => Arc::new(move |view| {
                 Tensor::from_array_shape_fn([1, h, w, 3], |[_, y, x, c]| {
-                    color_map(view.get(x as _, y as _))[c]
+                    color_map(sample(&view, x as f32 / w as f32, y as f32 / h as f32))[c]
                 })
             }),
         };
@@ -105,21 +111,13 @@ impl Cnn {
 
     /// Runs the network on an input image, returning the estimated outputs.
     ///
-    /// # Panics
-    ///
-    /// The image's resolution must match the CNN's [`input_resolution`][Self::input_resolution],
-    /// otherwise this method will panic.
+    /// The input image will be sampled to create the network's input tensor. If the image's aspect
+    /// ratio does not match the network's input aspect ratio, the image will be stretched.
     pub fn estimate<V: AsImageView>(&self, image: &V) -> Result<Outputs, Error> {
         self.estimate_impl(image.as_view())
     }
 
     fn estimate_impl(&self, image: ImageView<'_>) -> Result<Outputs, Error> {
-        assert_eq!(
-            image.resolution(),
-            self.input_resolution(),
-            "CNN input image does not have expected resolution"
-        );
-
         let tensor = (self.image_map)(image);
 
         self.nn.estimate(&Inputs::from(tensor))
