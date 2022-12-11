@@ -21,7 +21,6 @@ use crate::{
     num::{sigmoid, TotalF32},
 };
 
-const NUM_LANDMARKS: usize = 468;
 const MODEL_DATA: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/3rdparty/onnx/face_landmark.onnx"
@@ -84,13 +83,15 @@ pub struct LandmarkResult {
 impl Default for LandmarkResult {
     fn default() -> Self {
         Self {
-            landmarks: Landmarks::new(NUM_LANDMARKS),
+            landmarks: Landmarks::new(Self::NUM_LANDMARKS),
             face_flag: 0.0,
         }
     }
 }
 
 impl LandmarkResult {
+    pub const NUM_LANDMARKS: usize = 468;
+
     /// Returns the 3D landmark positions in the input image's coordinate system.
     pub fn landmark_positions(&self) -> impl Iterator<Item = (f32, f32, f32)> + '_ {
         (0..self.landmark_count()).map(|index| self.landmark_position(index))
