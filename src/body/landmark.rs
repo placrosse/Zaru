@@ -10,6 +10,7 @@ use crate::{
     nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},
     num::sigmoid,
     resolution::{AspectRatio, Resolution},
+    slice::SliceExt,
     timer::Timer,
 };
 
@@ -84,7 +85,10 @@ impl Landmarker {
         self.result_buffer.pose_presence = pose_flag.index([0, 0]).as_singular();
 
         for (coords, out) in zip_exact(
-            screen_landmarks.index([0]).as_slice().chunks(5),
+            screen_landmarks
+                .index([0])
+                .as_slice()
+                .array_chunks_exact::<5>(),
             &mut self.result_buffer.landmarks,
         ) {
             let (x, y, z) = (coords[0], coords[1], coords[2]);

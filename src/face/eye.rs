@@ -13,6 +13,7 @@ use crate::{
     landmark::{Estimation, Landmarks, Network},
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
     resolution::Resolution,
+    slice::SliceExt,
 };
 
 const MODEL_DATA: &[u8] = include_bytes!(concat!(
@@ -51,22 +52,22 @@ impl Network for EyeNetwork {
         let eye_contour = &outputs[0];
         let iris_contour = &outputs[1];
 
-        for (coords, [out_x, out_y, out_z]) in zip_exact(
-            eye_contour.index([0]).as_slice().chunks(3), // x, y, and z coordinates
+        for (&[x, y, z], [out_x, out_y, out_z]) in zip_exact(
+            eye_contour.index([0]).as_slice().array_chunks_exact::<3>(), // x, y, and z coordinates
             estimation.landmarks.positions_mut()[5..].iter_mut(),
         ) {
-            *out_x = coords[0];
-            *out_y = coords[1];
-            *out_z = coords[2];
+            *out_x = x;
+            *out_y = y;
+            *out_z = z;
         }
 
-        for (coords, [out_x, out_y, out_z]) in zip_exact(
-            iris_contour.index([0]).as_slice().chunks(3), // x, y, and z coordinates
+        for (&[x, y, z], [out_x, out_y, out_z]) in zip_exact(
+            iris_contour.index([0]).as_slice().array_chunks_exact::<3>(), // x, y, and z coordinates
             estimation.landmarks.positions_mut()[..5].iter_mut(),
         ) {
-            *out_x = coords[0];
-            *out_y = coords[1];
-            *out_z = coords[2];
+            *out_x = x;
+            *out_y = y;
+            *out_z = z;
         }
     }
 }

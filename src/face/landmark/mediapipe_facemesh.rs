@@ -19,6 +19,7 @@ use crate::{
     landmark::{self, Landmarks},
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
     num::{sigmoid, TotalF32},
+    slice::SliceExt,
 };
 
 const MODEL_DATA: &[u8] = include_bytes!(concat!(
@@ -61,11 +62,13 @@ impl landmark::Network for MediaPipeFaceMesh {
 
     fn extract(&self, output: &Outputs, estimation: &mut Self::Output) {
         estimation.face_flag = sigmoid(output[1].index([0, 0, 0, 0]).as_singular());
-        for (coords, out) in zip_exact(
-            output[0].index([0, 0, 0]).as_slice().chunks(3),
+        for (&[x, y, z], out) in zip_exact(
+            output[0]
+                .index([0, 0, 0])
+                .as_slice()
+                .array_chunks_exact::<3>(),
             estimation.landmarks.positions_mut(),
         ) {
-            let [x, y, z] = [coords[0], coords[1], coords[2]];
             out[0] = x;
             out[1] = y;
             out[2] = z;

@@ -8,6 +8,7 @@ use crate::{
     iter::zip_exact,
     landmark::{Confidence, Estimation, Landmarks, Network},
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
+    slice::SliceExt,
 };
 
 /// Landmark results estimated by [`LiteNetwork`] and [`FullNetwork`].
@@ -350,11 +351,13 @@ fn extract(outputs: &Outputs, estimation: &mut LandmarkResult) {
 
     estimation.presence = presence_flag.index([0, 0]).as_singular();
     estimation.raw_handedness = handedness.index([0, 0]).as_singular();
-    for (coords, out) in zip_exact(
-        screen_landmarks.index([0]).as_slice().chunks(3),
+    for (&[x, y, z], out) in zip_exact(
+        screen_landmarks
+            .index([0])
+            .as_slice()
+            .array_chunks_exact::<3>(),
         estimation.landmarks.positions_mut(),
     ) {
-        let [x, y, z] = [coords[0], coords[1], coords[2]];
         out[0] = x;
         out[1] = y;
         out[2] = z;

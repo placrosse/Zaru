@@ -11,6 +11,7 @@ use crate::{
     iter::zip_exact,
     landmark::{Estimation, Landmarks, Network},
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
+    slice::SliceExt,
 };
 
 const NUM_LANDMARKS: usize = 68;
@@ -72,11 +73,10 @@ impl Network for PeppaFacialLandmark {
 
     fn extract(&self, outputs: &Outputs, estimation: &mut Self::Output) {
         let res = self.cnn().input_resolution();
-        for (coords, out) in zip_exact(
-            outputs[0].index([0]).as_slice()[..NUM_LANDMARKS * 2].chunks(2),
+        for (&[x, y], out) in zip_exact(
+            outputs[0].index([0]).as_slice()[..NUM_LANDMARKS * 2].array_chunks_exact::<2>(),
             estimation.landmarks.positions_mut(),
         ) {
-            let [x, y] = [coords[0], coords[1]];
             out[0] = x * res.width() as f32;
             out[1] = y * res.height() as f32;
         }
@@ -118,11 +118,10 @@ impl Network for FaceOnnx {
 
     fn extract(&self, outputs: &Outputs, estimation: &mut Self::Output) {
         let res = self.cnn().input_resolution();
-        for (coords, out) in zip_exact(
-            outputs[0].index([0]).as_slice()[..NUM_LANDMARKS * 2].chunks(2),
+        for (&[x, y], out) in zip_exact(
+            outputs[0].index([0]).as_slice()[..NUM_LANDMARKS * 2].array_chunks_exact::<2>(),
             estimation.landmarks.positions_mut(),
         ) {
-            let [x, y] = [coords[0], coords[1]];
             out[0] = x * res.width() as f32;
             out[1] = y * res.height() as f32;
         }
