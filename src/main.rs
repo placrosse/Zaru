@@ -4,10 +4,10 @@ use std::io;
 
 use pawawwewism::{promise, Promise, PromiseHandle, Worker};
 use zaru::face::detection::Detector;
-use zaru::face::eye::{EyeLandmarker, EyeLandmarks};
+use zaru::face::eye::{EyeLandmarks, EyeNetwork};
 use zaru::face::landmark::mediapipe_facemesh::{self, LandmarkResult, MediaPipeFaceMesh};
 use zaru::image::{Image, RotatedRect};
-use zaru::landmark::{Estimator, LandmarkTracker};
+use zaru::landmark::{Estimator, LandmarkTracker, Network};
 use zaru::num::TotalF32;
 use zaru::procrustes::ProcrustesAnalyzer;
 use zaru::resolution::{AspectRatio, Resolution};
@@ -18,10 +18,7 @@ use zaru::{gui, image, Error};
 fn main() -> Result<(), Error> {
     zaru::init_logger!();
 
-    let eye_input_aspect = EyeLandmarker::new()
-        .input_resolution()
-        .aspect_ratio()
-        .unwrap();
+    let eye_input_aspect = EyeNetwork.cnn().input_resolution().aspect_ratio().unwrap();
 
     let mut face_tracker = face_track_worker(eye_input_aspect)?;
     let mut left_eye_worker = eye_worker(Eye::Left)?;
@@ -211,7 +208,7 @@ fn eye_worker(eye: Eye) -> Result<Worker<EyeParams>, io::Error> {
         Eye::Left => "left iris",
         Eye::Right => "right iris",
     };
-    let mut landmarker = EyeLandmarker::new();
+    let mut landmarker = Estimator::new(EyeNetwork);
     let mut fps = FpsCounter::new(name);
 
     Worker::builder().name(name).spawn(
@@ -221,10 +218,10 @@ fn eye_worker(eye: Eye) -> Result<Worker<EyeParams>, io::Error> {
               }| {
             let Ok((image, rect)) = eye_image.block() else { return };
             let marks = match eye {
-                Eye::Left => landmarker.compute(&image),
+                Eye::Left => landmarker.estimate(&image),
                 Eye::Right => {
-                    let marks = landmarker.compute(&image.flip_horizontal());
-                    marks.flip_horizontal_in_place();
+                    let marks = landmarker.estimate(&image.flip_horizontal());
+                    marks.flip_horizontal_in_place(image.resolution());
                     marks
                 }
             };
