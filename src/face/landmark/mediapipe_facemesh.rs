@@ -92,22 +92,6 @@ impl Default for LandmarkResult {
 impl LandmarkResult {
     pub const NUM_LANDMARKS: usize = 468;
 
-    /// Returns the 3D landmark positions in the input image's coordinate system.
-    pub fn landmark_positions(&self) -> impl Iterator<Item = (f32, f32, f32)> + '_ {
-        (0..self.landmark_count()).map(|index| self.landmark_position(index))
-    }
-
-    /// Returns a landmark's position in the input image's coordinate system.
-    pub fn landmark_position(&self, index: usize) -> (f32, f32, f32) {
-        let [x, y, z] = self.landmarks.landmark(index).position();
-        (x, y, z)
-    }
-
-    #[inline]
-    pub fn landmark_count(&self) -> usize {
-        self.landmarks.len()
-    }
-
     #[inline]
     pub fn landmarks(&self) -> &Landmarks {
         &self.landmarks
@@ -130,11 +114,17 @@ impl LandmarkResult {
     }
 
     pub fn rotation_radians(&self) -> f32 {
-        let left_eye = self.landmark_position(LandmarkIdx::LeftEyeOuterCorner as _);
-        let right_eye = self.landmark_position(LandmarkIdx::RightEyeOuterCorner as _);
+        let left_eye = self
+            .landmarks()
+            .landmark(LandmarkIdx::LeftEyeOuterCorner as _)
+            .position();
+        let right_eye = self
+            .landmarks()
+            .landmark(LandmarkIdx::RightEyeOuterCorner as _)
+            .position();
         let left_to_right_eye = Vector2::new(
-            (right_eye.0 - left_eye.0) as f32,
-            (right_eye.1 - left_eye.1) as f32,
+            (right_eye[0] - left_eye[0]) as f32,
+            (right_eye[1] - left_eye[1]) as f32,
         );
         Rotation2::rotation_between(&Vector2::x(), &left_to_right_eye).angle()
     }
@@ -151,8 +141,8 @@ impl LandmarkResult {
             ]
             .into_iter()
             .map(|idx| {
-                let pos = self.landmark_position(idx as usize);
-                (pos.0 as i32, pos.1 as i32)
+                let [x, y, ..] = self.landmarks().landmark(idx as usize).position();
+                (x as i32, y as i32)
             }),
         )
         .unwrap()
@@ -170,8 +160,8 @@ impl LandmarkResult {
             ]
             .into_iter()
             .map(|idx| {
-                let pos = self.landmark_position(idx as usize);
-                (pos.0 as i32, pos.1 as i32)
+                let [x, y, ..] = self.landmarks().landmark(idx as usize).position();
+                (x as i32, y as i32)
             }),
         )
         .unwrap()
@@ -188,7 +178,7 @@ impl LandmarkResult {
     }
 
     fn draw_impl(&self, image: &mut ImageViewMut<'_>) {
-        for (x, y, _z) in self.landmark_positions() {
+        for &[x, y, ..] in self.landmarks().positions() {
             image::draw_marker(image, x as _, y as _).size(3);
         }
 
@@ -198,15 +188,19 @@ impl LandmarkResult {
             _ => Color::RED,
         };
         let (x_min, x_max) = self
-            .landmark_positions()
-            .map(|(x, _, _)| TotalF32(x))
+            .landmarks()
+            .positions()
+            .iter()
+            .map(|[x, ..]| TotalF32(*x))
             .minmax()
             .into_option()
             .unwrap();
         let x = (x_min.0 + x_max.0) / 2.0;
         let y = self
-            .landmark_positions()
-            .map(|(_, y, _)| TotalF32(y))
+            .landmarks()
+            .positions()
+            .iter()
+            .map(|[_, y, ..]| TotalF32(*y))
             .min()
             .unwrap()
             .0;
@@ -219,20 +213,26 @@ impl LandmarkResult {
         .align_bottom()
         .color(color);
 
-        let left_eye = self.landmark_position(LandmarkIdx::LeftEyeOuterCorner as _);
-        let right_eye = self.landmark_position(LandmarkIdx::RightEyeOuterCorner as _);
+        let left_eye = self
+            .landmarks()
+            .landmark(LandmarkIdx::LeftEyeOuterCorner as _)
+            .position();
+        let right_eye = self
+            .landmarks()
+            .landmark(LandmarkIdx::RightEyeOuterCorner as _)
+            .position();
         image::draw_line(
             image,
-            left_eye.0 as _,
-            left_eye.1 as _,
-            right_eye.0 as _,
-            right_eye.1 as _,
+            left_eye[0] as _,
+            left_eye[1] as _,
+            right_eye[0] as _,
+            right_eye[1] as _,
         )
         .color(Color::WHITE);
         image::draw_text(
             image,
-            ((left_eye.0 + right_eye.0) / 2.0) as i32,
-            ((left_eye.1 + right_eye.1) / 2.0) as i32,
+            ((left_eye[0] + right_eye[0]) / 2.0) as i32,
+            ((left_eye[1] + right_eye[1]) / 2.0) as i32,
             &format!("{:.1} deg", self.rotation_radians().to_degrees()),
         )
         .align_bottom()
