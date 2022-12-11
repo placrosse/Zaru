@@ -403,9 +403,11 @@ impl<'a> ImageView<'a> {
 
     /// Creates an immutable subview into an area of this view, specified by `rect`.
     ///
-    /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
-    /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
-    /// `rect`.
+    /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will
+    /// access the underlying [`Image`] outside of this [`ImageView`]. If part of `rect` are outside
+    /// of the underlying [`Image`], they will be read as [`Color::NULL`].
+    ///
+    /// The returned view always has the size of `rect`.
     pub fn view(&self, rect: impl Into<RotatedRect>) -> ImageView<'_> {
         ImageView {
             image: self.image,

@@ -6,7 +6,7 @@ use crate::{
     filter::Filter,
     image::{AsImageView, ImageView, RotatedRect},
     iter::zip_exact,
-    nn::{unadjust_aspect_ratio, Cnn, Outputs},
+    nn::{Cnn, Outputs},
     resolution::{AspectRatio, Resolution},
     timer::Timer,
 };
@@ -215,7 +215,6 @@ pub trait Network: Send + Sync + 'static {
 pub struct Estimator<E: Estimation> {
     network: Box<dyn Network<Output = E>>,
     estimation: E,
-    t_resize: Timer,
     t_infer: Timer,
     filter: LandmarkFilter,
 }
@@ -225,7 +224,6 @@ impl<E: Estimation + Default> Estimator<E> {
         Self {
             network: Box::new(network),
             estimation: E::default(),
-            t_resize: Timer::new("resize"),
             t_infer: Timer::new("infer"),
             filter: LandmarkFilter::default(),
         }
@@ -235,15 +233,15 @@ impl<E: Estimation + Default> Estimator<E> {
 impl<E: Estimation> Estimator<E> {
     /// Returns the expected input resolution of the internal neural network.
     ///
-    /// If an image is passed that has a different resolution, it will first be resized (while
-    /// adding black bars to retain the original aspect ratio).
+    /// If an image is passed that has a different resolution, the [`Estimator`] will automatically
+    /// create an [`ImageView`] that
     pub fn input_resolution(&self) -> Resolution {
         self.network.cnn().input_resolution()
     }
 
     /// Returns profiling timers for this landmark estimator.
     pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
-        [&self.t_resize, &self.t_infer].into_iter()
+        [&self.t_infer].into_iter()
     }
 
     /// Sets the [`LandmarkFilter`] to apply to all landmark positions.
@@ -265,18 +263,14 @@ impl<E: Estimation> Estimator<E> {
     fn estimate_impl(&mut self, image: ImageView<'_>) -> &mut E {
         let cnn = self.network.cnn();
         let input_res = cnn.input_resolution();
-        let full_res = image.resolution();
-        let orig_aspect = full_res.aspect_ratio().unwrap();
 
-        // FIXME: we can just create an oversized view, `aspect_aware_resize` is pretty obsolete.
-        // Needs a change to allow CNNs to consume any size of input view
-        let mut image = image;
-        let resized;
-        if image.resolution() != input_res {
-            resized = self.t_resize.time(|| image.aspect_aware_resize(input_res));
-            image = resized.as_view();
-        }
-        let outputs = self.t_infer.time(|| cnn.estimate(&image)).unwrap();
+        // If the input image's aspect ratio doesn't match the CNN's input, create an oversized view
+        // that does.
+        let rect = image
+            .rect()
+            .grow_to_fit_aspect(input_res.aspect_ratio().unwrap());
+        let view = image.view(rect);
+        let outputs = self.t_infer.time(|| cnn.estimate(&view)).unwrap();
         log::trace!("inference result: {:?}", outputs);
 
         self.network.extract(&outputs, &mut self.estimation);
@@ -286,17 +280,15 @@ impl<E: Estimation> Estimator<E> {
         self.filter.filter(self.estimation.landmarks_mut());
 
         // Map landmark coordinates back into the input image.
+        let scale = rect.width() as f32 / input_res.width() as f32;
         for pos in self.estimation.landmarks_mut().positions_mut() {
-            let [x, y] = [pos[0], pos[1]];
-            let (x, y) = unadjust_aspect_ratio(
-                x / input_res.width() as f32,
-                y / input_res.height() as f32,
-                orig_aspect,
-            );
-            let (x, y) = (x * full_res.width() as f32, y * full_res.height() as f32);
+            // Map all coordinates from the network's input coordinate system to `rect`'s system.
+            *pos = pos.map(|t| t * scale);
 
-            pos[0] = x;
-            pos[1] = y;
+            // Now remove the offset added by the oversized rectangle (this compensates for
+            // "black bars" added to adjust the aspect ratio).
+            pos[0] = pos[0] + rect.x() as f32;
+            pos[1] = pos[1] + rect.y() as f32;
         }
 
         &mut self.estimation
