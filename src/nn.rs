@@ -9,6 +9,7 @@ use std::{
     borrow::Cow,
     ops::{Index, Range, RangeInclusive},
     path::Path,
+    sync::Arc,
 };
 
 use tract_onnx::prelude::{
@@ -25,14 +26,13 @@ type Model = SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn Ty
 
 /// A convolutional neural network (CNN) that operates on image data.
 ///
-/// Neural networks using this interface are expected use take sRGB color data scaled down to a
-/// range of `[-1.0, 1.0]`. Now that I think about it, this sounds wrong, these values might have to
-/// be linearized first. This should also be made configurable since not every CNN takes the same
-/// input.
+/// Like the underlying [`NeuralNetwork`], this is a cheaply [`Clone`]able handle to the underlying
+/// data.
+#[derive(Clone)]
 pub struct Cnn {
     nn: NeuralNetwork,
     input_res: Resolution,
-    image_map: Box<dyn Fn(ImageView<'_>) -> Tensor + Send + Sync>,
+    image_map: Arc<dyn Fn(ImageView<'_>) -> Tensor + Send + Sync>,
 }
 
 impl Cnn {
@@ -50,13 +50,13 @@ impl Cnn {
 
         // Box a closure that maps the whole input image to a tensor. That way we avoid dynamic
         // dispatch as much as possible.
-        let image_map: Box<dyn Fn(ImageView<'_>) -> _ + Send + Sync> = match shape {
-            CnnInputShape::NCHW => Box::new(move |view| {
+        let image_map: Arc<dyn Fn(ImageView<'_>) -> _ + Send + Sync> = match shape {
+            CnnInputShape::NCHW => Arc::new(move |view| {
                 Tensor::from_array_shape_fn([1, 3, h, w], |[_, c, y, x]| {
                     color_map(view.get(x as _, y as _))[c]
                 })
             }),
-            CnnInputShape::NHWC => Box::new(move |view| {
+            CnnInputShape::NHWC => Arc::new(move |view| {
                 Tensor::from_array_shape_fn([1, h, w, 3], |[_, y, x, c]| {
                     color_map(view.get(x as _, y as _))[c]
                 })
@@ -201,7 +201,7 @@ pub enum CnnInputShape {
     NHWC,
 }
 
-/// ONNX network loader.
+/// Neural network loader.
 pub struct Loader<'a> {
     model_data: Cow<'a, [u8]>,
     enable_gpu: bool,
@@ -213,8 +213,8 @@ impl<'a> Loader<'a> {
     /// If this method is called and the GPU backend does not support the network, [`Loader::load`]
     /// will return an error.
     ///
-    /// Note that the GPU backend [`wonnx`] is still in early stages and does not support most of the
-    /// networks used in this project.
+    /// Note that the GPU backend [`wonnx`] is still in early stages and does not support most of
+    /// the networks used in this project.
     pub fn with_gpu_support(mut self) -> Self {
         self.enable_gpu = true;
         self
@@ -236,12 +236,20 @@ impl<'a> Loader<'a> {
             None
         };
 
-        Ok(NeuralNetwork { inner: model, gpu })
+        Ok(NeuralNetwork(Arc::new(NeuralNetworkImpl {
+            inner: model,
+            gpu,
+        })))
     }
 }
 
 /// A neural network that can be used for inference.
-pub struct NeuralNetwork {
+///
+/// This is a cheaply [`Clone`]able handle to the underlying network structures.
+#[derive(Clone)]
+pub struct NeuralNetwork(Arc<NeuralNetworkImpl>);
+
+struct NeuralNetworkImpl {
     inner: Model,
     gpu: Option<wonnx::Session>,
 }
@@ -277,12 +285,12 @@ impl NeuralNetwork {
 
     /// Returns the number of input nodes of the network.
     pub fn num_inputs(&self) -> usize {
-        self.inner.model().inputs.len()
+        self.0.inner.model().inputs.len()
     }
 
     /// Returns the number of output nodes of the network.
     pub fn num_outputs(&self) -> usize {
-        self.inner.model().outputs.len()
+        self.0.inner.model().outputs.len()
     }
 
     /// Returns an iterator over the network's input node information.
@@ -303,13 +311,13 @@ impl NeuralNetwork {
         }
     }
 
-    /// Runs the network on a set of inputs, returning the estimated outputs.
+    /// Runs the network on a set of [`Inputs`], returning the estimated [`Outputs`].
     ///
-    /// Other libraries call this step "infer", but that is inaccurate as it sounds much too logical
-    /// for what neural networks are actually capable of, so Zaru calls it `estimate` instead.
+    /// If the network was loaded with GPU support enabled, computation will happen there.
+    /// Otherwise, it is done on the CPU.
     #[doc(alias = "infer")]
     pub fn estimate(&self, inputs: &Inputs) -> Result<Outputs, Error> {
-        let outputs = match &self.gpu {
+        let outputs = match &self.0.gpu {
             Some(gpu) => {
                 let inputs = self
                     .inputs()
@@ -337,6 +345,7 @@ impl NeuralNetwork {
             }
             None => {
                 let outputs = self
+                    .0
                     .inner
                     .run(inputs.iter().map(|t| t.to_tract()).collect())?;
                 let outputs = outputs
@@ -363,7 +372,7 @@ impl<'a> Iterator for InputInfoIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let id = self.ids.next()?;
 
-        let model = &self.net.inner.model();
+        let model = &self.net.0.inner.model();
         let fact = model.input_fact(id).expect("`input_fact` returned error");
 
         let node = model.input_outlets().unwrap()[id].node;
@@ -411,7 +420,7 @@ impl<'a> Iterator for OutputInfoIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let id = self.ids.next()?;
 
-        let model = &self.net.inner.model();
+        let model = &self.net.0.inner.model();
         let fact = model.output_fact(id).expect("`output_fact` returned error");
 
         let node = model.output_outlets().unwrap()[id].node;
