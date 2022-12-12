@@ -226,7 +226,7 @@ impl Webcam {
                     Ok(Some(webcam)) => return Ok(webcam),
                     Ok(None) => {}
                     Err(e) => {
-                        log::warn!("{}", e);
+                        log::debug!("{}", e);
                     }
                 },
                 Err(e) => {
@@ -239,18 +239,24 @@ impl Webcam {
     }
 
     fn open_impl(dev: Device, options: &WebcamOptions) -> Result<Option<Self>, crate::Error> {
+        let caps = dev.capabilities()?;
         let cam_name_from_env = env::var(ENV_VAR_WEBCAM_NAME).ok();
         if let Some(name) = &options.name.as_deref().or(cam_name_from_env.as_deref()) {
-            if dev.capabilities()?.card() != *name {
+            if caps.card() != *name {
                 return Ok(None);
             }
         }
 
-        let caps = dev.capabilities()?.device_capabilities();
+        let cap_flags = caps.device_capabilities();
         let path = dev.path()?;
-        log::debug!("device {} capabilities: {:?}", path.display(), caps);
+        log::debug!(
+            "device {} ({}) capabilities: {:?}",
+            caps.card(),
+            path.display(),
+            cap_flags,
+        );
 
-        if !caps.contains(CapabilityFlags::VIDEO_CAPTURE) {
+        if !cap_flags.contains(CapabilityFlags::VIDEO_CAPTURE) {
             return Ok(None);
         }
 
@@ -265,7 +271,8 @@ impl Webcam {
         let actual = capture.set_frame_interval(fract)?;
 
         log::info!(
-            "opened {}, {}x{} @ {:.1}Hz",
+            "opened {} ({}), {}x{} @ {:.1}Hz",
+            caps.card(),
             path.display(),
             format.width(),
             format.height(),
