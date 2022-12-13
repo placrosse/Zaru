@@ -6,14 +6,17 @@ use pawawwewism::{promise, Promise, PromiseHandle, Worker};
 use zaru::face::detection::Detector;
 use zaru::face::eye::{EyeLandmarks, EyeNetwork};
 use zaru::face::landmark::mediapipe_facemesh::{self, LandmarkResult, MediaPipeFaceMesh};
+use zaru::filter::ema::Ema;
 use zaru::image::{Image, RotatedRect};
-use zaru::landmark::{Estimator, LandmarkTracker, Network};
+use zaru::landmark::{Estimator, LandmarkFilter, LandmarkTracker, Network};
 use zaru::num::TotalF32;
 use zaru::procrustes::ProcrustesAnalyzer;
 use zaru::resolution::{AspectRatio, Resolution};
 use zaru::timer::{FpsCounter, Timer};
 use zaru::webcam::{ParamPreference, Webcam, WebcamOptions};
 use zaru::{gui, image, Error};
+
+const BLANK: bool = true;
 
 fn main() -> Result<(), Error> {
     zaru::init_logger!();
@@ -35,7 +38,6 @@ fn main() -> Result<(), Error> {
     let mut fps = FpsCounter::new("webcam");
     loop {
         let image = webcam.read()?;
-        let resolution = image.resolution();
         let (landmarks, landmarks_handle) = promise();
         let (left_eye, left_eye_handle) = promise();
         let (right_eye, right_eye_handle) = promise();
@@ -56,7 +58,6 @@ fn main() -> Result<(), Error> {
             landmarks: right_eye_lm,
         });
         assembler.send(AssemblerParams {
-            image_size: resolution,
             landmarks: landmarks_handle,
             left_eye: left_eye_lm_handle,
             right_eye: right_eye_lm_handle,
@@ -67,8 +68,7 @@ fn main() -> Result<(), Error> {
 }
 
 struct AssemblerParams {
-    image_size: Resolution,
-    landmarks: PromiseHandle<LandmarkResult>,
+    landmarks: PromiseHandle<(Image, LandmarkResult)>,
     left_eye: PromiseHandle<EyeLandmarks>,
     right_eye: PromiseHandle<EyeLandmarks>,
 }
@@ -82,14 +82,15 @@ fn assembler() -> Result<Worker<AssemblerParams>, io::Error> {
 
     Worker::builder().name("assembler").spawn(
         move |AssemblerParams {
-                  image_size,
                   landmarks,
                   left_eye,
                   right_eye,
               }| {
-            let mut image = Image::new(image_size.width(), image_size.height());
+            let Ok((mut image, face_landmark)) = landmarks.block() else { return };
 
-            let Ok(face_landmark) = landmarks.block() else { return };
+            if BLANK {
+                image = Image::new(image.width(), image.height());
+            }
 
             let procrustes_result = t_procrustes.time(|| {
                 procrustes_analyzer.analyze(face_landmark.landmarks().positions().iter().map(
@@ -125,7 +126,7 @@ fn assembler() -> Result<Worker<AssemblerParams>, io::Error> {
 
 struct FaceTrackParams {
     image: Image,
-    landmarks: Promise<LandmarkResult>,
+    landmarks: Promise<(Image, LandmarkResult)>,
     left_eye: Promise<(Image, RotatedRect)>,
     right_eye: Promise<(Image, RotatedRect)>,
 }
@@ -136,6 +137,10 @@ fn face_track_worker(eye_input_aspect: AspectRatio) -> Result<Worker<FaceTrackPa
 
     let mut detector = Detector::default();
     let mut estimator = Estimator::new(MediaPipeFaceMesh);
+    estimator.set_filter(LandmarkFilter::new(
+        Ema::new(0.7),
+        LandmarkResult::NUM_LANDMARKS,
+    ));
     let mut tracker = LandmarkTracker::new(estimator.input_resolution().aspect_ratio().unwrap());
     let input_ratio = detector.input_resolution().aspect_ratio().unwrap();
 
@@ -169,8 +174,6 @@ fn face_track_worker(eye_input_aspect: AspectRatio) -> Result<Worker<FaceTrackPa
             }
 
             if let Some(res) = tracker.track(&mut estimator, &image) {
-                landmarks.fulfill(res.estimation().clone());
-
                 let left = res.estimation().left_eye();
                 let right = res.estimation().right_eye();
 
@@ -180,6 +183,7 @@ fn face_track_worker(eye_input_aspect: AspectRatio) -> Result<Worker<FaceTrackPa
 
                 left_eye.fulfill((image.view(left).to_image(), left));
                 right_eye.fulfill((image.view(right).to_image(), right));
+                landmarks.fulfill((image, res.estimation().clone()));
             }
 
             drop(guard);
@@ -208,8 +212,12 @@ fn eye_worker(eye: Eye) -> Result<Worker<EyeParams>, io::Error> {
         Eye::Left => "left iris",
         Eye::Right => "right iris",
     };
-    let mut landmarker = Estimator::new(EyeNetwork);
     let mut fps = FpsCounter::new(name);
+    let mut estimator = Estimator::new(EyeNetwork);
+    estimator.set_filter(LandmarkFilter::new(
+        Ema::new(0.7),
+        EyeLandmarks::NUM_LANDMARKS,
+    ));
 
     Worker::builder().name(name).spawn(
         move |EyeParams {
@@ -218,9 +226,9 @@ fn eye_worker(eye: Eye) -> Result<Worker<EyeParams>, io::Error> {
               }| {
             let Ok((image, rect)) = eye_image.block() else { return };
             let marks = match eye {
-                Eye::Left => landmarker.estimate(&image),
+                Eye::Left => estimator.estimate(&image),
                 Eye::Right => {
-                    let marks = landmarker.estimate(&image.flip_horizontal());
+                    let marks = estimator.estimate(&image.flip_horizontal());
                     marks.flip_horizontal_in_place(image.resolution());
                     marks
                 }
@@ -232,7 +240,7 @@ fn eye_worker(eye: Eye) -> Result<Worker<EyeParams>, io::Error> {
             });
             landmarks.fulfill(marks.clone());
 
-            fps.tick_with(landmarker.timers());
+            fps.tick_with(estimator.timers());
         },
     )
 }
