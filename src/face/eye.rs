@@ -81,12 +81,14 @@ pub struct EyeLandmarks {
 impl Default for EyeLandmarks {
     fn default() -> Self {
         Self {
-            landmarks: Landmarks::new(76),
+            landmarks: Landmarks::new(Self::NUM_LANDMARKS),
         }
     }
 }
 
 impl EyeLandmarks {
+    pub const NUM_LANDMARKS: usize = 76;
+
     #[inline]
     pub fn landmarks(&self) -> &Landmarks {
         &self.landmarks
