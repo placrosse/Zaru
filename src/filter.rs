@@ -31,6 +31,7 @@ use std::time::Instant;
 
 pub mod alpha_beta;
 pub mod ema;
+pub mod one_euro;
 
 /// Base trait for filtering algorithms that defines the per-variable state of the filter.
 ///
