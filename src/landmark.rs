@@ -216,6 +216,7 @@ pub struct Estimator<E: Estimation> {
     network: Box<dyn Network<Output = E>>,
     estimation: E,
     t_infer: Timer,
+    t_filter: Timer,
     filter: LandmarkFilter,
 }
 
@@ -225,6 +226,7 @@ impl<E: Estimation + Default> Estimator<E> {
             network: Box::new(network),
             estimation: E::default(),
             t_infer: Timer::new("infer"),
+            t_filter: Timer::new("filter"),
             filter: LandmarkFilter::default(),
         }
     }
@@ -241,7 +243,7 @@ impl<E: Estimation> Estimator<E> {
 
     /// Returns profiling timers for this landmark estimator.
     pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
-        [&self.t_infer].into_iter()
+        [&self.t_infer, &self.t_filter].into_iter()
     }
 
     /// Sets the [`LandmarkFilter`] to apply to all landmark positions.
@@ -255,7 +257,12 @@ impl<E: Estimation> Estimator<E> {
         self.filter = filter;
     }
 
-    /// Performs landmark estimation on `image`.
+    /// Performs landmark estimation on `image`, returning the [`Estimation`].
+    ///
+    /// If the aspect ratio of `image` does not match the aspect ratio of the network's input, an
+    /// enlarged [`ImageView`] of the right aspect ratio is created first. If `image` is a view into
+    /// a larger base image, this may include more pixels from the base image that aren't included
+    /// in `image`. Otherwise, it adds black bars to pad the image to the right aspect ratio.
     pub fn estimate<V: AsImageView>(&mut self, image: &V) -> &mut E {
         self.estimate_impl(image.as_view())
     }
@@ -277,7 +284,8 @@ impl<E: Estimation> Estimator<E> {
 
         // Importantly, the filter uses the network's coordinates, which makes filter parameters
         // independent of the image's dimensions.
-        self.filter.filter(self.estimation.landmarks_mut());
+        self.t_filter
+            .time(|| self.filter.filter(self.estimation.landmarks_mut()));
 
         // Map landmark coordinates back into the input image.
         let scale = rect.width() as f32 / input_res.width() as f32;
