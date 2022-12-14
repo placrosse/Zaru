@@ -23,9 +23,12 @@ wonnx = { git = "https://github.com/webonnx/wonnx.git", rev = "315d66a318515f1cc
 # image processing
 image = { version = "0.24.0", default-features = false, features = ["jpeg", "png", "gif"] }
 embedded-graphics = "0.7.1"
-zune-jpeg = "0.2.0"
 mozjpeg = "0.9.4"
 linuxvideo = "0.1.1"
+zune-jpeg = { git = "https://github.com/SludgePhD/zune-jpeg.git", rev = "e76c28cb3b39e9a02ae4732a1f4a3fcf4ea99aed" }
+# This zune-jpeg commit contains a bunch of fixes not on crates.io.
+# It should probably be switched to https://github.com/etemesi254/zune-image, but that is currently
+# too slow to be usable (<30 FPS at 4K even on my workstation).
 
 # linear algebra
 nalgebra = "0.31.0"

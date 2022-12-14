@@ -37,7 +37,7 @@ enum JpegBackend {
     ZuneJpeg,
 }
 
-const JPEG_BACKEND: JpegBackend = JpegBackend::MozJpeg;
+const JPEG_BACKEND: JpegBackend = JpegBackend::ZuneJpeg;
 
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]

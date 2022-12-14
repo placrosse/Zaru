@@ -3190,8 +3190,7 @@ dependencies = [
 [[package]]
 name = "zune-jpeg"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93ae8cde2c8ecd69c969064c02650c1a7572d3579e2457e92c1d8740d2b2953c"
+source = "git+https://github.com/SludgePhD/zune-jpeg.git?rev=e76c28cb3b39e9a02ae4732a1f4a3fcf4ea99aed#e76c28cb3b39e9a02ae4732a1f4a3fcf4ea99aed"
 dependencies = [
  "log",
  "scoped_threadpool",
