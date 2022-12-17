@@ -34,6 +34,7 @@ pub mod webcam;
 
 #[cfg(test)]
 mod test;
+pub mod droidcam;
 
 pub type Error = Box<dyn std::error::Error + Sync + Send>;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
