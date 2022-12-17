@@ -12,10 +12,11 @@ mod blend;
 mod draw;
 mod rect;
 
+mod jpeg;
 #[cfg(test)]
 mod tests;
 
-use std::{fmt, num::NonZeroU32, ops::Index, path::Path};
+use std::{fmt, ops::Index, path::Path};
 
 use embedded_graphics::{pixelcolor::raw::RawU32, prelude::PixelColor};
 use image::{GenericImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
@@ -25,19 +26,6 @@ use crate::resolution::Resolution;
 pub use blend::*;
 pub use draw::*;
 pub use rect::*;
-
-/// Because computers, we support several different JPEG decoding backends.
-#[allow(dead_code)]
-enum JpegBackend {
-    /// Uses the `jpeg-decoder` crate, a robust but slow pure-Rust JPEG decoder.
-    JpegDecoder,
-    /// Uses the `mozjpeg` crate, a wrapper around Mozilla's libjpeg fork. Robust and fast, but C.
-    MozJpeg,
-    /// Uses the `zune-jpeg` crate, a fragile (panics on many inputs) but fast pure-Rust JPEG decoder.
-    ZuneJpeg,
-}
-
-const JPEG_BACKEND: JpegBackend = JpegBackend::MozJpeg;
 
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
@@ -93,36 +81,7 @@ impl Image {
 
     /// Decodes a JFIF JPEG or Motion JPEG from a byte slice.
     pub fn decode_jpeg(data: &[u8]) -> Result<Self, crate::Error> {
-        let buf = match JPEG_BACKEND {
-            JpegBackend::JpegDecoder => {
-                image::load_from_memory_with_format(data, image::ImageFormat::Jpeg)?.to_rgba8()
-            }
-            JpegBackend::MozJpeg => {
-                let mut decompress = mozjpeg::Decompress::new_mem(data)?.rgba()?;
-                let buf = decompress
-                    .read_scanlines_flat()
-                    .ok_or_else(|| "failed to decode image")?;
-                ImageBuffer::from_raw(
-                    decompress.width().try_into().unwrap(),
-                    decompress.height().try_into().unwrap(),
-                    buf,
-                )
-                .expect("failed to create ImageBuffer")
-            }
-            JpegBackend::ZuneJpeg => {
-                let mut decomp = zune_jpeg::Decoder::new_with_options(
-                    zune_jpeg::ZuneJpegOptions::new()
-                        .set_num_threads(NonZeroU32::new(1).unwrap())
-                        .set_out_colorspace(zune_jpeg::ColorSpace::RGBA),
-                );
-                let buf = decomp.decode_buffer(data)?;
-                let width = u32::from(decomp.width());
-                let height = u32::from(decomp.height());
-                ImageBuffer::from_raw(width, height, buf).expect("failed to create ImageBuffer")
-            }
-        };
-
-        Ok(Self { buf })
+        jpeg::decode_jpeg(data)
     }
 
     /// Saves an image to the file system.
