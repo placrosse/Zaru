@@ -27,6 +27,7 @@ pub enum ParamPreference {
 }
 
 impl Default for ParamPreference {
+    #[inline]
     fn default() -> Self {
         Self::Resolution
     }

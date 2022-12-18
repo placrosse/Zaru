@@ -1,6 +1,4 @@
-//! [Droidcam] IP webcam client.
-//!
-//! [Droidcam]: https://droidcam.org/
+//! IP webcam client for servers offering HTTP MJPG streams.
 
 use std::{
     io::{self, prelude::*, BufRead, BufReader},
@@ -9,16 +7,14 @@ use std::{
 
 use crate::{image::Image, timer::Timer};
 
-pub struct Droidcam {
+pub struct HttpStream {
     stream: BufReader<TcpStream>,
     boundary: String,
     t_dequeue: Timer,
     t_decode: Timer,
 }
 
-impl Droidcam {
-    pub const DEFAULT_PORT: u16 = 4747;
-
+impl HttpStream {
     pub fn connect(addr: SocketAddr) -> crate::Result<Self> {
         let mut stream = TcpStream::connect(addr)?;
         write!(stream, "GET /video HTTP/1.1\r\nHost: {}\r\n\r\n", addr.ip())?;
@@ -52,7 +48,14 @@ impl Droidcam {
                 let Some(bnd) = bnd.strip_prefix("boundary=") else {
                     return Err("malformed Content-Type header (missing boundary)".into());
                 };
-                boundary = Some(bnd.to_string());
+                log::trace!("multipart boundary: {bnd}");
+                let mut bnd = bnd.to_string();
+                // Some servers (Droidcam) include the `--` in the boundary specification. This
+                // appears to violate the MIME spec.
+                if !bnd.starts_with("--") {
+                    bnd = format!("--{bnd}");
+                }
+                boundary = Some(bnd);
                 break;
             }
         }
