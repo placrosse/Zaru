@@ -12,3 +12,8 @@
 - rewrite the "UI" to be more fully featured
   - having an interactive thing that lets you configure any video/image source
     and apply tools to it would also be cool
+- fix the compile times
+  - long `cargo check` times seem to be caused by all the mediapipe soln ports, presumably because
+    they include megabytes of data into the binary?
+  - Rust 1.67.0 will ship an improvement for this
+- port body landmarks to the new infra

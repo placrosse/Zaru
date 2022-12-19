@@ -364,14 +364,14 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-epoch"
-version = "0.9.11"
+version = "0.9.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f916dfc5d356b0ed9dae65f1db9fc9770aa2851d2662b988ccf4fe3516e86348"
+checksum = "01a9af1f4c2ef74bb8aa1f7e19706bc72d03598c8a570bb5de72243c7a9d9d5a"
 dependencies = [
  "autocfg",
  "cfg-if",
  "crossbeam-utils",
- "memoffset",
+ "memoffset 0.7.1",
  "scopeguard",
 ]
 
@@ -1141,6 +1141,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "linuxvideo"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "95684411162b92119168e7335d9c94cf9498f69316c73f70ade506c227cc6bfa"
+dependencies = [
+ "bitflags",
+ "log",
+ "nix 0.26.1",
+]
+
+[[package]]
 name = "liquid"
 version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1260,6 +1271,15 @@ name = "memoffset"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
+name = "memoffset"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
 dependencies = [
  "autocfg",
 ]
@@ -1479,7 +1499,7 @@ dependencies = [
  "bitflags",
  "cfg-if",
  "libc",
- "memoffset",
+ "memoffset 0.6.5",
 ]
 
 [[package]]
@@ -1492,8 +1512,22 @@ dependencies = [
  "bitflags",
  "cfg-if",
  "libc",
- "memoffset",
+ "memoffset 0.6.5",
  "pin-utils",
+]
+
+[[package]]
+name = "nix"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46a58d1d356c6597d08cde02c2f09d785b09e28711837b1ed667dc652c08a694"
+dependencies = [
+ "bitflags",
+ "cfg-if",
+ "libc",
+ "memoffset 0.7.1",
+ "pin-utils",
+ "static_assertions",
 ]
 
 [[package]]
@@ -1967,21 +2001,19 @@ checksum = "60a357793950651c4ed0f3f52338f53b2f809f32d83a07f72909fa13e4c6c1e3"
 
 [[package]]
 name = "rayon"
-version = "1.5.3"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd99e5772ead8baa5215278c9b15bf92087709e9c1b2d1f97cdb5a183c933a7d"
+checksum = "6db3a213adf02b3bcfd2d3846bb41cb22857d131789e01df434fb7e7bc0759b7"
 dependencies = [
- "autocfg",
- "crossbeam-deque",
  "either",
  "rayon-core",
 ]
 
 [[package]]
 name = "rayon-core"
-version = "1.9.3"
+version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "258bcdb5ac6dad48491bb2992db6b7cf74878b0384908af124823d118c99683f"
+checksum = "cac410af5d00ab6884528b4ab69d1e8e146e8d471201800fa1b4524126de6ad3"
 dependencies = [
  "crossbeam-channel",
  "crossbeam-deque",
@@ -3166,10 +3198,9 @@ dependencies = [
  "bytemuck",
  "embedded-graphics",
  "env_logger",
- "fastrand",
  "image",
  "itertools",
- "linuxvideo",
+ "linuxvideo 0.2.0",
  "log",
  "mozjpeg",
  "naga",
@@ -3184,7 +3215,93 @@ dependencies = [
  "wgpu",
  "winit",
  "wonnx",
+ "zaru-gui",
+ "zaru-image",
+ "zaru-nn",
+ "zaru-utils",
+ "zaru-video",
  "zune-jpeg",
+]
+
+[[package]]
+name = "zaru-gui"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "itertools",
+ "log",
+ "naga",
+ "once_cell",
+ "pollster",
+ "wgpu",
+ "winit",
+ "zaru-image",
+]
+
+[[package]]
+name = "zaru-image"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "embedded-graphics",
+ "image",
+ "itertools",
+ "linuxvideo 0.1.1",
+ "log",
+ "mozjpeg",
+ "nalgebra",
+ "once_cell",
+ "pawawwewism",
+ "zaru-utils",
+ "zune-jpeg",
+]
+
+[[package]]
+name = "zaru-nn"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "env_logger",
+ "itertools",
+ "log",
+ "once_cell",
+ "pollster",
+ "tinyvec",
+ "tract-onnx",
+ "wonnx",
+ "zaru-image",
+ "zaru-utils",
+]
+
+[[package]]
+name = "zaru-utils"
+version = "0.1.0"
+dependencies = [
+ "approx",
+ "env_logger",
+ "fastrand",
+ "log",
+ "nalgebra",
+ "once_cell",
+]
+
+[[package]]
+name = "zaru-video"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "embedded-graphics",
+ "env_logger",
+ "image",
+ "itertools",
+ "linuxvideo 0.2.0",
+ "log",
+ "mozjpeg",
+ "once_cell",
+ "pawawwewism",
+ "zaru-image",
+ "zaru-utils",
 ]
 
 [[package]]

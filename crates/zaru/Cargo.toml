@@ -1,0 +1,54 @@
+[package]
+name = "zaru"
+version = "0.1.0"
+edition = "2021"
+license-file = "LICENSE"
+repository = "https://github.com/SludgePhD/Zaru"
+description = "Neural Network powered machine perception and computer vision library"
+
+[dependencies]
+zaru-image = { path = "../zaru-image" }
+zaru-nn = { path = "../zaru-nn" }
+zaru-gui = { path = "../zaru-gui" }
+zaru-utils = { path = "../zaru-utils" }
+zaru-video = { path = "../zaru-video" }
+
+# generic deps
+anyhow = "1.0.53"
+log = "0.4.14"
+env_logger = "0.10.0"
+itertools = "0.10.3"
+once_cell = "1.9.0"
+pawawwewism = "0.1.0"
+
+# neural nets
+tract-onnx = "0.18.0"
+tinyvec = { version = "1.6.0", features = ["alloc"] }
+wonnx = { git = "https://github.com/webonnx/wonnx.git", rev = "315d66a318515f1cc5e42684ddb8bd22ec01d378" }
+
+# image processing
+image = { version = "0.24.0", default-features = false, features = ["jpeg", "png", "gif"] }
+embedded-graphics = "0.7.1"
+mozjpeg = "0.9.4"
+linuxvideo = "0.2.0"
+zune-jpeg = { git = "https://github.com/SludgePhD/zune-jpeg.git", rev = "e76c28cb3b39e9a02ae4732a1f4a3fcf4ea99aed" }
+# This zune-jpeg commit contains a bunch of fixes not on crates.io.
+# It should probably be switched to https://github.com/etemesi254/zune-image, but that is currently
+# too slow to be usable (<30 FPS at 4K even on my workstation).
+
+# linear algebra
+nalgebra = "0.31.0"
+
+# GUI
+winit = "0.27.3"
+wgpu = { version = "0.14.0", features = ["spirv"] }
+pollster = "0.2.5"
+naga = { version = "0.10.0", features = ["glsl-in"] }
+bytemuck = { version = "1.7.3", features = ["derive"] }
+
+# tracker-only deps
+serde = { version = "1.0.136", features = ["derive"] }
+
+[dev-dependencies]
+rayon = "1.5.1"
+approx = "0.5.1"
