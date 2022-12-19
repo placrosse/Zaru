@@ -279,14 +279,10 @@ impl Network for LiteNetwork {
     type Output = LandmarkResult;
 
     fn cnn(&self) -> &Cnn {
-        const MODEL_DATA: &[u8] = include_bytes!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/onnx/hand_landmark_lite.onnx"
-        ));
-
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
+            let model_data = include_blob::include_bytes!("3rdparty/onnx/hand_landmark_lite.onnx");
             Cnn::new(
-                NeuralNetwork::from_onnx(MODEL_DATA)
+                NeuralNetwork::from_onnx(model_data)
                     .unwrap()
                     .load()
                     .unwrap(),
@@ -313,14 +309,10 @@ impl Network for FullNetwork {
     type Output = LandmarkResult;
 
     fn cnn(&self) -> &Cnn {
-        const MODEL_DATA: &[u8] = include_bytes!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../3rdparty/onnx/hand_landmark_full.onnx"
-        ));
-
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
+            let model_data = include_blob::include_bytes!("3rdparty/onnx/hand_landmark_full.onnx");
             Cnn::new(
-                NeuralNetwork::from_onnx(MODEL_DATA)
+                NeuralNetwork::from_onnx(model_data)
                     .unwrap()
                     .load()
                     .unwrap(),

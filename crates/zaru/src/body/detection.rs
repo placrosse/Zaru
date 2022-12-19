@@ -16,14 +16,10 @@ use zaru_image::{
     draw, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect, Resolution,
 };
 
-const MODEL_DATA: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../../3rdparty/onnx/pose_detection.onnx"
-));
-
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
+    let model_data = include_blob::include_bytes!("3rdparty/onnx/pose_detection.onnx");
     Cnn::new(
-        NeuralNetwork::from_onnx(MODEL_DATA)
+        NeuralNetwork::from_onnx(model_data)
             .unwrap()
             .load()
             .unwrap(),
