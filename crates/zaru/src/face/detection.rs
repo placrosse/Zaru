@@ -316,7 +316,7 @@ impl DetectionNetwork for ShortRangeNetwork {
     fn cnn() -> &'static Cnn {
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
             let model_data =
-                include_blob::include_bytes!("3rdparty/onnx/face_detection_short_range.onnx");
+                include_blob::include_bytes!("../../3rdparty/onnx/face_detection_short_range.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()
@@ -348,7 +348,7 @@ impl DetectionNetwork for FullRangeNetwork {
     fn cnn() -> &'static Cnn {
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
             let model_data =
-                include_blob::include_bytes!("3rdparty/onnx/face_detection_full_range.onnx");
+                include_blob::include_bytes!("../../3rdparty/onnx/face_detection_full_range.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()

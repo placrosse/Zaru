@@ -17,7 +17,7 @@ use crate::{
 };
 
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob::include_bytes!("3rdparty/onnx/iris_landmark.onnx");
+    let model_data = include_blob::include_bytes!("../../3rdparty/onnx/iris_landmark.onnx");
     Cnn::new(
         NeuralNetwork::from_onnx(model_data)
             .unwrap()

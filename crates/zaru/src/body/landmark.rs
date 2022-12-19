@@ -252,7 +252,8 @@ pub struct LiteNetwork;
 impl LandmarkNetwork for LiteNetwork {
     fn cnn() -> &'static Cnn {
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
-            let model_data = include_blob::include_bytes!("3rdparty/onnx/pose_landmark_lite.onnx");
+            let model_data =
+                include_blob::include_bytes!("../../3rdparty/onnx/pose_landmark_lite.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()
@@ -273,7 +274,8 @@ pub struct FullNetwork;
 impl LandmarkNetwork for FullNetwork {
     fn cnn() -> &'static Cnn {
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
-            let model_data = include_blob::include_bytes!("3rdparty/onnx/pose_landmark_full.onnx");
+            let model_data =
+                include_blob::include_bytes!("../../3rdparty/onnx/pose_landmark_full.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()

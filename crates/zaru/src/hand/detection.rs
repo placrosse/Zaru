@@ -279,7 +279,8 @@ pub struct LiteNetwork;
 impl PalmDetectionNetwork for LiteNetwork {
     fn cnn() -> &'static Cnn {
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
-            let model_data = include_blob::include_bytes!("3rdparty/onnx/palm_detection_lite.onnx");
+            let model_data =
+                include_blob::include_bytes!("../../3rdparty/onnx/palm_detection_lite.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()
@@ -303,7 +304,8 @@ pub struct FullNetwork;
 impl PalmDetectionNetwork for FullNetwork {
     fn cnn() -> &'static Cnn {
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
-            let model_data = include_blob::include_bytes!("3rdparty/onnx/palm_detection_full.onnx");
+            let model_data =
+                include_blob::include_bytes!("../../3rdparty/onnx/palm_detection_full.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()

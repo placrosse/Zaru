@@ -280,7 +280,8 @@ impl Network for LiteNetwork {
 
     fn cnn(&self) -> &Cnn {
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
-            let model_data = include_blob::include_bytes!("3rdparty/onnx/hand_landmark_lite.onnx");
+            let model_data =
+                include_blob::include_bytes!("../../3rdparty/onnx/hand_landmark_lite.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()
@@ -310,7 +311,8 @@ impl Network for FullNetwork {
 
     fn cnn(&self) -> &Cnn {
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
-            let model_data = include_blob::include_bytes!("3rdparty/onnx/hand_landmark_full.onnx");
+            let model_data =
+                include_blob::include_bytes!("../../3rdparty/onnx/hand_landmark_full.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()

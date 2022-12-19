@@ -52,7 +52,8 @@ impl Network for PeppaFacialLandmark {
 
     fn cnn(&self) -> &Cnn {
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
-            let model_data = include_blob::include_bytes!("3rdparty/onnx/slim_160_latest.onnx");
+            let model_data =
+                include_blob::include_bytes!("../../3rdparty/onnx/slim_160_latest.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()
@@ -93,7 +94,8 @@ impl Network for FaceOnnx {
 
     fn cnn(&self) -> &Cnn {
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
-            let model_data = include_blob::include_bytes!("3rdparty/onnx/landmarks_68_pfld.onnx");
+            let model_data =
+                include_blob::include_bytes!("../../3rdparty/onnx/landmarks_68_pfld.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()

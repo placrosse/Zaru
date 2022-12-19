@@ -1,13 +1,17 @@
 use std::{
     collections::hash_map::DefaultHasher,
-    fs,
+    env, fs,
     hash::{Hash, Hasher},
-    path::Path,
+    path::PathBuf,
     str::FromStr,
 };
 
 use proc_macro::{TokenStream, TokenTree};
 
+/// Includes a file that was prepared for inclusion by a build script.
+///
+/// Takes a string literal as its argument, denoting the file's path (relative to the directory
+/// containing the package's `Cargo.toml`).
 #[proc_macro]
 pub fn include_bytes(args: TokenStream) -> TokenStream {
     let tts = args.into_iter().collect::<Vec<_>>();
@@ -27,14 +31,11 @@ pub fn include_bytes(args: TokenStream) -> TokenStream {
     let lit = &lit[1..lit.len() - 1];
     // TODO: handle escapes and the entire string literal syntax
 
-    let path = Path::new(&lit);
+    let mut path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
+    path.push(lit);
 
     let path = path.canonicalize().unwrap_or_else(|_| {
-        panic!(
-            "could not find file '{}' (working directory is '{}')",
-            path.display(),
-            std::env::current_dir().unwrap().display(),
-        );
+        panic!("could not find file '{}'", path.display(),);
     });
     let metadata = fs::metadata(&path).unwrap();
     assert!(metadata.is_file());

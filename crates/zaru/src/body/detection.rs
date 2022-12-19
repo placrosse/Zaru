@@ -17,7 +17,7 @@ use zaru_image::{
 };
 
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob::include_bytes!("3rdparty/onnx/pose_detection.onnx");
+    let model_data = include_blob::include_bytes!("../../3rdparty/onnx/pose_detection.onnx");
     Cnn::new(
         NeuralNetwork::from_onnx(model_data)
             .unwrap()
