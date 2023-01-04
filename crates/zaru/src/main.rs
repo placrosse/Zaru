@@ -74,7 +74,7 @@ struct AssemblerParams {
 
 fn assembler() -> Result<Worker<AssemblerParams>, io::Error> {
     let mut fps = FpsCounter::new("assembler");
-    let mut t_procrustes = Timer::new("procrustes");
+    let t_procrustes = Timer::new("procrustes");
 
     let mut procrustes_analyzer =
         ProcrustesAnalyzer::new(mediapipe_facemesh::reference_positions());
@@ -132,7 +132,7 @@ struct FaceTrackParams {
 
 fn face_track_worker(eye_input_aspect: AspectRatio) -> Result<Worker<FaceTrackParams>, io::Error> {
     let mut fps = FpsCounter::new("tracker");
-    let mut t_total = Timer::new("total");
+    let t_total = Timer::new("total");
 
     let mut detector = Detector::default();
     let mut estimator = Estimator::new(MediaPipeFaceMesh);

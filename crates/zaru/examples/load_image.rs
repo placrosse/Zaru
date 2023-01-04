@@ -15,7 +15,7 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let mut t_decode = Timer::new("decode");
+    let t_decode = Timer::new("decode");
     let mut fps = FpsCounter::new("load image");
     loop {
         let image = t_decode.time(|| Image::decode_jpeg(&data))?;

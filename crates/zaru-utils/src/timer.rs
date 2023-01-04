@@ -3,10 +3,15 @@
 use std::{
     cell::Cell,
     fmt::{self, Arguments},
+    mem,
+    sync::Mutex,
     time::{Duration, Instant},
 };
 
-use crate::filter::{ema, Filter};
+use crate::filter::{
+    ema::{Ema, EmaState},
+    Filter,
+};
 
 const EMA_ALPHA: f32 = 0.3;
 
@@ -16,12 +21,16 @@ const EMA_ALPHA: f32 = 0.3;
 /// ([`std::fmt::Display`]).
 pub struct Timer {
     name: &'static str,
-    ema: ema::Ema,
-    ema_state: Cell<ema::EmaState>,
+    ema: Ema,
+    state: Mutex<State>,
+}
+
+struct State {
+    ema_state: EmaState,
     /// The current average time.
-    avg: Cell<f32>,
+    avg: f32,
     /// The number of time measurements that contributed to the current `avg`.
-    count: Cell<usize>,
+    count: usize,
 }
 
 impl Timer {
@@ -29,15 +38,17 @@ impl Timer {
     pub fn new(name: &'static str) -> Self {
         Self {
             name,
-            ema: ema::Ema::new(EMA_ALPHA),
-            ema_state: Default::default(),
-            avg: Cell::new(0.0),
-            count: Cell::new(0),
+            ema: Ema::new(EMA_ALPHA),
+            state: Mutex::new(State {
+                ema_state: Default::default(),
+                avg: 0.0,
+                count: 0,
+            }),
         }
     }
 
     /// Invokes a closure, measuring and recording the time it takes.
-    pub fn time<T>(&mut self, timee: impl FnOnce() -> T) -> T {
+    pub fn time<T>(&self, timee: impl FnOnce() -> T) -> T {
         let _guard = self.start();
         timee()
     }
@@ -46,30 +57,32 @@ impl Timer {
     ///
     /// When the returned [`TimerGuard`] is dropped, the time between the call to `start` and the
     /// drop is measured and recorded.
-    pub fn start(&mut self) -> TimerGuard<'_> {
+    pub fn start(&self) -> TimerGuard<'_> {
         TimerGuard {
             start: Instant::now(),
             timer: self,
         }
     }
 
-    fn stop(&mut self, start: Instant) {
+    fn stop(&self, start: Instant) {
         let duration = start.elapsed();
-        let state = self.ema_state.get_mut();
-        self.avg.set(self.ema.filter(state, duration.as_secs_f32()));
-        *self.count.get_mut() += 1;
+        let mut state = self.state.lock().unwrap();
+        let filtered = self
+            .ema
+            .filter(&mut state.ema_state, duration.as_secs_f32());
+        state.avg = filtered;
+        state.count += 1;
     }
 }
 
 /// Displays the average recorded time and resets it.
 impl fmt::Display for Timer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // (this can't actually fail, `time` takes `&mut self` and this function can't be
-        // invoked more than once at the same time because `Timer` isn't `Sync`)
-        self.ema_state.replace(Default::default());
+        let mut state = self.state.lock().unwrap();
+        state.ema_state = Default::default();
 
-        let avg = self.avg.replace(0.0);
-        let len = self.count.replace(0);
+        let avg = mem::replace(&mut state.avg, 0.0);
+        let len = mem::replace(&mut state.count, 0);
         let avg_ms = avg * 1000.0;
 
         write!(f, "{}: {len}x{avg_ms:.01}ms", self.name)
@@ -86,7 +99,7 @@ impl Clone for Timer {
 /// Guard returned by [`Timer::start`]. Stops timing the operation when dropped.
 pub struct TimerGuard<'a> {
     start: Instant,
-    timer: &'a mut Timer,
+    timer: &'a Timer,
 }
 
 impl Drop for TimerGuard<'_> {
