@@ -19,6 +19,112 @@ use crate::{
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork},
 };
 
+pub enum Keypoint {
+    LeftEye = 0,
+    RightEye = 1,
+}
+
+/// A small and efficient face detection network, best for faces in <3m of the camera.
+pub struct ShortRangeNetwork;
+
+static SHORT_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
+    let model_data =
+        include_blob::include_bytes!("../../3rdparty/onnx/face_detection_short_range.onnx");
+    Cnn::new(
+        NeuralNetwork::from_onnx(model_data)
+            .unwrap()
+            .load()
+            .unwrap(),
+        CnnInputShape::NCHW,
+        create_linear_color_mapper(-1.0..=1.0),
+    )
+    .unwrap()
+});
+
+impl Network for ShortRangeNetwork {
+    type Classes = ();
+
+    fn cnn(&self) -> &Cnn {
+        &SHORT_RANGE_MODEL
+    }
+
+    fn extract(&self, outputs: &Outputs, thresh: f32, detections: &mut Detections) {
+        static ANCHORS: Lazy<Anchors> = Lazy::new(|| {
+            Anchors::calculate(&AnchorParams {
+                layers: &[LayerInfo::new(2, 16, 16), LayerInfo::new(6, 8, 8)],
+            })
+        });
+
+        let res = SHORT_RANGE_MODEL.input_resolution();
+        extract_outputs(res, &ANCHORS, outputs, thresh, detections);
+    }
+}
+
+/// A larger detection network with a greater detection range, but slower inference speed (around 5
+/// times that of [`ShortRangeNetwork`]).
+pub struct FullRangeNetwork;
+
+static FULL_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
+    let model_data =
+        include_blob::include_bytes!("../../3rdparty/onnx/face_detection_full_range.onnx");
+    Cnn::new(
+        NeuralNetwork::from_onnx(model_data)
+            .unwrap()
+            .load()
+            .unwrap(),
+        CnnInputShape::NCHW,
+        create_linear_color_mapper(-1.0..=1.0),
+    )
+    .unwrap()
+});
+
+impl Network for FullRangeNetwork {
+    type Classes = ();
+
+    fn cnn(&self) -> &Cnn {
+        &FULL_RANGE_MODEL
+    }
+
+    fn extract(&self, outputs: &Outputs, thresh: f32, detections: &mut Detections) {
+        static ANCHORS: Lazy<Anchors> = Lazy::new(|| {
+            Anchors::calculate(&AnchorParams {
+                layers: &[LayerInfo::new(1, 48, 48)],
+            })
+        });
+
+        let res = FULL_RANGE_MODEL.input_resolution();
+        extract_outputs(res, &ANCHORS, outputs, thresh, detections);
+    }
+}
+
+fn extract_outputs(
+    input_res: Resolution,
+    anchors: &Anchors,
+    outputs: &Outputs,
+    thresh: f32,
+    detections: &mut Detections,
+) {
+    let num_anchors = anchors.anchor_count();
+    let boxes = &outputs[0];
+    let confidences = &outputs[1];
+
+    assert_eq!(boxes.shape(), &[1, num_anchors, 16]);
+    assert_eq!(confidences.shape(), &[1, num_anchors, 1]);
+    for (index, view) in confidences.index([0]).iter().enumerate() {
+        let conf = sigmoid(view.as_slice()[0]);
+        if conf < thresh {
+            continue;
+        }
+
+        let tensor_view = boxes.index([0, index]);
+        let box_params = tensor_view.as_slice();
+        detections.push(
+            (),
+            extract_detection(&anchors[index], input_res, box_params, conf),
+        );
+    }
+}
+
 fn extract_detection(
     anchor: &Anchor,
     input_res: Resolution,
@@ -64,112 +170,6 @@ fn extract_detection(
     det.set_angle(angle);
 
     det
-}
-
-pub enum Keypoint {
-    LeftEye = 0,
-    RightEye = 1,
-}
-
-/// A small and efficient face detection network, best for faces in <3m of the camera.
-pub struct ShortRangeNetwork;
-
-static SHORT_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data =
-        include_blob::include_bytes!("../../3rdparty/onnx/face_detection_short_range.onnx");
-    Cnn::new(
-        NeuralNetwork::from_onnx(model_data)
-            .unwrap()
-            .load()
-            .unwrap(),
-        CnnInputShape::NCHW,
-        create_linear_color_mapper(-1.0..=1.0),
-    )
-    .unwrap()
-});
-
-impl Network for ShortRangeNetwork {
-    type Classes = ();
-
-    fn cnn(&self) -> &Cnn {
-        &SHORT_RANGE_MODEL
-    }
-
-    fn extract(&self, outputs: &Outputs, thresh: f32, detections: &mut Detections) {
-        static ANCHORS: Lazy<Anchors> = Lazy::new(|| {
-            Anchors::calculate(&AnchorParams {
-                layers: &[LayerInfo::new(2, 16, 16), LayerInfo::new(6, 8, 8)],
-            })
-        });
-
-        let res = SHORT_RANGE_MODEL.input_resolution();
-        extract_ssd(res, &ANCHORS, outputs, thresh, detections);
-    }
-}
-
-/// A larger detection network with a greater detection range, but slower inference speed (around 5
-/// times that of [`ShortRangeNetwork`]).
-pub struct FullRangeNetwork;
-
-static FULL_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data =
-        include_blob::include_bytes!("../../3rdparty/onnx/face_detection_full_range.onnx");
-    Cnn::new(
-        NeuralNetwork::from_onnx(model_data)
-            .unwrap()
-            .load()
-            .unwrap(),
-        CnnInputShape::NCHW,
-        create_linear_color_mapper(-1.0..=1.0),
-    )
-    .unwrap()
-});
-
-impl Network for FullRangeNetwork {
-    type Classes = ();
-
-    fn cnn(&self) -> &Cnn {
-        &FULL_RANGE_MODEL
-    }
-
-    fn extract(&self, outputs: &Outputs, thresh: f32, detections: &mut Detections) {
-        static ANCHORS: Lazy<Anchors> = Lazy::new(|| {
-            Anchors::calculate(&AnchorParams {
-                layers: &[LayerInfo::new(1, 48, 48)],
-            })
-        });
-
-        let res = FULL_RANGE_MODEL.input_resolution();
-        extract_ssd(res, &ANCHORS, outputs, thresh, detections);
-    }
-}
-
-fn extract_ssd(
-    input_res: Resolution,
-    anchors: &Anchors,
-    outputs: &Outputs,
-    thresh: f32,
-    detections: &mut Detections,
-) {
-    let num_anchors = anchors.anchor_count();
-    let boxes = &outputs[0];
-    let confidences = &outputs[1];
-
-    assert_eq!(boxes.shape(), &[1, num_anchors, 16]);
-    assert_eq!(confidences.shape(), &[1, num_anchors, 1]);
-    for (index, view) in confidences.index([0]).iter().enumerate() {
-        let conf = sigmoid(view.as_slice()[0]);
-        if conf < thresh {
-            continue;
-        }
-
-        let tensor_view = boxes.index([0, index]);
-        let box_params = tensor_view.as_slice();
-        detections.push(
-            (),
-            extract_detection(&anchors[index], input_res, box_params, conf),
-        );
-    }
 }
 
 #[cfg(test)]

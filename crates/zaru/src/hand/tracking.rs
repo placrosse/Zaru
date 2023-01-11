@@ -10,19 +10,19 @@ use std::{
 };
 use zaru_image::{Image, RotatedRect};
 
-use crate::landmark::{Estimator, LandmarkTracker, Network};
-
-use super::{
-    detection::{self, Detection, PalmDetector},
-    landmark::LandmarkResult,
+use crate::{
+    detection::{self, Detector, RawDetection},
+    landmark::{Estimator, LandmarkTracker, Network},
 };
+
+use super::landmark::LandmarkResult;
 
 /// Self-contained hand detector, tracker, and landmarker.
 pub struct HandTracker {
     hands: Vec<TrackedHand>,
     next_hand_id: HandId,
-    detector: Worker<(Arc<Image>, Promise<Vec<Detection>>)>,
-    detections_handle: Option<PromiseHandle<Vec<Detection>>>,
+    detector: Worker<(Arc<Image>, Promise<Vec<RawDetection>>)>,
+    detections_handle: Option<PromiseHandle<Vec<RawDetection>>>,
     next_det: Instant,
     det_interval: Duration,
     make_estimator: Box<dyn Fn() -> Estimator<LandmarkResult>>,
@@ -43,21 +43,19 @@ impl HandTracker {
     /// Creates a new [`HandTracker`] with the given palm detection and landmarking networks.
     pub fn new<D, L>(detector: D, landmarker: L) -> Self
     where
-        D: detection::PalmDetectionNetwork,
+        D: detection::Network<Classes = ()>,
         L: Network<Output = LandmarkResult> + Clone + 'static,
     {
-        let mut palm_detector = PalmDetector::new(detector);
+        let mut palm_detector = Detector::new(detector);
         Self {
             hands: Vec::new(),
             next_hand_id: HandId(0),
             detector: Worker::builder()
                 .name("palm detector")
-                .spawn(
-                    move |(image, promise): (Arc<Image>, Promise<Vec<Detection>>)| {
-                        let detections = palm_detector.detect(&*image);
-                        promise.fulfill(detections.to_vec());
-                    },
-                )
+                .spawn(move |(image, promise): (Arc<Image>, Promise<Vec<_>>)| {
+                    let detections = palm_detector.detect(&*image);
+                    promise.fulfill(detections.iter().cloned().collect());
+                })
                 .unwrap(),
             detections_handle: None,
             next_det: Instant::now(),
@@ -146,7 +144,7 @@ impl HandTracker {
                     .lock()
                     .unwrap()
                     .rect()
-                    .iou(&det.bounding_rect().grow_rel(grow_by))
+                    .iou(&det.bounding_rect().to_rect().grow_rel(grow_by))
                     >= self.iou_thresh
                 {
                     // Overlap
@@ -158,10 +156,8 @@ impl HandTracker {
         });
 
         self.hands.extend(detections.iter().map(|det| {
-            let roi = RotatedRect::new(
-                det.bounding_rect().grow_rel(grow_by),
-                det.rotation_radians(),
-            );
+            let roi =
+                RotatedRect::new(det.bounding_rect().to_rect().grow_rel(grow_by), det.angle());
             let mut estimator = (self.make_estimator)();
             let mut tracker =
                 LandmarkTracker::new(estimator.input_resolution().aspect_ratio().unwrap());

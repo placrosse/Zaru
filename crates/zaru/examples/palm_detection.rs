@@ -1,6 +1,7 @@
 use zaru::{
+    detection::Detector,
     gui,
-    hand::detection::{self, PalmDetector},
+    hand::detection,
     timer::FpsCounter,
     video::webcam::{Webcam, WebcamOptions},
 };
@@ -11,9 +12,9 @@ fn main() -> anyhow::Result<()> {
     zaru::init_logger!();
 
     let mut palm_detector = if USE_FULL_DETECTION_NETWORK {
-        PalmDetector::new(detection::FullNetwork)
+        Detector::new(detection::FullNetwork)
     } else {
-        PalmDetector::new(detection::LiteNetwork)
+        Detector::new(detection::LiteNetwork)
     };
 
     let mut fps = FpsCounter::new("hand tracker");
@@ -22,7 +23,7 @@ fn main() -> anyhow::Result<()> {
     loop {
         let mut image = webcam.read()?;
 
-        for det in palm_detector.detect(&image) {
+        for det in palm_detector.detect(&image).iter() {
             det.draw(&mut image);
         }
 
