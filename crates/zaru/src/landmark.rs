@@ -235,8 +235,9 @@ impl<E: Estimation + Default> Estimator<E> {
 impl<E: Estimation> Estimator<E> {
     /// Returns the expected input resolution of the internal neural network.
     ///
-    /// If an image is passed that has a different resolution, the [`Estimator`] will automatically
-    /// create an [`ImageView`] that
+    /// If an image is passed that has a different resolution, it will be sampled to match the input
+    /// resolution. The [`Estimator`] will also automatically ensure that the aspect ratio matches
+    /// by creating an oversized view of the input.
     pub fn input_resolution(&self) -> Resolution {
         self.network.cnn().input_resolution()
     }

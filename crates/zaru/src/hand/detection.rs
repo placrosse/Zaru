@@ -165,7 +165,7 @@ impl Detection {
     }
 
     pub fn bounding_rect(&self) -> Rect {
-        self.raw.bounding_rect().to_rect(&self.full_res)
+        self.raw.bounding_rect().to_rect_old(&self.full_res)
     }
 
     pub fn keypoint(&self, keypoint: Keypoint) -> (i32, i32) {

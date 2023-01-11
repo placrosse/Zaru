@@ -94,6 +94,7 @@ impl NonMaxSuppression {
 
                     // compute confidence-weighted average of the overlapping detections
                     let mut acc_rect = BoundingRect::from_center(0.0, 0.0, 0.0, 0.0);
+                    let mut acc_angle = 0.0;
                     let mut acc = RawDetection::new(seed.confidence(), acc_rect);
                     let mut divisor = 0.0;
                     for det in &self.avg_buf {
@@ -119,6 +120,7 @@ impl NonMaxSuppression {
                         acc_rect.yc += rect.yc * factor;
                         acc_rect.w += rect.w * factor;
                         acc_rect.h += rect.h * factor;
+                        acc_angle += det.angle * factor;
                     }
 
                     for lm in &mut acc.keypoints {
@@ -129,8 +131,10 @@ impl NonMaxSuppression {
                     acc_rect.yc /= divisor;
                     acc_rect.w /= divisor;
                     acc_rect.h /= divisor;
+                    acc_angle /= divisor;
 
                     acc.set_bounding_rect(acc_rect);
+                    acc.set_angle(acc_angle);
                     self.out_buf.push(acc);
                 }
             }

@@ -175,7 +175,7 @@ impl Detection {
     }
 
     pub fn bounding_rect(&self) -> Rect {
-        self.raw.bounding_rect().to_rect(&self.full_res)
+        self.raw.bounding_rect().to_rect_old(&self.full_res)
     }
 
     pub fn keypoints(&self) -> impl Iterator<Item = (i32, i32)> + '_ {

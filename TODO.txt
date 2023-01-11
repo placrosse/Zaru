@@ -18,3 +18,4 @@ include-blob:
 - make it work (and run CI) on Windows+macOS
 - allow the build script to prepare an entire directory for inclusion
 - communicate the list of available files from the build script to the proc macro for better errors
+- ensure and test that unreferenced symbols aren't included in the executable

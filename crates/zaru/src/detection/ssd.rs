@@ -10,6 +10,9 @@ use std::ops::Index;
 use zaru_image::Resolution;
 
 /// An anchor of an SSD network.
+///
+/// The anchor position coordinates are in range 0 to 1 and have to be adjusted to match the
+/// network's input resolution.
 pub struct Anchor {
     // values range from 0 to 1
     x_center: f32,

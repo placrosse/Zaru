@@ -6,9 +6,248 @@
 pub mod nms;
 pub mod ssd;
 
-use zaru_image::{Rect, Resolution};
+use std::{fmt::Debug, marker::PhantomData};
+
+use zaru_image::{
+    draw, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect, Resolution,
+    RotatedRect,
+};
+use zaru_nn::{Cnn, Outputs};
+use zaru_utils::timer::Timer;
 
 use crate::nn::point_to_img;
+
+use self::nms::NonMaxSuppression;
+
+/// Trait implemented by neural networks that detect objects in an input image.
+pub trait Network: Send + Sync + 'static {
+    /// The type used to represent the object classes this network can distinguish.
+    ///
+    /// Networks that only handle a single object class can set this to `()`.
+    type Classes: Classes;
+
+    /// Returns the [`Cnn`] to use for detection.
+    fn cnn(&self) -> &Cnn;
+
+    /// Extracts all detections with confidence above `threshold` from the network's output.
+    ///
+    /// Keypoint and detection positions are expected to be in the coordinate system of the
+    /// network's input.
+    fn extract(
+        &self,
+        outputs: &Outputs,
+        threshold: f32,
+        detections: &mut Detections<Self::Classes>,
+    );
+}
+
+/// A collection of per-class object detections.
+#[derive(Debug)]
+pub struct Detections<C: Classes = ()> {
+    // FIXME: make this sparse, networks can have thousands of classes
+    vec: Vec<Vec<RawDetection>>,
+    _p: PhantomData<C>,
+}
+
+impl<C: Classes> Detections<C> {
+    pub fn new() -> Self {
+        Self {
+            vec: Vec::new(),
+            _p: PhantomData,
+        }
+    }
+
+    /// Returns the total number of detections across all object classes.
+    pub fn len(&self) -> usize {
+        self.vec.iter().map(|v| v.len()).sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.vec.iter().all(|v| v.is_empty())
+    }
+
+    pub fn clear(&mut self) {
+        for class in &mut self.vec {
+            class.clear();
+        }
+    }
+
+    pub fn push(&mut self, class: C, detection: RawDetection) {
+        let raw_class = class.as_u32() as usize;
+        if self.vec.len() <= raw_class {
+            self.vec.resize_with(raw_class + 1, Vec::new);
+        }
+
+        self.vec[raw_class].push(detection);
+    }
+
+    /// Returns an iterator yielding all detections alongside their class.
+    pub fn all_detections(&self) -> impl Iterator<Item = (C, &RawDetection)> {
+        self.vec
+            .iter()
+            .enumerate()
+            .flat_map(|(i, v)| v.iter().map(move |det| (C::from_u32(i as u32), det)))
+    }
+
+    pub fn all_detections_mut(&mut self) -> impl Iterator<Item = (C, &mut RawDetection)> {
+        self.vec
+            .iter_mut()
+            .enumerate()
+            .flat_map(|(i, v)| v.iter_mut().map(move |det| (C::from_u32(i as u32), det)))
+    }
+
+    /// Returns an iterator that yields all detections of the given class.
+    pub fn for_class(&self, class: C) -> impl Iterator<Item = &RawDetection> {
+        self.vec
+            .get(class.as_u32() as usize)
+            .into_iter()
+            .flat_map(|v| v.iter())
+    }
+}
+
+impl Detections {
+    /// Returns an iterator yielding the stored detections.
+    pub fn iter(&self) -> impl Iterator<Item = &RawDetection> {
+        self.vec.iter().flat_map(|v| v.iter())
+    }
+}
+
+/// Types that represent object classes.
+///
+/// Some object detectors are able to detect and distinguish between a number of different types of
+/// objects. A type implementing this trait can be used to represent the different object classes.
+///
+/// For networks that only detect objects of a single type, `()` can be used as the [`Classes`]
+/// implementor.
+pub trait Classes: Send + Sync + 'static {
+    /// Casts an instance of `self` to a raw `u32`.
+    fn as_u32(&self) -> u32;
+
+    /// Casts a raw `u32` to an instance of `Self`.
+    ///
+    /// The library never passes invalid values for `raw` to this method, so any (safe) behavior is
+    /// permitted in that case (eg. panicking or returning a default value).
+    fn from_u32(raw: u32) -> Self;
+}
+
+impl Classes for () {
+    #[inline]
+    fn as_u32(&self) -> u32 {
+        0
+    }
+
+    #[inline]
+    fn from_u32(_: u32) -> Self {
+        ()
+    }
+}
+
+/// A generic object detector.
+///
+/// This type wraps a [`Network`] for object detection.
+pub struct Detector<C: Classes> {
+    network: Box<dyn Network<Classes = C>>,
+    detections: Detections<C>,
+    t_infer: Timer,
+    t_extract: Timer,
+    t_nms: Timer,
+    thresh: f32,
+    nms: NonMaxSuppression,
+    _p: PhantomData<C>,
+}
+
+impl<C: Classes> Detector<C> {
+    pub const DEFAULT_THRESHOLD: f32 = 0.5;
+
+    pub fn new<N: Network<Classes = C>>(network: N) -> Self {
+        Self {
+            network: Box::new(network),
+            detections: Detections::new(),
+            t_infer: Timer::new("infer"),
+            t_extract: Timer::new("extract"),
+            t_nms: Timer::new("nms"),
+            thresh: Self::DEFAULT_THRESHOLD,
+            nms: NonMaxSuppression::new(),
+            _p: PhantomData,
+        }
+    }
+
+    pub fn input_resolution(&self) -> Resolution {
+        self.network.cnn().input_resolution()
+    }
+
+    #[inline]
+    pub fn set_threshold(&mut self, thresh: f32) {
+        self.thresh = thresh;
+    }
+
+    pub fn nms_mut(&mut self) -> &mut NonMaxSuppression {
+        &mut self.nms
+    }
+
+    pub fn detect<V: AsImageView>(&mut self, image: &V) -> &Detections<C> {
+        self.detect_impl(image.as_view())
+    }
+
+    fn detect_impl(&mut self, image: ImageView<'_>) -> &Detections<C> {
+        self.detections.clear();
+
+        let cnn = self.network.cnn();
+        let input_res = cnn.input_resolution();
+
+        // If the input image's aspect ratio doesn't match the CNN's input, create an oversized view
+        // that does.
+        let rect = image
+            .rect()
+            .grow_to_fit_aspect(input_res.aspect_ratio().unwrap());
+        let view = image.view(rect);
+        let outputs = self.t_infer.time(|| cnn.estimate(&view)).unwrap();
+        log::trace!("inference result: {:?}", outputs);
+
+        self.t_extract.time(|| {
+            self.network
+                .extract(&outputs, self.thresh, &mut self.detections)
+        });
+
+        self.t_nms.time(|| {
+            for class in &mut self.detections.vec {
+                // FIXME: do this in-place
+                let iter = self.nms.process(class);
+                class.clear();
+                class.extend(iter);
+            }
+        });
+
+        // Map all coordinates back into the input image.
+        let scale = rect.width() as f32 / input_res.width() as f32;
+        for (_, det) in self.detections.all_detections_mut() {
+            // Map all coordinates from the network's input coordinate system to `rect`'s system.
+            det.rect.xc *= scale;
+            det.rect.yc *= scale;
+            det.rect.w *= scale;
+            det.rect.h *= scale;
+            for kp in &mut det.keypoints {
+                kp.x *= scale;
+                kp.y *= scale;
+            }
+
+            // Now remove the offset added by the oversized rectangle (this compensates for
+            // "black bars" added to adjust the aspect ratio).
+            det.rect.xc += rect.x() as f32;
+            det.rect.yc += rect.y() as f32;
+            for kp in &mut det.keypoints {
+                kp.x += rect.x() as f32;
+                kp.y += rect.y() as f32;
+            }
+        }
+
+        &self.detections
+    }
+
+    pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
+        [&self.t_infer, &self.t_extract, &self.t_nms].into_iter()
+    }
+}
 
 /// A detected object.
 ///
@@ -26,6 +265,7 @@ use crate::nn::point_to_img;
 #[derive(Debug, Clone)]
 pub struct RawDetection {
     confidence: f32,
+    angle: f32,
     rect: BoundingRect,
     keypoints: Vec<Keypoint>,
 }
@@ -34,6 +274,7 @@ impl RawDetection {
     pub fn new(confidence: f32, rect: BoundingRect) -> Self {
         Self {
             confidence,
+            angle: 0.0,
             rect,
             keypoints: Vec::new(),
         }
@@ -42,6 +283,7 @@ impl RawDetection {
     pub fn with_keypoints(confidence: f32, rect: BoundingRect, keypoints: Vec<Keypoint>) -> Self {
         Self {
             confidence,
+            angle: 0.0,
             rect,
             keypoints,
         }
@@ -59,6 +301,20 @@ impl RawDetection {
         self.confidence = confidence;
     }
 
+    /// Returns the angle of the detected object, in radians, clockwise.
+    ///
+    /// Note that not all networks support computing the object angle. If it is not supported, an
+    /// angle of 0.0 will be returned.
+    pub fn angle(&self) -> f32 {
+        self.angle
+    }
+
+    /// Sets the angle of the detected object, in radians, clockwise.
+    pub fn set_angle(&mut self, angle: f32) {
+        self.angle = angle;
+    }
+
+    /// Returns the axis-aligned bounding rectangle containing the detected object.
     pub fn bounding_rect(&self) -> BoundingRect {
         self.rect
     }
@@ -74,12 +330,41 @@ impl RawDetection {
     pub fn keypoints_mut(&mut self) -> &mut Vec<Keypoint> {
         &mut self.keypoints
     }
+
+    pub fn draw<I: AsImageViewMut>(&self, image: &mut I) {
+        self.draw_impl(&mut image.as_view_mut());
+    }
+
+    fn draw_impl(&self, image: &mut ImageViewMut<'_>) {
+        draw::rotated_rect(
+            image,
+            RotatedRect::new(self.bounding_rect().to_rect(), self.angle()),
+        )
+        .color(Color::from_rgb8(170, 0, 0));
+        for lm in self.keypoints() {
+            draw::marker(image, lm.x() as _, lm.y() as _);
+        }
+
+        let color = match self.confidence() {
+            0.8.. => Color::GREEN,
+            0.4..=0.8 => Color::YELLOW,
+            _ => Color::RED,
+        };
+        draw::text(
+            image,
+            self.bounding_rect().xc as _,
+            (self.bounding_rect().yc + self.bounding_rect().h * 0.5) as _,
+            &format!("conf={:.01}", self.confidence()),
+        )
+        .align_top()
+        .color(color);
+    }
 }
 
 /// A 2D keypoint produced as part of a [`RawDetection`].
 ///
-/// A keypoint by itself is just a point in an unspecified coordinate system. Keypoints are often,
-/// but not always, inside the detection bounding box.
+/// Keypoints are often, but not always, inside the detection bounding box and indicate the
+/// approximate location of some object landmark.
 ///
 /// The meaning of a keypoint depends on the specific detector and on its index in the keypoint
 /// list. Typically keypoints are used to crop/rotate a detected object for further processing.
@@ -123,19 +408,6 @@ impl BoundingRect {
         Self { xc, yc, w, h }
     }
 
-    pub(crate) fn grow_rel(&self, left: f32, right: f32, top: f32, bottom: f32) -> Self {
-        let left = left * self.w;
-        let right = right * self.w;
-        let top = top * self.h;
-        let bottom = bottom * self.h;
-        Self {
-            xc: self.xc + (right - left) * 0.5,
-            yc: self.yc + (bottom - top) * 0.5,
-            w: self.w + left + right,
-            h: self.h + top + bottom,
-        }
-    }
-
     /// Uniformly scales the size of `self` by `scale`.
     #[cfg(test)]
     fn scale(&self, scale: f32) -> Self {
@@ -147,7 +419,7 @@ impl BoundingRect {
         }
     }
 
-    pub(crate) fn to_rect(&self, full_res: &Resolution) -> Rect {
+    pub(crate) fn to_rect_old(&self, full_res: &Resolution) -> Rect {
         let top_left = (self.xc - self.w / 2.0, self.yc - self.h / 2.0);
         let bottom_right = (self.xc + self.w / 2.0, self.yc + self.h / 2.0);
 
@@ -155,6 +427,15 @@ impl BoundingRect {
         let bottom_right = point_to_img(bottom_right.0, bottom_right.1, full_res);
 
         Rect::from_corners(top_left, bottom_right)
+    }
+
+    pub fn to_rect(&self) -> Rect {
+        Rect::from_center(
+            self.xc as _,
+            self.yc as _,
+            self.w.ceil() as _,
+            self.h.ceil() as _,
+        )
     }
 
     fn top_left(&self) -> (f32, f32) {

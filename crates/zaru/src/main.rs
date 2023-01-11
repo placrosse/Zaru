@@ -3,7 +3,8 @@ mod facetracking;
 use std::io;
 
 use pawawwewism::{promise, Promise, PromiseHandle, Worker};
-use zaru::face::detection::Detector;
+use zaru::detection::Detector;
+use zaru::face::detection::ShortRangeNetwork;
 use zaru::face::eye::{EyeLandmarks, EyeNetwork};
 use zaru::face::landmark::mediapipe_facemesh::{self, LandmarkResult, MediaPipeFaceMesh};
 use zaru::filter::ema::Ema;
@@ -134,7 +135,7 @@ fn face_track_worker(eye_input_aspect: AspectRatio) -> Result<Worker<FaceTrackPa
     let mut fps = FpsCounter::new("tracker");
     let t_total = Timer::new("total");
 
-    let mut detector = Detector::default();
+    let mut detector = Detector::new(ShortRangeNetwork);
     let mut estimator = Estimator::new(MediaPipeFaceMesh);
     estimator.set_filter(LandmarkFilter::new(
         Ema::new(0.7),
@@ -165,10 +166,13 @@ fn face_track_worker(eye_input_aspect: AspectRatio) -> Result<Worker<FaceTrackPa
                     .max_by_key(|det| TotalF32(det.confidence()))
                 {
                     let rect = target
-                        .bounding_rect_loose()
+                        .bounding_rect()
+                        .to_rect()
+                        .grow_rel(0.3)
                         .move_by(view_rect.x(), view_rect.y());
                     log::trace!("start tracking face at {:?}", rect);
                     tracker.set_roi(rect);
+                    // FIXME: seed with rotation
                 }
             }
 

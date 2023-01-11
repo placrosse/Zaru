@@ -1,5 +1,6 @@
 use zaru::{
-    face::detection::{Detector, FullRangeNetwork, ShortRangeNetwork},
+    detection::Detector,
+    face::detection::{FullRangeNetwork, ShortRangeNetwork},
     gui,
     timer::FpsCounter,
     video::webcam::{Webcam, WebcamOptions},
@@ -25,7 +26,7 @@ fn main() -> anyhow::Result<()> {
         let view_rect = image.resolution().fit_aspect_ratio(input_ratio);
         let mut view = image.view_mut(view_rect);
 
-        for detection in detector.detect(&view) {
+        for detection in detector.detect(&view).iter() {
             detection.draw(&mut view);
         }
 

@@ -1,8 +1,9 @@
 use std::any::type_name;
 
 use zaru::{
+    detection::Detector,
     face::{
-        detection::Detector,
+        detection::ShortRangeNetwork,
         landmark::multipie68::{self, LandmarkResult},
     },
     gui,
@@ -32,7 +33,7 @@ impl Algo {
 fn main() -> anyhow::Result<()> {
     zaru::init_logger!();
 
-    let mut detector = Detector::default();
+    let mut detector = Detector::new(ShortRangeNetwork);
     let mut algos = [
         Algo::new(multipie68::PeppaFacialLandmark, Color::GREEN),
         Algo::new(multipie68::FaceOnnx, Color::RED),
@@ -41,10 +42,11 @@ fn main() -> anyhow::Result<()> {
     let webcam = Webcam::open(WebcamOptions::default())?;
     for image in webcam {
         let mut image = image?;
-        if let Some(det) = detector.detect(&image).first() {
+        if let Some(det) = detector.detect(&image).iter().next() {
             for algo in &mut algos {
                 let rect = det
-                    .bounding_rect_raw()
+                    .bounding_rect()
+                    .to_rect()
                     .grow_rel(0.15)
                     .grow_to_fit_aspect(algo.estimator.input_resolution().aspect_ratio().unwrap());
                 draw::rect(&mut image, rect).color(algo.color);

@@ -39,15 +39,12 @@ static MODEL: Lazy<Cnn> = Lazy::new(|| {
 
 /// Estimates facial landmarks using the MediaPipe Face Mesh network.
 ///
-/// The input image must be a cropped image of a face. When using [`Detector`], the
-/// rectangle returned by [`Detection::bounding_rect_loose`] produces good results.
+/// The input image must be a cropped image of a face.
 ///
 /// The image should depict a face that is mostly upright. Results will be poor if the face is
 /// rotated too much. A [`LandmarkTracker`] can be used to automatically follow the rotation of a
 /// face and pass an upright view to the network.
 ///
-/// [`Detector`]: super::super::detection::Detector
-/// [`Detection::bounding_rect_loose`]: super::super::detection::Detection::bounding_rect_loose
 /// [`LandmarkTracker`]: crate::landmark::LandmarkTracker
 pub struct MediaPipeFaceMesh;
 

@@ -16,7 +16,8 @@ use itertools::Itertools;
 use nalgebra::RealField;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use zaru::{
-    face::detection::Detector,
+    detection::Detector,
+    face::detection::ShortRangeNetwork,
     image::Image,
     iter::zip_exact,
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork},
@@ -70,20 +71,20 @@ fn main() -> anyhow::Result<()> {
     let embeddings = image_paths
         .par_iter()
         .map_init(
-            || Detector::default(),
+            || Detector::new(ShortRangeNetwork),
             |det, (path, class)| {
                 let image = Image::load(path).unwrap();
 
                 let dets = det.detect(&image);
-                if dets.is_empty() {
-                    println!("No faces detected in '{}'", path.display());
-                    return None;
-                }
+                let rect = match dets.iter().next() {
+                    Some(det) => det.bounding_rect().to_rect(),
+                    None => {
+                        println!("No faces detected in '{}'", path.display());
+                        return None;
+                    }
+                };
                 let grow_by = 0.4;
-                let rect = dets[0]
-                    .bounding_rect_raw()
-                    .grow_rel(grow_by)
-                    .grow_to_fit_aspect(target_aspect);
+                let rect = rect.grow_rel(grow_by).grow_to_fit_aspect(target_aspect);
                 let face = image.view(rect).aspect_aware_resize(cnn.input_resolution());
                 let out = cnn.estimate(&face).unwrap();
                 let view = out[0].index([0]);
