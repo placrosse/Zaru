@@ -15,8 +15,6 @@ use zaru_image::{
 use zaru_nn::{Cnn, Outputs};
 use zaru_utils::timer::Timer;
 
-use crate::nn::point_to_img;
-
 use self::nms::NonMaxSuppression;
 
 /// Trait implemented by neural networks that detect objects in an input image.
@@ -417,16 +415,6 @@ impl BoundingRect {
             w: self.w * scale,
             h: self.h * scale,
         }
-    }
-
-    pub(crate) fn to_rect_old(&self, full_res: &Resolution) -> Rect {
-        let top_left = (self.xc - self.w / 2.0, self.yc - self.h / 2.0);
-        let bottom_right = (self.xc + self.w / 2.0, self.yc + self.h / 2.0);
-
-        let top_left = point_to_img(top_left.0, top_left.1, full_res);
-        let bottom_right = point_to_img(bottom_right.0, bottom_right.1, full_res);
-
-        Rect::from_corners(top_left, bottom_right)
     }
 
     pub fn to_rect(&self) -> Rect {

@@ -2,9 +2,10 @@ use std::{env, iter, thread, time::Instant};
 
 use zaru::{
     body::{
-        detection::PoseDetector,
+        detection::{Keypoint, PoseNetwork},
         landmark::{FullNetwork, Landmarker, LiteNetwork},
     },
+    detection::Detector,
     gui,
     image::{draw, Color, Image, Rect},
     num::TotalF32,
@@ -48,7 +49,7 @@ fn main() -> anyhow::Result<()> {
         None => Box::new(Webcam::open(WebcamOptions::default())?.into_iter()),
     };
 
-    let mut detector = PoseDetector::new();
+    let mut detector = Detector::new(PoseNetwork);
     let mut landmarker = if USE_FULL_NETWORK {
         Landmarker::new(FullNetwork)
     } else {
@@ -60,7 +61,7 @@ fn main() -> anyhow::Result<()> {
         let mut image = result?;
 
         let detections = detector.detect(&image);
-        for detection in detections {
+        for detection in detections.iter() {
             detection.draw(&mut image);
         }
 
@@ -68,13 +69,18 @@ fn main() -> anyhow::Result<()> {
             .iter()
             .max_by_key(|det| TotalF32(det.confidence()))
         {
-            let hips = detection.keypoint_hips();
+            let hips = detection.keypoints()[Keypoint::Hips as usize];
             let grow_by = 0.15;
-            let body_rect = Rect::bounding(detection.keypoints())
-                .unwrap()
-                .grow_move_center(hips.0, hips.1)
-                .grow_to_fit_aspect(landmarker.input_resolution().aspect_ratio().unwrap())
-                .grow_rel(grow_by);
+            let body_rect = Rect::bounding(
+                detection
+                    .keypoints()
+                    .iter()
+                    .map(|kp| (kp.x() as _, kp.y() as _)),
+            )
+            .unwrap()
+            .grow_move_center(hips.x() as _, hips.y() as _)
+            .grow_to_fit_aspect(landmarker.input_resolution().aspect_ratio().unwrap())
+            .grow_rel(grow_by);
             draw::rect(&mut image, body_rect).color(Color::BLUE);
             let mut body_view = image.view_mut(body_rect);
             let landmarks = landmarker.compute(&body_view);
