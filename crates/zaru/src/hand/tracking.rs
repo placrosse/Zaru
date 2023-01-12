@@ -11,7 +11,7 @@ use std::{
 use zaru_image::{Image, RotatedRect};
 
 use crate::{
-    detection::{self, Detector, RawDetection},
+    detection::{self, Detection, Detector},
     landmark::{Estimator, LandmarkTracker, Network},
 };
 
@@ -21,8 +21,8 @@ use super::landmark::LandmarkResult;
 pub struct HandTracker {
     hands: Vec<TrackedHand>,
     next_hand_id: HandId,
-    detector: Worker<(Arc<Image>, Promise<Vec<RawDetection>>)>,
-    detections_handle: Option<PromiseHandle<Vec<RawDetection>>>,
+    detector: Worker<(Arc<Image>, Promise<Vec<Detection>>)>,
+    detections_handle: Option<PromiseHandle<Vec<Detection>>>,
     next_det: Instant,
     det_interval: Duration,
     make_estimator: Box<dyn Fn() -> Estimator<LandmarkResult>>,

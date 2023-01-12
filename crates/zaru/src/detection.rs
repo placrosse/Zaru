@@ -43,7 +43,7 @@ pub trait Network: Send + Sync + 'static {
 #[derive(Debug)]
 pub struct Detections<C: Classes = ()> {
     // FIXME: make this sparse, networks can have thousands of classes
-    vec: Vec<Vec<RawDetection>>,
+    vec: Vec<Vec<Detection>>,
     _p: PhantomData<C>,
 }
 
@@ -70,7 +70,7 @@ impl<C: Classes> Detections<C> {
         }
     }
 
-    pub fn push(&mut self, class: C, detection: RawDetection) {
+    pub fn push(&mut self, class: C, detection: Detection) {
         let raw_class = class.as_u32() as usize;
         if self.vec.len() <= raw_class {
             self.vec.resize_with(raw_class + 1, Vec::new);
@@ -80,14 +80,14 @@ impl<C: Classes> Detections<C> {
     }
 
     /// Returns an iterator yielding all detections alongside their class.
-    pub fn all_detections(&self) -> impl Iterator<Item = (C, &RawDetection)> {
+    pub fn all_detections(&self) -> impl Iterator<Item = (C, &Detection)> {
         self.vec
             .iter()
             .enumerate()
             .flat_map(|(i, v)| v.iter().map(move |det| (C::from_u32(i as u32), det)))
     }
 
-    pub fn all_detections_mut(&mut self) -> impl Iterator<Item = (C, &mut RawDetection)> {
+    pub fn all_detections_mut(&mut self) -> impl Iterator<Item = (C, &mut Detection)> {
         self.vec
             .iter_mut()
             .enumerate()
@@ -95,7 +95,7 @@ impl<C: Classes> Detections<C> {
     }
 
     /// Returns an iterator that yields all detections of the given class.
-    pub fn for_class(&self, class: C) -> impl Iterator<Item = &RawDetection> {
+    pub fn for_class(&self, class: C) -> impl Iterator<Item = &Detection> {
         self.vec
             .get(class.as_u32() as usize)
             .into_iter()
@@ -105,7 +105,7 @@ impl<C: Classes> Detections<C> {
 
 impl Detections {
     /// Returns an iterator yielding the stored detections.
-    pub fn iter(&self) -> impl Iterator<Item = &RawDetection> {
+    pub fn iter(&self) -> impl Iterator<Item = &Detection> {
         self.vec.iter().flat_map(|v| v.iter())
     }
 }
@@ -249,26 +249,22 @@ impl<C: Classes> Detector<C> {
 
 /// A detected object.
 ///
-/// A [`RawDetection`] consists of a [`BoundingRect`] enclosing the detected object, a confidence
-/// value, and an optional set of located keypoints.
+/// A [`Detection`] consists of a [`BoundingRect`] enclosing the detected object, a confidence
+/// value, an optional rotation angle of the object, and a possibly empty set of located keypoints.
 ///
 /// Per convention, the confidence value lies between 0.0 and 1.0, which can be achieved by passing
 /// the raw network output through [`crate::num::sigmoid`] (but the network documentation should be
 /// consulted). The confidence value is used when performing non-maximum suppression with
 /// [`nms::SuppressionMode::Average`], so it has to have the expected range when making use of that.
-///
-/// Called "raw" because it does not reside in any defined coordinate system. Detector
-/// implementations typically provide a wrapper around this type that allows accessing the detection
-/// as a [`Rect`] in input image coordinates.
 #[derive(Debug, Clone)]
-pub struct RawDetection {
+pub struct Detection {
     confidence: f32,
     angle: f32,
     rect: BoundingRect,
     keypoints: Vec<Keypoint>,
 }
 
-impl RawDetection {
+impl Detection {
     pub fn new(confidence: f32, rect: BoundingRect) -> Self {
         Self {
             confidence,
@@ -359,7 +355,7 @@ impl RawDetection {
     }
 }
 
-/// A 2D keypoint produced as part of a [`RawDetection`].
+/// A 2D keypoint produced as part of a [`Detection`].
 ///
 /// Keypoints are often, but not always, inside the detection bounding box and indicate the
 /// approximate location of some object landmark.

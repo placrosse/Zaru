@@ -9,7 +9,7 @@ use zaru_utils::num::sigmoid;
 use crate::{
     detection::{
         ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
-        BoundingRect, Detections, Network, RawDetection,
+        BoundingRect, Detection, Detections, Network,
     },
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork},
 };
@@ -149,7 +149,7 @@ fn extract_detection(
     input_res: Resolution,
     box_params: &[f32],
     confidence: f32,
-) -> RawDetection {
+) -> Detection {
     assert_eq!(box_params.len(), 18);
 
     let input_w = input_res.width() as f32;
@@ -166,7 +166,7 @@ fn extract_detection(
         )
     };
 
-    let mut det = RawDetection::with_keypoints(
+    let mut det = Detection::with_keypoints(
         confidence,
         BoundingRect::from_center(xc, yc, w, h),
         vec![
