@@ -3,7 +3,7 @@
 //! [Procrustes analysis]: https://en.wikipedia.org/wiki/Procrustes_analysis
 
 use nalgebra::{
-    Const, Dynamic, Matrix, Matrix3, Matrix4, Rotation3, UnitQuaternion, VecStorage, Vector3,
+    Const, Dynamic, Matrix, Matrix3, Matrix4, OMatrix, Rotation3, UnitQuaternion, Vector3,
 };
 
 use crate::iter::zip_exact;
@@ -20,9 +20,9 @@ pub struct ProcrustesAnalyzer {
 
     buf: Vec<Vector3<f32>>,
     /// `Q` matrix for Kabsch algorithm, computed from reference points.
-    q: Matrix<f32, Dynamic, Const<3>, VecStorage<f32, Dynamic, Const<3>>>,
+    q: OMatrix<f32, Dynamic, Const<3>>,
     /// Transposed `P` matrix for Kabsch algorithm.
-    p_t: Matrix<f32, Const<3>, Dynamic, VecStorage<f32, Const<3>, Dynamic>>,
+    p_t: OMatrix<f32, Const<3>, Dynamic>,
 }
 
 impl ProcrustesAnalyzer {
