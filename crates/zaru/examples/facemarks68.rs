@@ -25,7 +25,7 @@ impl Algo {
         Self {
             estimator: Estimator::new(network),
             color,
-            fps: FpsCounter::new(type_name::<L>()),
+            fps: FpsCounter::new(type_name::<L>().split("::").last().unwrap()),
         }
     }
 }
