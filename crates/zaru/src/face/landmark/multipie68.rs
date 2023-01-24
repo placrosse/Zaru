@@ -121,3 +121,13 @@ impl Network for FaceOnnx {
         }
     }
 }
+
+include!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../3rdparty/3d/multipie68.rs"
+));
+
+/// Returns an iterator over the reference landmark positions.
+pub fn reference_positions() -> impl Iterator<Item = [f32; 3]> {
+    REFERENCE_POSITIONS.iter().copied()
+}

@@ -9,6 +9,8 @@ Note that files may have been converted from other formats.
 |------|--------|---------|
 | `3d/canonical_face_model.obj` | [MediaPipe] | Apache-2.0
 | `3d/canonical_face_model.rs` | [MediaPipe] | Apache-2.0
+| `3d/multipie68.obj` | [head-pose-estimation] | MIT
+| `3d/multipie68.rs` | [head-pose-estimation] | MIT
 | `img/sad_linus.jpg` | - | none
 | `img/sad_linus_cropped.jpg` | - | none
 | `onnx/face_detection_full_range.onnx` | [MediaPipe] | Apache-2.0
@@ -30,6 +32,7 @@ Note that files may have been converted from other formats.
 [InsightFace_Pytorch]: https://github.com/TreB1eN/InsightFace_Pytorch
 [FaceONNX]: https://github.com/FaceONNX/FaceONNX.Models
 [Peppa-Facial-Landmark-PyTorch]: https://github.com/ainrichman/Peppa-Facial-Landmark-PyTorch
+[head-pose-estimation]: https://github.com/yinguobing/head-pose-estimation
 
 ## Neural Network conversion
 
