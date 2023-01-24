@@ -1,5 +1,6 @@
 //! Hand landmark prediction.
 
+use include_blob::include_blob;
 use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
 use zaru_image::{draw, AsImageViewMut, Color, ImageViewMut};
@@ -280,8 +281,7 @@ impl Network for LiteNetwork {
 
     fn cnn(&self) -> &Cnn {
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
-            let model_data =
-                include_blob::include_bytes!("../../3rdparty/onnx/hand_landmark_lite.onnx");
+            let model_data = include_blob!("../../3rdparty/onnx/hand_landmark_lite.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()
@@ -311,8 +311,7 @@ impl Network for FullNetwork {
 
     fn cnn(&self) -> &Cnn {
         static MODEL: Lazy<Cnn> = Lazy::new(|| {
-            let model_data =
-                include_blob::include_bytes!("../../3rdparty/onnx/hand_landmark_full.onnx");
+            let model_data = include_blob!("../../3rdparty/onnx/hand_landmark_full.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()

@@ -4,6 +4,7 @@
 //!
 //! [Iris]: https://google.github.io/mediapipe/solutions/iris
 
+use include_blob::include_blob;
 use nalgebra::Point2;
 use once_cell::sync::Lazy;
 
@@ -17,7 +18,7 @@ use crate::{
 };
 
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob::include_bytes!("../../3rdparty/onnx/iris_landmark.onnx");
+    let model_data = include_blob!("../../3rdparty/onnx/iris_landmark.onnx");
     Cnn::new(
         NeuralNetwork::from_onnx(model_data)
             .unwrap()

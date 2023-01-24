@@ -1,5 +1,6 @@
 //! Human body detection.
 
+use include_blob::include_blob;
 use once_cell::sync::Lazy;
 use zaru_nn::Outputs;
 use zaru_utils::num::sigmoid;
@@ -14,7 +15,7 @@ use crate::{
 use zaru_image::Resolution;
 
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob::include_bytes!("../../3rdparty/onnx/pose_detection.onnx");
+    let model_data = include_blob!("../../3rdparty/onnx/pose_detection.onnx");
     Cnn::new(
         NeuralNetwork::from_onnx(model_data)
             .unwrap()

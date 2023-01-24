@@ -9,6 +9,7 @@
 // eye and mouth landmarks. However, it uses custom ops, and so can't be converted to a
 // non-TensorFlow format.
 
+use include_blob::include_blob;
 use itertools::Itertools;
 use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
@@ -25,7 +26,7 @@ use crate::{
 };
 
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob::include_bytes!("../../3rdparty/onnx/face_landmark.onnx");
+    let model_data = include_blob!("../../3rdparty/onnx/face_landmark.onnx");
     Cnn::new(
         NeuralNetwork::from_onnx(model_data)
             .unwrap()

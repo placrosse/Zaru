@@ -1,5 +1,6 @@
 //! Palm detection.
 
+use include_blob::include_blob;
 use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
 use zaru_image::Resolution;
@@ -45,7 +46,7 @@ pub const ALL_KEYPOINTS: &[Keypoint] = &[
 pub struct LiteNetwork;
 
 static LITE_MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob::include_bytes!("../../3rdparty/onnx/palm_detection_lite.onnx");
+    let model_data = include_blob!("../../3rdparty/onnx/palm_detection_lite.onnx");
     Cnn::new(
         NeuralNetwork::from_onnx(model_data)
             .unwrap()
@@ -80,7 +81,7 @@ impl Network for LiteNetwork {
 pub struct FullNetwork;
 
 static FULL_MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob::include_bytes!("../../3rdparty/onnx/palm_detection_full.onnx");
+    let model_data = include_blob!("../../3rdparty/onnx/palm_detection_full.onnx");
     Cnn::new(
         NeuralNetwork::from_onnx(model_data)
             .unwrap()

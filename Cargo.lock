@@ -70,12 +70,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ar"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d67af77d68a931ecd5cbd8a3b5987d63a1d1d1278f7f6a60ae33db485cdebb69"
-
-[[package]]
 name = "arrayref"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1013,16 +1007,23 @@ dependencies = [
 
 [[package]]
 name = "include-blob"
-version = "0.1.0"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f15e9644a80cafd330536184f240a2867d24c8dfded66d56a04f4ff4dd8e8887"
 dependencies = [
- "ar",
  "include-blob-macros",
  "object",
+ "sludge-ar-with-ranlib",
 ]
 
 [[package]]
 name = "include-blob-macros"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c17cafd298aeb61e5eb8082dbc01ca64956a6cbdce1ffcd85ff75e6107e7598"
+dependencies = [
+ "syn",
+]
 
 [[package]]
 name = "indexmap"
@@ -2306,6 +2307,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "sludge-ar-with-ranlib"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8364be70b9da92dd326b54c534e9be24ebeab92d0dcd4d6fb989d275476c0121"
+
+[[package]]
 name = "smallvec"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2354,9 +2361,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "syn"
-version = "1.0.103"
+version = "1.0.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a864042229133ada95abf3b54fdc62ef5ccabe9515b64717bcb9a1919e59445d"
+checksum = "1f4064b5b16e03ae50984a5a8ed5d4f8803e6bc1fd170a3cda91a1be4b18e3f5"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -5,6 +5,7 @@
 //!
 //! [Face Detection]: https://google.github.io/mediapipe/solutions/face_detection
 
+use include_blob::include_blob;
 use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
 use zaru_image::Resolution;
@@ -28,8 +29,7 @@ pub enum Keypoint {
 pub struct ShortRangeNetwork;
 
 static SHORT_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data =
-        include_blob::include_bytes!("../../3rdparty/onnx/face_detection_short_range.onnx");
+    let model_data = include_blob!("../../3rdparty/onnx/face_detection_short_range.onnx");
     Cnn::new(
         NeuralNetwork::from_onnx(model_data)
             .unwrap()
@@ -65,8 +65,7 @@ impl Network for ShortRangeNetwork {
 pub struct FullRangeNetwork;
 
 static FULL_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data =
-        include_blob::include_bytes!("../../3rdparty/onnx/face_detection_full_range.onnx");
+    let model_data = include_blob!("../../3rdparty/onnx/face_detection_full_range.onnx");
     Cnn::new(
         NeuralNetwork::from_onnx(model_data)
             .unwrap()

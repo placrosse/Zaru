@@ -22,7 +22,7 @@ once_cell = "1.9.0"
 pawawwewism = "0.1.0"
 
 # neural nets
-include-blob = { path = "../include-blob" }
+include-blob = "0.1.0"
 tract-onnx = "0.18.0"
 tinyvec = { version = "1.6.0", features = ["alloc"] }
 wonnx = { git = "https://github.com/webonnx/wonnx.git", rev = "315d66a318515f1cc5e42684ddb8bd22ec01d378" }
@@ -51,7 +51,7 @@ bytemuck = { version = "1.7.3", features = ["derive"] }
 serde = { version = "1.0.136", features = ["derive"] }
 
 [build-dependencies]
-include-blob = { path = "../include-blob" }
+include-blob = "0.1.0"
 
 [dev-dependencies]
 rayon = "1.5.1"
