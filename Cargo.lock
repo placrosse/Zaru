@@ -919,6 +919,15 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
+dependencies = [
+ "ahash 0.7.6",
+]
+
+[[package]]
+name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
@@ -1895,6 +1904,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
+name = "primal-check"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9df7f93fd637f083201473dab4fee2db4c429d32e55e3299980ab3957ab916a0"
+dependencies = [
+ "num-integer",
+]
+
+[[package]]
 name = "proc-macro-crate"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2022,6 +2040,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand_distr"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32cb0b9bc82b0a0876c2dd994a7e7a2683d3e7390ca40e6886785ef0c7e3ee31"
+dependencies = [
+ "num-traits",
+ "rand",
+]
+
+[[package]]
 name = "range-alloc"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2127,6 +2155,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfa0f585226d2e68097d4f95d113b15b83a82e819ab25717ec0590d9584ef366"
 dependencies = [
  "semver",
+]
+
+[[package]]
+name = "rustfft"
+version = "6.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e17d4f6cbdb180c9f4b2a26bbf01c4e647f1e1dea22fe8eb9db54198b32f9434"
+dependencies = [
+ "num-complex",
+ "num-integer",
+ "num-traits",
+ "primal-check",
+ "strength_reduce",
+ "transpose",
+ "version_check",
 ]
 
 [[package]]
@@ -2354,6 +2397,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
+name = "strength_reduce"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe895eb47f22e2ddd4dabc02bce419d2e643c8e3b585c78158b349195bc24d82"
+
+[[package]]
+name = "string-interner"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91e2531d8525b29b514d25e275a43581320d587b86db302b9a7e464bac579648"
+dependencies = [
+ "cfg-if",
+ "hashbrown 0.11.2",
+ "serde",
+]
+
+[[package]]
 name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2513,9 +2573,9 @@ dependencies = [
 
 [[package]]
 name = "tract-core"
-version = "0.18.3"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "749008dd00a80c0b90632242a48c82f9161345d345d42b26712e94d27ef14e25"
+checksum = "be9e73c16d90a587a464ed56662943ab3651470ff10d7abdff79822072ad196b"
 dependencies = [
  "anyhow",
  "bit-set",
@@ -2529,6 +2589,7 @@ dependencies = [
  "ndarray",
  "num-integer",
  "num-traits",
+ "rustfft",
  "smallvec",
  "tract-data",
  "tract-linalg",
@@ -2536,9 +2597,9 @@ dependencies = [
 
 [[package]]
 name = "tract-data"
-version = "0.18.3"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4048227338d62c89e64c8f64e91cedb8cd80f12582c70ce1eee8da19959a1dab"
+checksum = "a7c8601518bb55fc921081fd43f63a3383a84a2bb71c83549a24ef978dd75e28"
 dependencies = [
  "anyhow",
  "educe",
@@ -2547,18 +2608,20 @@ dependencies = [
  "lazy_static",
  "maplit",
  "ndarray",
+ "nom",
  "num-complex",
  "num-integer",
  "num-traits",
  "scan_fmt",
  "smallvec",
+ "string-interner",
 ]
 
 [[package]]
 name = "tract-hir"
-version = "0.18.3"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "964b4e4a53dcc1a99ce573ce6e68ac9689063166a5f80d14eea0d3b5ab8a0b14"
+checksum = "22365f720a2584cfa17c007cbd197d2622df997fc5f648fa2cce1934d124e556"
 dependencies = [
  "derive-new",
  "educe",
@@ -2568,9 +2631,9 @@ dependencies = [
 
 [[package]]
 name = "tract-linalg"
-version = "0.18.3"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "106b9a5813b5888fca992e9ff16726efcdf3beea7449ff5931016b77c349c5ac"
+checksum = "cd6bb4e9470edfe18cde1cadb437bf7b2bf6377ff4e355ef040cc4c40cf8e0dd"
 dependencies = [
  "cc",
  "derive-new",
@@ -2592,9 +2655,9 @@ dependencies = [
 
 [[package]]
 name = "tract-nnef"
-version = "0.18.3"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2b31a5ed846ae1d775c657e41526dfeff959f816c967fd2964e60509eb1e2f7"
+checksum = "cae5f68df710e440192446153b86a0dcdeee49fa2e485b03fb0dbaaa4cd2a504"
 dependencies = [
  "byteorder",
  "flate2",
@@ -2607,9 +2670,9 @@ dependencies = [
 
 [[package]]
 name = "tract-onnx"
-version = "0.18.3"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6cb5c92226cb869324f445a01ed1ae3839383f86a1a1bd39eb516f460a59ffd7"
+checksum = "84940804e0989f8b80e22efac2228d1bbad69bb89eff8a545fae9f242ef25cb1"
 dependencies = [
  "bytes",
  "derive-new",
@@ -2626,15 +2689,27 @@ dependencies = [
 
 [[package]]
 name = "tract-onnx-opl"
-version = "0.18.3"
+version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e4926640b96ef156f3d4b9af08ecd47a0a6f9d0c49d16505af8dc413c377757"
+checksum = "c9a4a682e8dcbdc56d9ba134163812cea7c8bc14fd486234648afbae000e7644"
 dependencies = [
  "educe",
  "getrandom",
  "log",
  "rand",
+ "rand_distr",
+ "rustfft",
  "tract-nnef",
+]
+
+[[package]]
+name = "transpose"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6522d49d03727ffb138ae4cbc1283d3774f0d10aa7f9bf52e6784c45daf9b23"
+dependencies = [
+ "num-integer",
+ "strength_reduce",
 ]
 
 [[package]]
@@ -3269,11 +3344,8 @@ dependencies = [
  "pollster",
  "rayon",
  "serde",
- "tinyvec",
- "tract-onnx",
  "wgpu",
  "winit",
- "wonnx",
  "zaru-gui",
  "zaru-image",
  "zaru-nn",

@@ -4,7 +4,7 @@ pub mod tensor;
 
 use tensor::Tensor;
 use tract_onnx::prelude::{
-    tvec, Framework, Graph, InferenceModelExt, SimplePlan, TVec, TypedFact, TypedOp,
+    tvec, Framework, Graph, InferenceModelExt, SimplePlan, TValue, TVec, TypedFact, TypedOp,
 };
 use wonnx::utils::{InputTensor, OutputTensor};
 use zaru_image::{AsImageView, AspectRatio, Color, ImageView, Resolution};
@@ -329,10 +329,12 @@ impl NeuralNetwork {
                 Outputs { inner: outputs }
             }
             None => {
-                let outputs = self
-                    .0
-                    .inner
-                    .run(inputs.iter().map(|t| t.to_tract()).collect())?;
+                let outputs = self.0.inner.run(
+                    inputs
+                        .iter()
+                        .map(|t| TValue::from_const(Arc::new(t.to_tract())))
+                        .collect(),
+                )?;
                 let outputs = outputs
                     .into_iter()
                     .map(|tract| Tensor::from_tract(&tract))
