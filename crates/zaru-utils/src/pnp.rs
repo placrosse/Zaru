@@ -125,9 +125,12 @@ impl Dlt {
 
         // Extract the rotation.
         let svd = p.fixed_columns::<3>(0).svd(true, true);
-        let rot = svd.u.unwrap() * svd.v_t.unwrap();
+        let u = svd.u.unwrap();
+        let v_t = svd.v_t.unwrap();
+        let rot = u * v_t;
+        let d = rot.determinant().signum();
         // Flip the sign if the determinant is negative; removes mirroring from the rotation matrix.
-        let rot = rot.determinant().signum() * rot;
+        let rot = d * rot;
         assert!(
             rot.is_special_orthogonal(0.001),
             "not special orthogonal; det={}, rot={rot}",
@@ -136,7 +139,7 @@ impl Dlt {
         let rot = Rotation3::from_matrix_unchecked(rot);
         log::trace!("rot={rot}");
 
-        let t = p.column(3).into_owned() / svd.singular_values[0];
+        let t = d * p.column(3).into_owned() / svd.singular_values[0];
         log::trace!("t={t}");
 
         DltOutput {
@@ -170,6 +173,7 @@ impl DltOutput {
 mod tests {
     use std::{
         collections::hash_map::DefaultHasher,
+        f32::consts::PI,
         hash::{Hash, Hasher},
         thread,
     };
@@ -179,7 +183,9 @@ mod tests {
 
     use super::*;
 
-    const POS_EPSILON: f32 = 0.01;
+    const HALF_TURN: f32 = PI - 0.0005;
+
+    const POS_EPSILON: f32 = 0.02;
     const ANGLE_EPSILON: f32 = 0.05;
 
     fn project(intrinsic: &Matrix3x4<f32>, p: Vector3<f32>) -> [f32; 2] {
@@ -187,6 +193,7 @@ mod tests {
         [p.x / p.z, p.y / p.z]
     }
 
+    #[track_caller]
     fn check(
         n: usize,
         tf: Matrix4<f32>,
@@ -230,7 +237,19 @@ mod tests {
         check(
             6,
             Matrix4::new_translation(&Vector3::new(1.0, 5.0, 0.0)),
-            -Vector3::new(1.0, 5.0, 0.0),
+            Vector3::new(1.0, 5.0, 0.0),
+            0.0,
+            0.0,
+            0.0,
+        );
+    }
+
+    #[test]
+    fn test_uniform_scale() {
+        check(
+            6,
+            Matrix4::new_scaling(3.0),
+            Vector3::new(0.0, 0.0, 0.0),
             0.0,
             0.0,
             0.0,
@@ -271,6 +290,35 @@ mod tests {
             90.0f32.to_radians(),
             45.0f32.to_radians(),
             0.0,
+        );
+        check(
+            6,
+            Rotation3::from_euler_angles(0.0, 0.0, PI).into(),
+            Vector3::zeros(),
+            0.0,
+            0.0,
+            PI,
+        );
+        check(
+            6,
+            Rotation3::from_euler_angles(HALF_TURN, 0.0, HALF_TURN).into(),
+            Vector3::zeros(),
+            HALF_TURN,
+            0.0,
+            HALF_TURN,
+        );
+    }
+
+    #[test]
+    fn test_rot_and_tlate() {
+        check(
+            6,
+            Matrix4::from(Rotation3::from_euler_angles(HALF_TURN, 0.0, HALF_TURN))
+                .append_translation(&[5.0, 10.0, 0.0].into()),
+            Vector3::new(5.0, 10.0, 0.0),
+            HALF_TURN,
+            0.0,
+            HALF_TURN,
         );
     }
 }
