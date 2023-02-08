@@ -19,6 +19,8 @@ image = { version = "0.24.0", default-features = false, features = ["jpeg", "png
 embedded-graphics = "0.7.1"
 mozjpeg = "0.9.4"
 linuxvideo = "0.1.1"
+winit = "0.27.3"
+v-ayylmao = "0.0.4"
 zune-jpeg = { git = "https://github.com/SludgePhD/zune-jpeg.git", rev = "e76c28cb3b39e9a02ae4732a1f4a3fcf4ea99aed" }
 # This zune-jpeg commit contains a bunch of fixes not on crates.io.
 # It should probably be switched to https://github.com/etemesi254/zune-image, but that is currently

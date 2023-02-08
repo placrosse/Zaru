@@ -83,6 +83,16 @@ impl Image {
     }
 
     pub fn from_rgba8(res: Resolution, buf: &[u8]) -> Self {
+        let expected_size = res.width() as usize * res.height() as usize * 4;
+        assert_eq!(
+            expected_size,
+            buf.len(),
+            "incorrect buffer size {} for {} image (expected {} bytes)",
+            buf.len(),
+            res,
+            expected_size,
+        );
+
         Self {
             buf: ImageBuffer::from_vec(res.width(), res.height(), buf.to_vec())
                 .expect("buffer size does not match image resolution"),
