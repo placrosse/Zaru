@@ -94,7 +94,13 @@ pub(super) fn decode_jpeg(data: &[u8]) -> anyhow::Result<Image> {
             image::load_from_memory_with_format(data, image::ImageFormat::Jpeg)?.to_rgba8()
         }
         JpegBackend::MozJpeg => {
-            let mut decompress = mozjpeg::Decompress::new_mem(data)?.rgba()?;
+            let mut decompress = mozjpeg::Decompress::new_mem(data)?;
+
+            // Tune settings for decode performance.
+            decompress.do_fancy_upsampling(false);
+            decompress.dct_method(mozjpeg::DctMethod::IntegerFast);
+
+            let mut decompress = decompress.rgba()?;
             let buf = decompress
                 .read_scanlines_flat()
                 .ok_or_else(|| anyhow::anyhow!("failed to decode image"))?;
