@@ -1,7 +1,7 @@
 use zaru::{
     body::detection::PoseNetwork,
     detection::Detector,
-    gui,
+    image::gui,
     timer::FpsCounter,
     video::webcam::{Webcam, WebcamOptions},
 };

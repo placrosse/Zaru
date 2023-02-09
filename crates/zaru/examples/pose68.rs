@@ -10,8 +10,7 @@ use zaru::{
         detection::ShortRangeNetwork,
         landmark::multipie68::{self},
     },
-    gui,
-    image::Color,
+    image::{gui, Color},
     landmark::{Estimation, Estimator},
     video::webcam::{Webcam, WebcamOptions},
 };

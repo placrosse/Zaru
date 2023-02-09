@@ -6,7 +6,7 @@ use zaru::{
         landmark::{FullNetwork, Landmarker, LiteNetwork},
     },
     detection::Detector,
-    gui,
+    image::gui,
     image::{draw, Color, Image, Rect},
     num::TotalF32,
     timer::FpsCounter,

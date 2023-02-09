@@ -38,7 +38,7 @@ pub mod landmark;
 
 pub use zaru_utils::{filter, iter, num, procrustes, slice, timer};
 #[doc(inline)]
-pub use {zaru_gui as gui, zaru_image as image, zaru_nn as nn, zaru_video as video};
+pub use {zaru_image as image, zaru_nn as nn, zaru_video as video};
 
 #[cfg(test)]
 mod test;

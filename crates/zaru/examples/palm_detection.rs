@@ -1,7 +1,7 @@
 use zaru::{
     detection::Detector,
-    gui,
     hand::detection,
+    image::gui,
     timer::FpsCounter,
     video::webcam::{Webcam, WebcamOptions},
 };

@@ -10,6 +10,7 @@
 
 mod blend;
 pub mod draw;
+pub mod gui;
 mod jpeg;
 mod rect;
 mod resolution;

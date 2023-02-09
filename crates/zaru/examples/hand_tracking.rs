@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
 use zaru::{
-    gui,
     hand::{detection, landmark, tracking::HandTracker},
-    image::{draw, Image},
+    image::{draw, gui, Image},
     timer::FpsCounter,
     video::webcam::{Webcam, WebcamOptions},
 };

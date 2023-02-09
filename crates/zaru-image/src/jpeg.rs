@@ -1,7 +1,6 @@
 use std::{
     cell::RefCell,
     env::{self, VarError},
-    mem,
     num::NonZeroU32,
     process,
 };
@@ -13,7 +12,6 @@ use v_ayylmao::{
     display::Display,
     jpeg::{JpegDecodeSession, JpegInfo},
 };
-use winit::event_loop::EventLoop;
 
 use crate::Resolution;
 
@@ -27,6 +25,7 @@ enum VaApi {
 }
 
 /// Because computers, we support several different JPEG decoding backends.
+#[derive(Debug)]
 enum JpegBackend {
     /// Uses the `jpeg-decoder` crate, a robust but slow pure-Rust JPEG decoder.
     JpegDecoder,
@@ -60,22 +59,26 @@ static USE_VAAPI: Lazy<VaApi> = Lazy::new(|| match env::var("ZARU_JPEG_VAAPI") {
     }
 });
 
-static JPEG_BACKEND: Lazy<JpegBackend> = Lazy::new(|| match env::var("ZARU_JPEG_BACKEND") {
-    Ok(v) if v == "fast-but-wrong" => JpegBackend::FastButWrong,
-    Ok(v) if v == "mozjpeg" => JpegBackend::MozJpeg,
-    Ok(v) if v == "jpeg-decoder" => JpegBackend::JpegDecoder,
-    Ok(v) => {
-        eprintln!("invalid value set for `ZARU_JPEG_BACKEND` variable: '{v}'; exiting");
-        process::exit(1);
-    }
-    Err(VarError::NotPresent) => DEFAULT_BACKEND,
-    Err(VarError::NotUnicode(s)) => {
-        eprintln!(
-            "invalid value set for `ZARU_JPEG_BACKEND` variable: {}; exiting",
-            s.to_string_lossy()
-        );
-        process::exit(1);
-    }
+static JPEG_BACKEND: Lazy<JpegBackend> = Lazy::new(|| {
+    let backend = match env::var("ZARU_JPEG_BACKEND") {
+        Ok(v) if v == "fast-but-wrong" => JpegBackend::FastButWrong,
+        Ok(v) if v == "mozjpeg" => JpegBackend::MozJpeg,
+        Ok(v) if v == "jpeg-decoder" => JpegBackend::JpegDecoder,
+        Ok(v) => {
+            eprintln!("invalid value set for `ZARU_JPEG_BACKEND` variable: '{v}'; exiting");
+            process::exit(1);
+        }
+        Err(VarError::NotPresent) => DEFAULT_BACKEND,
+        Err(VarError::NotUnicode(s)) => {
+            eprintln!(
+                "invalid value set for `ZARU_JPEG_BACKEND` variable: {}; exiting",
+                s.to_string_lossy()
+            );
+            process::exit(1);
+        }
+    };
+    log::debug!("using JPEG decode backend: {:?}", backend);
+    backend
 });
 
 pub(super) fn decode_jpeg(data: &[u8]) -> anyhow::Result<Image> {
@@ -123,16 +126,13 @@ fn decode_jpeg_vaapi(jpeg: &[u8]) -> anyhow::Result<Image> {
         VaApi::Off => bail!("VA-API use disabled by env var"),
         VaApi::Force | VaApi::On => {
             static DISPLAY: Lazy<Option<Display>> = Lazy::new(|| {
-                let ev = EventLoop::new();
-                // TODO: remove once `EventLoop` implements `HasRawDisplayHandle`
-                let display = match unsafe { Display::new_unmanaged(&*ev) } {
+                let display = match unsafe { Display::new_unmanaged(&*crate::gui::DISPLAY) } {
                     Ok(display) => display,
                     Err(e) => {
                         log::warn!("failed to open VA-API display: {e}");
                         return None;
                     }
                 };
-                mem::forget(ev);
 
                 match display.query_vendor_string() {
                     Ok(vendor) => {
@@ -142,6 +142,7 @@ fn decode_jpeg_vaapi(jpeg: &[u8]) -> anyhow::Result<Image> {
                             return None;
                         }
 
+                        log::debug!("using VA-API for JPEG decoding (vendor string: {vendor})");
                         Some(display)
                     }
                     Err(e) => {

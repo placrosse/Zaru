@@ -17,9 +17,9 @@ use wgpu::{
 };
 use winit::{dpi::PhysicalSize, event_loop::EventLoopWindowTarget, window::WindowBuilder};
 
-use zaru_image::Resolution;
+use crate::Resolution;
 
-use crate::shaders::Shaders;
+use super::shaders::Shaders;
 
 const BACKGROUND: Color = Color::BLACK;
 

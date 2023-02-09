@@ -9,7 +9,8 @@ use std::{
     sync::{mpsc::sync_channel, Mutex},
 };
 
-use once_cell::sync::OnceCell;
+use once_cell::sync::Lazy;
+use raw_window_handle::{HasRawDisplayHandle, RawDisplayHandle};
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopClosed, EventLoopProxy},
@@ -17,7 +18,7 @@ use winit::{
     window::WindowId,
 };
 
-use zaru_image::{Image, Resolution};
+use crate::{Image, Resolution};
 
 use self::renderer::{Gpu, Renderer, Window};
 
@@ -82,9 +83,22 @@ enum Msg {
     },
 }
 
-static SENDER: OnceCell<Mutex<EventLoopProxy<Msg>>> = OnceCell::new();
+struct UnsafeSendSync<T>(T);
+unsafe impl<T> Sync for UnsafeSendSync<T> {}
+unsafe impl<T> Send for UnsafeSendSync<T> {}
 
-fn start_gui() -> EventLoopProxy<Msg> {
+pub struct Display {
+    raw: UnsafeSendSync<RawDisplayHandle>,
+    proxy: Mutex<EventLoopProxy<Msg>>,
+}
+
+unsafe impl HasRawDisplayHandle for Display {
+    fn raw_display_handle(&self) -> RawDisplayHandle {
+        self.raw.0
+    }
+}
+
+pub static DISPLAY: Lazy<Display> = Lazy::new(|| {
     let (sender, recv) = sync_channel(0);
 
     std::thread::Builder::new()
@@ -94,7 +108,12 @@ fn start_gui() -> EventLoopProxy<Msg> {
                 .with_any_thread(true)
                 .build();
             let proxy = event_loop.create_proxy();
-            sender.send(proxy).unwrap();
+            sender
+                .send(Display {
+                    raw: UnsafeSendSync(event_loop.raw_display_handle()),
+                    proxy: Mutex::new(proxy),
+                })
+                .unwrap();
 
             let gui = Gui::new();
             gui.run(event_loop);
@@ -102,12 +121,12 @@ fn start_gui() -> EventLoopProxy<Msg> {
         .unwrap();
 
     recv.recv().unwrap()
-}
+});
 
 fn send(msg: Msg) {
     // TODO: backpressure
-    SENDER
-        .get_or_init(|| Mutex::new(start_gui()))
+    DISPLAY
+        .proxy
         .lock()
         .unwrap()
         .send_event(msg)

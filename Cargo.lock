@@ -3389,7 +3389,6 @@ dependencies = [
  "serde",
  "wgpu",
  "winit",
- "zaru-gui",
  "zaru-image",
  "zaru-nn",
  "zaru-utils",
@@ -3398,36 +3397,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "zaru-gui"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytemuck",
- "itertools",
- "log",
- "naga",
- "once_cell",
- "pollster",
- "wgpu",
- "winit",
- "zaru-image",
-]
-
-[[package]]
 name = "zaru-image"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bytemuck",
  "embedded-graphics",
  "image",
  "itertools",
  "linuxvideo 0.1.1",
  "log",
  "mozjpeg",
+ "naga",
  "nalgebra",
  "once_cell",
  "pawawwewism",
+ "pollster",
+ "raw-window-handle 0.5.0",
  "v-ayylmao",
+ "wgpu",
  "winit",
  "zaru-utils",
  "zune-jpeg",

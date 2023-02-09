@@ -9,7 +9,6 @@ description = "Neural Network powered machine perception and computer vision lib
 [dependencies]
 zaru-image = { path = "../zaru-image" }
 zaru-nn = { path = "../zaru-nn" }
-zaru-gui = { path = "../zaru-gui" }
 zaru-utils = { path = "../zaru-utils" }
 zaru-video = { path = "../zaru-video" }
 
