@@ -1,14 +1,10 @@
 //! TODO: just make them use floats already
 
-use std::{
-    cmp, fmt,
-    ops::{Bound, RangeBounds},
-};
+use std::{cmp, fmt, ops::RangeInclusive};
 
 use crate::image::AspectRatio;
 use crate::num::TotalF32;
 use embedded_graphics::prelude::*;
-use itertools::Itertools;
 use nalgebra::{Point2, Rotation2};
 
 /// An axis-aligned rectangle.
@@ -53,47 +49,18 @@ impl Rect {
     }
 
     /// Constructs a [`Rect`] that spans a range of X and Y coordinates.
-    pub fn from_ranges<X, Y>(x: X, y: Y) -> Self
-    where
-        X: RangeBounds<i32>,
-        Y: RangeBounds<i32>,
-    {
-        fn cvt_lower_bound(b: Bound<&i32>) -> i32 {
-            match b {
-                Bound::Included(&min) => min,
-                Bound::Excluded(&i32::MAX) | Bound::Unbounded => {
-                    panic!("invalid rectangle range bound: {:?}", b)
-                }
-                Bound::Excluded(&v) => v + 1,
-            }
-        }
-
-        fn cvt_upper_bound(b: Bound<&i32>) -> i32 {
-            match b {
-                Bound::Included(&max) => max,
-                Bound::Excluded(&i32::MIN) | Bound::Unbounded => {
-                    panic!("invalid rectangle range bound: {:?}", b)
-                }
-                Bound::Excluded(&v) => v - 1,
-            }
-        }
-
-        let x_min = cvt_lower_bound(x.start_bound());
-        let x_max = cvt_upper_bound(x.end_bound());
-        let y_min = cvt_lower_bound(y.start_bound());
-        let y_max = cvt_upper_bound(y.end_bound());
-
-        Self::span_inner(x_min, y_min, x_max, y_max)
+    pub fn from_ranges(x: RangeInclusive<i32>, y: RangeInclusive<i32>) -> Self {
+        Self::span_inner(*x.start(), *y.start(), *x.end(), *y.end())
     }
 
     /// Creates a rectangle from two opposing corner points.
     pub fn from_corners(top_left: (i32, i32), bottom_right: (i32, i32)) -> Self {
-        Self::span_inner(top_left.0, top_left.1, bottom_right.0, bottom_right.1)
+        Self::bounding([top_left, bottom_right]).unwrap()
     }
 
     /// Computes the (axis-aligned) bounding rectangle that encompasses `points`.
     ///
-    /// Returns `None` if `points` is an empty iterator.
+    /// Returns [`None`] if `points` is an empty iterator.
     pub fn bounding<I: IntoIterator<Item = (i32, i32)>>(points: I) -> Option<Self> {
         let mut iter = points.into_iter();
 
@@ -108,20 +75,6 @@ impl Rect {
         }
 
         Some(Self::span_inner(x_min, y_min, x_max, y_max))
-    }
-
-    pub fn including(&self, x: i32, y: i32) -> Self {
-        let mut x_min = self.x();
-        let mut y_min = self.y();
-        let mut x_max = self.x() + self.width() as i32 - 1;
-        let mut y_max = self.y() + self.height() as i32 - 1;
-
-        x_min = cmp::min(x_min, x);
-        x_max = cmp::max(x_max, x);
-        y_min = cmp::min(y_min, y);
-        y_max = cmp::max(y_max, y);
-
-        Self::span_inner(x_min, y_min, x_max, y_max)
     }
 
     fn span_inner(x_min: i32, y_min: i32, x_max: i32, y_max: i32) -> Self {
@@ -139,29 +92,19 @@ impl Rect {
     }
 
     /// Grows each side of this rectangle by adding a margin.
-    ///
-    /// # Panics
-    ///
-    /// This method will panic if the adding margin makes the rectangle's width or height overflow a
-    /// `u32`, or if the resulting width or height would be less than 0.
     #[must_use]
-    pub fn grow_sides(&self, left: i32, right: i32, top: i32, bottom: i32) -> Self {
-        Self {
-            rect: embedded_graphics::primitives::Rectangle {
-                top_left: Point {
-                    x: self.rect.top_left.x - left,
-                    y: self.rect.top_left.y - top,
-                },
-                size: Size {
-                    width: (i64::from(self.rect.size.width) + i64::from(left) + i64::from(right))
-                        .try_into()
-                        .unwrap(),
-                    height: (i64::from(self.rect.size.height) + i64::from(top) + i64::from(bottom))
-                        .try_into()
-                        .unwrap(),
-                },
-            },
-        }
+    fn grow_sides(&self, left: i32, right: i32, top: i32, bottom: i32) -> Self {
+        let (x, y) = (self.x(), self.y());
+
+        let width = (i64::from(self.rect.size.width) + i64::from(left) + i64::from(right))
+            .try_into()
+            .unwrap();
+
+        let height = (i64::from(self.rect.size.height) + i64::from(top) + i64::from(bottom))
+            .try_into()
+            .unwrap();
+
+        Self::from_top_left(x, y, width, height)
     }
 
     /// Grows this rectangle by adding a margin relative to width and height.
@@ -173,19 +116,6 @@ impl Rect {
         let right = self.rect.size.width as f32 * amount;
         let top = self.rect.size.height as f32 * amount;
         let bottom = self.rect.size.height as f32 * amount;
-        self.grow_sides(left as i32, right as i32, top as i32, bottom as i32)
-    }
-
-    /// Grows each side of this rectangle by a margin relative to the rectangles width or height.
-    ///
-    /// `left` and `right` are fractions of the rectangle's width, `top` and `bottom` are fractions
-    /// of the rectangle's height.
-    #[must_use]
-    pub fn grow_sides_rel(&self, left: f32, right: f32, top: f32, bottom: f32) -> Self {
-        let left = self.rect.size.width as f32 * left;
-        let right = self.rect.size.width as f32 * right;
-        let top = self.rect.size.height as f32 * top;
-        let bottom = self.rect.size.height as f32 * bottom;
         self.grow_sides(left as i32, right as i32, top as i32, bottom as i32)
     }
 
@@ -215,6 +145,8 @@ impl Rect {
         res
     }
 
+    /// Moves this rectangle's center to the given coordinates, ensuring that the resulting [`Rect`]
+    /// still contains all points in the original area.
     pub fn grow_move_center(&self, x_center: i32, y_center: i32) -> Self {
         let w = cmp::max(
             (i64::from(x_center) - i64::from(self.x())).abs(),
@@ -292,22 +224,7 @@ impl Rect {
         if x_min > x_max || y_min > y_max {
             return None;
         }
-        let rect = Rect::from_corners((x_min, y_min), (x_max, y_max));
-        assert!(
-            self.contains_rect(&rect),
-            "intersect self={:?} other={:?} res={:?}",
-            self,
-            other,
-            rect,
-        );
-        assert!(
-            other.contains_rect(&rect),
-            "intersect self={:?} other={:?} res={:?}",
-            self,
-            other,
-            rect,
-        );
-        Some(rect)
+        Some(Rect::from_corners((x_min, y_min), (x_max, y_max)))
     }
 
     fn intersection_area(&self, other: &Self) -> u64 {
@@ -328,27 +245,6 @@ impl Rect {
             && i64::from(self.y()) <= y
             && i64::from(self.x()) + i64::from(self.width()) > x
             && i64::from(self.y()) + i64::from(self.height()) > y
-    }
-
-    /// Returns whether `self` contains `other`.
-    pub fn contains_rect(&self, other: &Rect) -> bool {
-        // TODO: specify behavior with 0-area rects
-        self.x() <= other.x()
-            && self.y() <= other.y()
-            && i64::from(self.x()) + i64::from(self.width())
-                >= i64::from(other.x()) + i64::from(other.width())
-            && i64::from(self.y()) + i64::from(self.height())
-                >= i64::from(other.y()) + i64::from(other.height())
-    }
-
-    /// Returns an iterator over all X,Y coordinates contained in this `Rect`.
-    pub fn iter_coords(&self) -> impl Iterator<Item = (i64, i64)> {
-        let x = i64::from(self.x());
-        let y = i64::from(self.y());
-        let w = i64::from(self.width());
-        let h = i64::from(self.height());
-
-        (x..x + w).cartesian_product(y..y + h)
     }
 }
 
@@ -585,21 +481,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_contains_rect() {
-        let outer = Rect::from_top_left(-8, -8, 16, 16);
-        assert!(outer.contains_rect(&outer));
-        assert!(outer.contains_rect(&Rect::from_top_left(-8, -8, 15, 15)));
-        assert!(outer.contains_rect(&Rect::from_top_left(-7, -7, 15, 15)));
-        assert!(!outer.contains_rect(&Rect::from_top_left(-7, -8, 16, 16)));
-        assert!(!outer.contains_rect(&Rect::from_top_left(-8, -7, 16, 16)));
-        assert!(!outer.contains_rect(&Rect::from_top_left(-8, -8, 17, 16)));
-        assert!(!outer.contains_rect(&Rect::from_top_left(-8, -8, 16, 17)));
-        assert!(outer.contains_rect(&Rect::from_top_left(-8, -8, 10, 10)));
-        assert!(!outer.contains_rect(&Rect::from_top_left(-9, -8, 10, 10)));
-        assert!(!outer.contains_rect(&Rect::from_top_left(-8, -9, 10, 10)));
-    }
-
-    #[test]
     fn test_contains_point() {
         let rect = Rect::from_top_left(-5, 5, 10, 5);
         assert!(rect.contains_point(-5, 5));
@@ -651,14 +532,6 @@ mod tests {
             Rect::bounding([(0, 0), (10, 0)]).unwrap(),
             Rect::from_top_left(0, 0, 11, 1),
         );
-    }
-
-    #[test]
-    fn test_including() {
-        let zero = Rect::from_corners((0, 0), (0, 0));
-        assert_eq!(zero.including(0, 0), Rect::from_corners((0, 0), (0, 0)));
-        assert_eq!(zero.including(1, 1), Rect::from_corners((0, 0), (1, 1)));
-        assert_eq!(zero.including(-1, -1), Rect::from_corners((-1, -1), (0, 0)));
     }
 
     #[test]

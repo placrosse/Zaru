@@ -199,15 +199,15 @@ mod tests {
     fn test_fit_aspect_ratio() {
         assert_eq!(
             Resolution::new(16, 16).fit_aspect_ratio(AspectRatio::new(16, 8).unwrap()),
-            Rect::from_ranges(0..16, 4..12)
+            Rect::from_ranges(0..=15, 4..=11)
         );
         assert_eq!(
             Resolution::new(16, 16).fit_aspect_ratio(AspectRatio::new(8, 16).unwrap()),
-            Rect::from_ranges(4..12, 0..16)
+            Rect::from_ranges(4..=11, 0..=15)
         );
         assert_eq!(
             Resolution::new(16, 8).fit_aspect_ratio(AspectRatio::new(16, 8).unwrap()),
-            Rect::from_ranges(0..16, 0..8)
+            Rect::from_ranges(0..=15, 0..=7)
         );
     }
 }
