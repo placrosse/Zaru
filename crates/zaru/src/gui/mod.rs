@@ -18,7 +18,7 @@ use winit::{
     window::WindowId,
 };
 
-use crate::{Image, Resolution};
+use crate::image::{Image, Resolution};
 
 use self::renderer::{Gpu, Renderer, Window};
 

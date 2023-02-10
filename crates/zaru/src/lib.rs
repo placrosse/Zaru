@@ -33,12 +33,19 @@ use log::LevelFilter;
 pub mod body;
 pub mod detection;
 pub mod face;
+pub mod filter;
+pub mod gui;
 pub mod hand;
+pub mod image;
+pub mod iter;
 pub mod landmark;
-
-pub use zaru_utils::{filter, iter, num, procrustes, slice, timer};
-#[doc(inline)]
-pub use {zaru_image as image, zaru_nn as nn, zaru_video as video};
+pub mod nn;
+pub mod num;
+pub mod pnp;
+pub mod procrustes;
+pub mod slice;
+pub mod timer;
+pub mod video;
 
 #[cfg(test)]
 mod test;

@@ -10,12 +10,12 @@ use zaru::{
         detection::ShortRangeNetwork,
         landmark::multipie68::{self},
     },
-    image::{gui, Color},
+    gui,
+    image::{draw, Color},
     landmark::{Estimation, Estimator},
+    pnp,
     video::webcam::{Webcam, WebcamOptions},
 };
-use zaru_image::draw;
-use zaru_utils::pnp;
 
 fn main() -> anyhow::Result<()> {
     zaru::init_logger!();

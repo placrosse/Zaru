@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 
-use zaru_image::Image;
+use crate::image::Image;
 
 pub fn sad_linus_full() -> &'static Image {
     static IMG: Lazy<Image> = Lazy::new(|| {

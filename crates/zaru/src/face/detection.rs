@@ -5,12 +5,12 @@
 //!
 //! [Face Detection]: https://google.github.io/mediapipe/solutions/face_detection
 
+use crate::image::Resolution;
+use crate::nn::Outputs;
+use crate::num::sigmoid;
 use include_blob::include_blob;
 use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
-use zaru_image::Resolution;
-use zaru_nn::Outputs;
-use zaru_utils::num::sigmoid;
 
 use crate::{
     detection::{

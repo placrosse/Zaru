@@ -7,9 +7,9 @@
 
 use include_blob::include_blob;
 use once_cell::sync::Lazy;
-use zaru_utils::iter::zip_exact;
 
 use crate::{
+    iter::zip_exact,
     landmark::{Estimation, Landmarks, Network},
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
     slice::SliceExt,

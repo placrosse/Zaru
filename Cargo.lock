@@ -1177,17 +1177,6 @@ checksum = "f051f77a7c8e6957c0696eac88f26b0117e54f52d3fc682ab19397a8812846a4"
 
 [[package]]
 name = "linuxvideo"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4aa44dd8da067adf7699ee275ef17ac481a8478919913be253d6c9ab52b8f87"
-dependencies = [
- "bitflags",
- "log",
- "nix 0.25.1",
-]
-
-[[package]]
-name = "linuxvideo"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95684411162b92119168e7335d9c94cf9498f69316c73f70ade506c227cc6bfa"
@@ -1550,7 +1539,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "memoffset 0.6.5",
- "pin-utils",
 ]
 
 [[package]]
@@ -3374,38 +3362,11 @@ dependencies = [
  "bytemuck",
  "embedded-graphics",
  "env_logger",
+ "fastrand",
  "image",
  "include-blob",
  "itertools",
- "linuxvideo 0.2.0",
- "log",
- "mozjpeg",
- "naga",
- "nalgebra",
- "once_cell",
- "pawawwewism",
- "pollster",
- "rayon",
- "serde",
- "wgpu",
- "winit",
- "zaru-image",
- "zaru-nn",
- "zaru-utils",
- "zaru-video",
- "zune-jpeg",
-]
-
-[[package]]
-name = "zaru-image"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytemuck",
- "embedded-graphics",
- "image",
- "itertools",
- "linuxvideo 0.1.1",
+ "linuxvideo",
  "log",
  "mozjpeg",
  "naga",
@@ -3414,58 +3375,15 @@ dependencies = [
  "pawawwewism",
  "pollster",
  "raw-window-handle 0.5.0",
+ "rayon",
+ "serde",
+ "tinyvec",
+ "tract-onnx",
  "v-ayylmao",
  "wgpu",
  "winit",
- "zaru-utils",
- "zune-jpeg",
-]
-
-[[package]]
-name = "zaru-nn"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "env_logger",
- "itertools",
- "log",
- "once_cell",
- "pollster",
- "tinyvec",
- "tract-onnx",
  "wonnx",
- "zaru-image",
- "zaru-utils",
-]
-
-[[package]]
-name = "zaru-utils"
-version = "0.1.0"
-dependencies = [
- "approx",
- "env_logger",
- "fastrand",
- "log",
- "nalgebra",
- "once_cell",
-]
-
-[[package]]
-name = "zaru-video"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "embedded-graphics",
- "env_logger",
- "image",
- "itertools",
- "linuxvideo 0.2.0",
- "log",
- "mozjpeg",
- "once_cell",
- "pawawwewism",
- "zaru-image",
- "zaru-utils",
+ "zune-jpeg",
 ]
 
 [[package]]

@@ -8,8 +8,8 @@ use include_blob::include_blob;
 use nalgebra::Point2;
 use once_cell::sync::Lazy;
 
-use zaru_image::{draw, AsImageViewMut, Color, ImageViewMut, Resolution};
-use zaru_utils::iter::zip_exact;
+use crate::image::{draw, AsImageViewMut, Color, ImageViewMut, Resolution};
+use crate::iter::zip_exact;
 
 use crate::{
     landmark::{Estimation, Landmarks, Network},

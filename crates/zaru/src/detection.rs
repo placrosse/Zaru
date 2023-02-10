@@ -8,12 +8,12 @@ pub mod ssd;
 
 use std::{fmt::Debug, marker::PhantomData};
 
-use zaru_image::{
+use crate::image::{
     draw, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect, Resolution,
     RotatedRect,
 };
-use zaru_nn::{Cnn, Outputs};
-use zaru_utils::timer::Timer;
+use crate::nn::{Cnn, Outputs};
+use crate::timer::Timer;
 
 use self::nms::NonMaxSuppression;
 

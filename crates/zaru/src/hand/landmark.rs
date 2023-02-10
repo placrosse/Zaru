@@ -1,10 +1,10 @@
 //! Hand landmark prediction.
 
+use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
+use crate::iter::zip_exact;
 use include_blob::include_blob;
 use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
-use zaru_image::{draw, AsImageViewMut, Color, ImageViewMut};
-use zaru_utils::iter::zip_exact;
 
 use crate::{
     landmark::{Confidence, Estimation, Landmarks, Network},

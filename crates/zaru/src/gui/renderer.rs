@@ -17,7 +17,7 @@ use wgpu::{
 };
 use winit::{dpi::PhysicalSize, event_loop::EventLoopWindowTarget, window::WindowBuilder};
 
-use crate::Resolution;
+use crate::image::Resolution;
 
 use super::shaders::Shaders;
 

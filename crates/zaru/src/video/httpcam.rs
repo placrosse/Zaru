@@ -5,9 +5,9 @@ use std::{
     net::{SocketAddr, TcpStream},
 };
 
+use crate::image::Image;
+use crate::timer::Timer;
 use anyhow::bail;
-use zaru_image::Image;
-use zaru_utils::timer::Timer;
 
 pub struct HttpStream {
     stream: BufReader<TcpStream>,

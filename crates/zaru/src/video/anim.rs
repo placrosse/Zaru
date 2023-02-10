@@ -8,12 +8,12 @@ use std::{
     time::Duration,
 };
 
+use crate::image::{AsImageView, Image, ImageView, Resolution};
 use anyhow::bail;
 use image::{
     codecs::{gif::GifDecoder, png::PngDecoder},
     AnimationDecoder,
 };
-use zaru_image::{AsImageView, Image, ImageView, Resolution};
 
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]

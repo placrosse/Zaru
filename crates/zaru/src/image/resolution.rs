@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::Rect;
+use crate::image::Rect;
 
 /// Resolution (`width x height`) of an image, window, camera, or display.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]

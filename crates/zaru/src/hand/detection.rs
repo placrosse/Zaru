@@ -1,11 +1,11 @@
 //! Palm detection.
 
+use crate::image::Resolution;
+use crate::nn::Outputs;
+use crate::num::sigmoid;
 use include_blob::include_blob;
 use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
-use zaru_image::Resolution;
-use zaru_nn::Outputs;
-use zaru_utils::num::sigmoid;
 
 use crate::{
     detection::{

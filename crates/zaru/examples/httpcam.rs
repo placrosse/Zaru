@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use zaru::{image::gui, timer::FpsCounter, video::httpcam::HttpStream};
+use zaru::{gui, timer::FpsCounter, video::httpcam::HttpStream};
 
 fn main() -> anyhow::Result<()> {
     zaru::init_logger!();

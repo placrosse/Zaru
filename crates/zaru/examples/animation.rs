@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use zaru::{image::gui, video::anim::Animation};
+use zaru::{gui, video::anim::Animation};
 
 fn main() -> anyhow::Result<()> {
     let path = std::env::args()

@@ -1,10 +1,11 @@
 //! Human body detection.
 
+use crate::nn::Outputs;
+use crate::num::sigmoid;
 use include_blob::include_blob;
 use once_cell::sync::Lazy;
-use zaru_nn::Outputs;
-use zaru_utils::num::sigmoid;
 
+use crate::image::Resolution;
 use crate::{
     detection::{
         ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
@@ -12,7 +13,6 @@ use crate::{
     },
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork},
 };
-use zaru_image::Resolution;
 
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
     let model_data = include_blob!("../../3rdparty/onnx/pose_detection.onnx");

@@ -13,12 +13,12 @@ use include_blob::include_blob;
 use itertools::Itertools;
 use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
-use zaru_image::{draw, AsImageViewMut, Color, ImageViewMut, RotatedRect};
-use zaru_utils::{
+
+use crate::image::{draw, AsImageViewMut, Color, ImageViewMut, RotatedRect};
+use crate::{
     iter::zip_exact,
     num::{sigmoid, TotalF32},
 };
-
 use crate::{
     landmark::{self, Landmarks},
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
@@ -303,8 +303,8 @@ impl Into<usize> for LandmarkIdx {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::image::{AsImageView, ImageView};
     use crate::{landmark::Estimator, procrustes::ProcrustesAnalyzer, test};
-    use zaru_image::{AsImageView, ImageView};
 
     #[track_caller]
     fn check_angle(expected_radians: f32, actual_radians: f32) {

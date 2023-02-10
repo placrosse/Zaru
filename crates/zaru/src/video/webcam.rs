@@ -5,14 +5,14 @@
 
 use std::{cmp::Reverse, env};
 
+use crate::image::{Image, Resolution};
+use crate::timer::Timer;
 use anyhow::bail;
 use linuxvideo::{
     format::{FrameIntervals, FrameSizes, PixFormat, Pixelformat},
     stream::ReadStream,
     BufType, CapabilityFlags, Device, Fract,
 };
-use zaru_image::{Image, Resolution};
-use zaru_utils::timer::Timer;
 
 /// Indicates whether to prefer a higher resolution or frame rate.
 ///

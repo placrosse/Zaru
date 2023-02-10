@@ -1,5 +1,6 @@
 use zaru::{
-    image::{gui, Image},
+    gui,
+    image::Image,
     timer::{FpsCounter, Timer},
 };
 

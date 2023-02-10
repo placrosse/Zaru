@@ -1,7 +1,7 @@
 use zaru::{
     detection::Detector,
     face::detection::{FullRangeNetwork, ShortRangeNetwork},
-    image::gui,
+    gui,
     timer::FpsCounter,
     video::webcam::{Webcam, WebcamOptions},
 };

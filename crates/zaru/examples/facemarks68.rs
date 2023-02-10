@@ -6,12 +6,12 @@ use zaru::{
         detection::ShortRangeNetwork,
         landmark::multipie68::{self, LandmarkResult},
     },
-    image::{gui, Color},
+    gui,
+    image::{draw, Color},
     landmark::{Estimation, Estimator, Network},
     timer::FpsCounter,
     video::webcam::{Webcam, WebcamOptions},
 };
-use zaru_image::draw;
 
 struct Algo {
     estimator: Estimator<LandmarkResult>,

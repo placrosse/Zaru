@@ -2,8 +2,8 @@
 
 use std::iter;
 
-use zaru_image::{AsImageView, AspectRatio, ImageView, Resolution, RotatedRect};
-use zaru_utils::iter::zip_exact;
+use crate::image::{AsImageView, AspectRatio, ImageView, Resolution, RotatedRect};
+use crate::iter::zip_exact;
 
 use crate::{
     filter::Filter,

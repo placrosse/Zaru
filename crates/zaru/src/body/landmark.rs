@@ -2,12 +2,12 @@
 
 // TODO: port to the new `landmark` module
 
-use include_blob::include_blob;
-use once_cell::sync::Lazy;
-use zaru_image::{
+use crate::image::{
     draw, AsImageView, AsImageViewMut, AspectRatio, Color, ImageView, ImageViewMut, Resolution,
 };
-use zaru_utils::{iter::zip_exact, num::sigmoid};
+use crate::{iter::zip_exact, num::sigmoid};
+use include_blob::include_blob;
+use once_cell::sync::Lazy;
 
 use crate::{
     nn::{create_linear_color_mapper, unadjust_aspect_ratio, Cnn, CnnInputShape, NeuralNetwork},

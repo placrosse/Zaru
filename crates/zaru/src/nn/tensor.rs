@@ -9,8 +9,8 @@
 
 use std::fmt;
 
+use crate::iter::zip_exact;
 use tinyvec::TinyVec;
-use zaru_utils::iter::zip_exact;
 
 #[derive(Clone)]
 struct Layout(TinyVec<[usize; 8]>);

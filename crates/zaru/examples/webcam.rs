@@ -1,5 +1,5 @@
 use zaru::{
-    image::gui,
+    gui,
     timer::FpsCounter,
     video::webcam::{Webcam, WebcamOptions},
 };

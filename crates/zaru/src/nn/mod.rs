@@ -2,12 +2,12 @@
 
 pub mod tensor;
 
+use crate::image::{AsImageView, AspectRatio, Color, ImageView, Resolution};
 use tensor::Tensor;
 use tract_onnx::prelude::{
     tvec, Framework, Graph, InferenceModelExt, SimplePlan, TValue, TVec, TypedFact, TypedOp,
 };
 use wonnx::utils::{InputTensor, OutputTensor};
-use zaru_image::{AsImageView, AspectRatio, Color, ImageView, Resolution};
 
 use std::{
     borrow::Cow,

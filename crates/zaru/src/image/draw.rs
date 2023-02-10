@@ -10,7 +10,7 @@ use embedded_graphics::{
 use itertools::Itertools;
 use nalgebra::{UnitQuaternion, Vector2, Vector3};
 
-use crate::{AsImageViewMut, Color, ImageViewMut, Rect};
+use crate::image::{AsImageViewMut, Color, ImageViewMut, Rect};
 
 use super::RotatedRect;
 

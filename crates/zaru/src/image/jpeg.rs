@@ -13,7 +13,8 @@ use v_ayylmao::{
     jpeg::{JpegDecodeSession, JpegInfo},
 };
 
-use crate::{gui, Resolution};
+use crate::gui;
+use crate::image::Resolution;
 
 use super::Image;
 

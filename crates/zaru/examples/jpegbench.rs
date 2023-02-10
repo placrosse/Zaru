@@ -1,9 +1,9 @@
 use anyhow::bail;
 use zaru::{
-    image::gui,
+    gui,
+    image::Image,
     timer::{FpsCounter, Timer},
 };
-use zaru_image::Image;
 
 fn main() -> anyhow::Result<()> {
     zaru::init_logger!();

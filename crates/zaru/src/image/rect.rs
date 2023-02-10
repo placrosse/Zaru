@@ -5,12 +5,11 @@ use std::{
     ops::{Bound, RangeBounds},
 };
 
+use crate::image::AspectRatio;
+use crate::num::TotalF32;
 use embedded_graphics::prelude::*;
 use itertools::Itertools;
 use nalgebra::{Point2, Rotation2};
-use zaru_utils::num::TotalF32;
-
-use crate::resolution::AspectRatio;
 
 /// An axis-aligned rectangle.
 ///

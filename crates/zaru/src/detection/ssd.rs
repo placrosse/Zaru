@@ -7,7 +7,7 @@
 
 use std::ops::Index;
 
-use zaru_image::Resolution;
+use crate::image::Resolution;
 
 /// An anchor of an SSD network.
 ///
