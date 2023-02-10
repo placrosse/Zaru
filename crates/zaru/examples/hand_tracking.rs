@@ -47,7 +47,7 @@ fn main() -> anyhow::Result<()> {
             draw::text(
                 target,
                 rect.center().0 as _,
-                rect.y(),
+                rect.y() as _,
                 &format!("{:?}", hand.id()),
             )
             .align_top();

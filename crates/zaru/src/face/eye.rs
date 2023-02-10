@@ -141,7 +141,7 @@ impl EyeLandmarks {
         draw::marker(&mut image, x as _, y as _)
             .size(3)
             .color(Color::CYAN);
-        draw::circle(&mut image, x as _, y as _, self.iris_diameter() as u32).color(Color::CYAN);
+        draw::circle(&mut image, x as _, y as _, self.iris_diameter()).color(Color::CYAN);
 
         for [x, y, _] in self.eye_contour().take(16) {
             draw::marker(&mut image, x as _, y as _)

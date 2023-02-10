@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
             let mut view = image.view_mut(rect);
             let lms = estimator.estimate(&view);
             for &[x, y, _] in lms.landmarks_mut().positions() {
-                draw::marker(&mut view, x as i32, y as i32).color(Color::RED);
+                draw::marker(&mut view, x, y).color(Color::RED);
             }
 
             let result = dlt.solve(lms.landmarks().positions().iter().map(|&[x, y, _]| [x, -y]));

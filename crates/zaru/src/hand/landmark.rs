@@ -130,7 +130,6 @@ impl LandmarkResult {
         };
 
         let [palm_x, palm_y, _] = self.palm_center();
-        let (palm_x, palm_y) = (palm_x as i32, palm_y as i32);
 
         let [a_x, a_y, _] = self.landmark_position(LandmarkIdx::MiddleFingerMcp as usize);
         let [b_x, b_y, _] = self.landmark_position(LandmarkIdx::Wrist as usize);
@@ -144,11 +143,11 @@ impl LandmarkResult {
         )
         .align_top();
 
-        draw::text(target, palm_x, palm_y - 5, hand);
+        draw::text(target, palm_x, palm_y - 5.0, hand);
         draw::text(
             target,
             palm_x,
-            palm_y + 5,
+            palm_y + 5.0,
             &format!("presence={:.2}", self.presence()),
         );
 
@@ -159,7 +158,7 @@ impl LandmarkResult {
             draw::line(target, a_x as _, a_y as _, b_x as _, b_y as _).color(Color::GREEN);
         }
         for [x, y, _] in self.landmark_positions() {
-            draw::marker(target, x as i32, y as i32);
+            draw::marker(target, x, y);
         }
     }
 }

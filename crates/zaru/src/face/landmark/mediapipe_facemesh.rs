@@ -205,8 +205,8 @@ impl LandmarkResult {
             .0;
         draw::text(
             image,
-            x as i32,
-            y as i32 - 3,
+            x,
+            y - 3.0,
             &format!("lm_conf={:.01}", self.face_confidence()),
         )
         .align_bottom()
@@ -220,18 +220,11 @@ impl LandmarkResult {
             .landmarks()
             .landmark(LandmarkIdx::RightEyeOuterCorner as _)
             .position();
-        draw::line(
-            image,
-            left_eye[0] as _,
-            left_eye[1] as _,
-            right_eye[0] as _,
-            right_eye[1] as _,
-        )
-        .color(Color::WHITE);
+        draw::line(image, left_eye[0], left_eye[1], right_eye[0], right_eye[1]).color(Color::WHITE);
         draw::text(
             image,
-            ((left_eye[0] + right_eye[0]) / 2.0) as i32,
-            ((left_eye[1] + right_eye[1]) / 2.0) as i32,
+            (left_eye[0] + right_eye[0]) / 2.0,
+            (left_eye[1] + right_eye[1]) / 2.0,
             &format!("{:.1} deg", self.rotation_radians().to_degrees()),
         )
         .align_bottom()

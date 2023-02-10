@@ -98,8 +98,8 @@ impl<'a> Drop for DrawRotatedRect<'a> {
 /// Guard returned by [`marker`]; draws the marker when dropped and allows customization.
 pub struct DrawMarker<'a> {
     image: ImageViewMut<'a>,
-    x: i32,
-    y: i32,
+    x: f32,
+    y: f32,
     color: Color,
     size: u32,
 }
@@ -132,8 +132,8 @@ impl Drop for DrawMarker<'_> {
         {
             match Pixel(
                 Point {
-                    x: self.x + xoff,
-                    y: self.y + yoff,
+                    x: self.x.round() as i32 + xoff,
+                    y: self.y.round() as i32 + yoff,
                 },
                 self.color,
             )
@@ -149,10 +149,10 @@ impl Drop for DrawMarker<'_> {
 /// Guard returned by [`line`][line()]; draws the line when dropped and allows customization.
 pub struct DrawLine<'a> {
     image: ImageViewMut<'a>,
-    start_x: i32,
-    start_y: i32,
-    end_x: i32,
-    end_y: i32,
+    start_x: f32,
+    start_y: f32,
+    end_x: f32,
+    end_y: f32,
     color: Color,
     stroke_width: u32,
 }
@@ -176,8 +176,8 @@ impl<'a> DrawLine<'a> {
 impl<'a> Drop for DrawLine<'a> {
     fn drop(&mut self) {
         match Line::new(
-            Point::new(self.start_x, self.start_y),
-            Point::new(self.end_x, self.end_y),
+            Point::new(self.start_x.round() as i32, self.start_y.round() as i32),
+            Point::new(self.end_x.round() as i32, self.end_y.round() as i32),
         )
         .into_styled(PrimitiveStyle::with_stroke(self.color, self.stroke_width))
         .draw(&mut Target(self.image.reborrow()))
@@ -191,8 +191,8 @@ impl<'a> Drop for DrawLine<'a> {
 /// Guard returned by [`text`]; draws the text when dropped and allows customization.
 pub struct DrawText<'a> {
     image: ImageViewMut<'a>,
-    x: i32,
-    y: i32,
+    x: f32,
+    y: f32,
     text: &'a str,
     color: Color,
     alignment: Alignment,
@@ -241,7 +241,7 @@ impl<'a> Drop for DrawText<'a> {
             .build();
         match Text::with_text_style(
             self.text,
-            Point::new(self.x, self.y),
+            Point::new(self.x.round() as i32, self.y.round() as i32),
             character_style,
             text_style,
         )
@@ -256,9 +256,9 @@ impl<'a> Drop for DrawText<'a> {
 /// Guard returned by [`circle`]; draws the circle when dropped and allows customization.
 pub struct DrawCircle<'a> {
     image: ImageViewMut<'a>,
-    x: i32,
-    y: i32,
-    diameter: u32,
+    x: f32,
+    y: f32,
+    diameter: f32,
     stroke_width: u32,
     color: Color,
 }
@@ -282,12 +282,12 @@ impl<'a> DrawCircle<'a> {
 impl<'a> Drop for DrawCircle<'a> {
     fn drop(&mut self) {
         let top_left = Point {
-            x: self.x - (self.diameter / 2) as i32,
-            y: self.y - (self.diameter / 2) as i32,
+            x: (self.x - (self.diameter / 2.0)).round() as i32,
+            y: (self.y - (self.diameter / 2.0)).round() as i32,
         };
         let circle = primitives::Circle {
             top_left,
-            diameter: self.diameter,
+            diameter: self.diameter as _,
         };
         match circle
             .into_styled(PrimitiveStyle::with_stroke(self.color, self.stroke_width))
@@ -302,10 +302,10 @@ impl<'a> Drop for DrawCircle<'a> {
 /// Guard returned by [`quaternion`]; draws the rotated coordinate system when dropped.
 pub struct DrawQuaternion<'a> {
     image: ImageViewMut<'a>,
-    x: i32,
-    y: i32,
+    x: f32,
+    y: f32,
     quaternion: UnitQuaternion<f32>,
-    axis_length: u32,
+    axis_length: f32,
     stroke_width: u32,
 }
 
@@ -317,7 +317,7 @@ impl<'a> DrawQuaternion<'a> {
     }
 
     /// Sets the length of each coordinate axis, in pixels.
-    pub fn axis_length(&mut self, length: u32) -> &mut Self {
+    pub fn axis_length(&mut self, length: f32) -> &mut Self {
         self.axis_length = length;
         self
     }
@@ -325,8 +325,8 @@ impl<'a> DrawQuaternion<'a> {
 
 impl<'a> Drop for DrawQuaternion<'a> {
     fn drop(&mut self) {
-        let axis_length = self.axis_length as f32;
-        let origin = Vector2::new(self.x as f32, self.y as f32);
+        let axis_length = self.axis_length;
+        let origin = Vector2::new(self.x, self.y);
 
         let x = (self.quaternion * Vector3::x() * axis_length).xy();
         let y = (self.quaternion * Vector3::y() * axis_length).xy();
@@ -336,30 +336,9 @@ impl<'a> Drop for DrawQuaternion<'a> {
         let y_end = origin + Vector2::new(y.x, -y.y);
         let z_end = origin + Vector2::new(z.x, -z.y);
 
-        line(
-            &mut self.image,
-            self.x,
-            self.y,
-            x_end.x as i32,
-            x_end.y as i32,
-        )
-        .color(Color::RED);
-        line(
-            &mut self.image,
-            self.x,
-            self.y,
-            y_end.x as i32,
-            y_end.y as i32,
-        )
-        .color(Color::GREEN);
-        line(
-            &mut self.image,
-            self.x,
-            self.y,
-            z_end.x as i32,
-            z_end.y as i32,
-        )
-        .color(Color::BLUE);
+        line(&mut self.image, self.x, self.y, x_end.x, x_end.y).color(Color::RED);
+        line(&mut self.image, self.x, self.y, y_end.x, y_end.y).color(Color::GREEN);
+        line(&mut self.image, self.x, self.y, z_end.x, z_end.y).color(Color::BLUE);
     }
 }
 
@@ -386,7 +365,7 @@ pub fn rotated_rect<I: AsImageViewMut>(image: &mut I, rect: RotatedRect) -> Draw
 /// Draws a marker onto an image.
 ///
 /// This can be used to visualize shape landmarks or points of interest.
-pub fn marker<I: AsImageViewMut>(image: &mut I, x: i32, y: i32) -> DrawMarker<'_> {
+pub fn marker<I: AsImageViewMut>(image: &mut I, x: f32, y: f32) -> DrawMarker<'_> {
     DrawMarker {
         image: image.as_view_mut(),
         x,
@@ -399,10 +378,10 @@ pub fn marker<I: AsImageViewMut>(image: &mut I, x: i32, y: i32) -> DrawMarker<'_
 /// Draws a line onto an image.
 pub fn line<I: AsImageViewMut>(
     image: &mut I,
-    start_x: i32,
-    start_y: i32,
-    end_x: i32,
-    end_y: i32,
+    start_x: f32,
+    start_y: f32,
+    end_x: f32,
+    end_y: f32,
 ) -> DrawLine<'_> {
     DrawLine {
         image: image.as_view_mut(),
@@ -420,8 +399,8 @@ pub fn line<I: AsImageViewMut>(
 /// By default, the text is drawn centered horizontally and vertically around `x` and `y`.
 pub fn text<'a, I: AsImageViewMut>(
     image: &'a mut I,
-    x: i32,
-    y: i32,
+    x: f32,
+    y: f32,
     text: &'a str,
 ) -> DrawText<'a> {
     DrawText {
@@ -438,9 +417,9 @@ pub fn text<'a, I: AsImageViewMut>(
 /// Draws a circle onto an image.
 pub fn circle<'a, I: AsImageViewMut>(
     image: &'a mut I,
-    x: i32,
-    y: i32,
-    diameter: u32,
+    x: f32,
+    y: f32,
+    diameter: f32,
 ) -> DrawCircle<'a> {
     DrawCircle {
         image: image.as_view_mut(),
@@ -461,8 +440,8 @@ pub fn circle<'a, I: AsImageViewMut>(
 /// this is the center of an image or of the object of interest.
 pub fn quaternion<'a, I: AsImageViewMut>(
     image: &'a mut I,
-    x: i32,
-    y: i32,
+    x: f32,
+    y: f32,
     quaternion: UnitQuaternion<f32>,
 ) -> DrawQuaternion<'a> {
     DrawQuaternion {
@@ -470,7 +449,7 @@ pub fn quaternion<'a, I: AsImageViewMut>(
         x,
         y,
         quaternion,
-        axis_length: 10,
+        axis_length: 10.0,
         stroke_width: 1,
     }
 }

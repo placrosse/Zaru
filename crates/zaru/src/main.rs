@@ -109,8 +109,8 @@ fn assembler() -> Result<Worker<AssemblerParams>, io::Error> {
             let center = face_landmark.landmarks().average();
             draw::quaternion(
                 &mut image,
-                center[0] as i32,
-                center[1] as i32,
+                center[0],
+                center[1],
                 procrustes_result.rotation(),
             );
 

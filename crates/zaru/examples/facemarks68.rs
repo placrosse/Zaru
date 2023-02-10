@@ -52,7 +52,7 @@ fn main() -> anyhow::Result<()> {
                 let mut view = image.view_mut(rect);
                 let lms = algo.estimator.estimate(&view);
                 for &[x, y, _] in lms.landmarks_mut().positions() {
-                    draw::marker(&mut view, x as i32, y as i32).color(algo.color);
+                    draw::marker(&mut view, x, y).color(algo.color);
                 }
                 algo.fps.tick_with(algo.estimator.timers());
             }
