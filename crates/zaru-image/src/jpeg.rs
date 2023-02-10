@@ -13,7 +13,7 @@ use v_ayylmao::{
     jpeg::{JpegDecodeSession, JpegInfo},
 };
 
-use crate::Resolution;
+use crate::{gui, Resolution};
 
 use super::Image;
 
@@ -132,7 +132,7 @@ fn decode_jpeg_vaapi(jpeg: &[u8]) -> anyhow::Result<Image> {
         VaApi::Off => bail!("VA-API use disabled by env var"),
         VaApi::Force | VaApi::On => {
             static DISPLAY: Lazy<Option<Display>> = Lazy::new(|| {
-                let display = match unsafe { Display::new_unmanaged(&*crate::gui::DISPLAY) } {
+                let display = match unsafe { Display::new_unmanaged(gui::Display::get()) } {
                     Ok(display) => display,
                     Err(e) => {
                         log::warn!("failed to open VA-API display: {e}");

@@ -87,9 +87,16 @@ struct UnsafeSendSync<T>(T);
 unsafe impl<T> Sync for UnsafeSendSync<T> {}
 unsafe impl<T> Send for UnsafeSendSync<T> {}
 
+/// A connection to the native display server.
 pub struct Display {
     raw: UnsafeSendSync<RawDisplayHandle>,
     proxy: Mutex<EventLoopProxy<Msg>>,
+}
+
+impl Display {
+    pub fn get() -> &'static Display {
+        &DISPLAY
+    }
 }
 
 unsafe impl HasRawDisplayHandle for Display {
@@ -98,7 +105,7 @@ unsafe impl HasRawDisplayHandle for Display {
     }
 }
 
-pub static DISPLAY: Lazy<Display> = Lazy::new(|| {
+static DISPLAY: Lazy<Display> = Lazy::new(|| {
     let (sender, recv) = sync_channel(0);
 
     std::thread::Builder::new()
