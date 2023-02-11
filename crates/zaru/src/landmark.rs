@@ -253,6 +253,7 @@ pub struct Estimator<E: Estimation> {
     network: Box<dyn Network<Output = E>>,
     estimation: E,
     t_infer: Timer,
+    t_extract: Timer,
     t_filter: Timer,
     filter: LandmarkFilter,
 }
@@ -263,6 +264,7 @@ impl<E: Estimation + Default> Estimator<E> {
             network: Box::new(network),
             estimation: E::default(),
             t_infer: Timer::new("infer"),
+            t_extract: Timer::new("extract"),
             t_filter: Timer::new("filter"),
             filter: LandmarkFilter::default(),
         }
@@ -281,7 +283,7 @@ impl<E: Estimation> Estimator<E> {
 
     /// Returns profiling timers for this landmark estimator.
     pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
-        [&self.t_infer, &self.t_filter].into_iter()
+        [&self.t_infer, &self.t_extract, &self.t_filter].into_iter()
     }
 
     /// Sets the [`LandmarkFilter`] to apply to all landmark positions.
@@ -318,7 +320,8 @@ impl<E: Estimation> Estimator<E> {
         let outputs = self.t_infer.time(|| cnn.estimate(&view)).unwrap();
         log::trace!("inference result: {:?}", outputs);
 
-        self.network.extract(&outputs, &mut self.estimation);
+        self.t_extract
+            .time(|| self.network.extract(&outputs, &mut self.estimation));
 
         // Importantly, the filter uses the network's coordinates, which makes filter parameters
         // independent of the image's dimensions.

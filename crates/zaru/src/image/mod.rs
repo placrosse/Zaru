@@ -6,7 +6,6 @@
 //! - [`ImageView`] and [`ImageViewMut`], borrowed rectangular views into an underlying [`Image`].
 //! - The [`AsImageView`] and [`AsImageViewMut`] traits to abstract over images and views.
 //! - A variety of [`draw`] functions to quickly visualize objects.
-//! - [`Rect`] and [`RotatedRect`], integer-valued rectangles representing parts of an image.
 
 mod blend;
 pub mod draw;
