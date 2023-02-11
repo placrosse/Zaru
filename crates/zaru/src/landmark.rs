@@ -354,25 +354,27 @@ impl<E: Estimation> Estimator<E> {
 /// indicating whether the tracked object is still in view.
 ///
 /// If the [`Estimator`] supports it, the tracker will also track the object's rotation.
-pub struct LandmarkTracker {
+pub struct LandmarkTracker<E: Estimation + Confidence> {
+    aspect_ratio: AspectRatio,
+    estimator: Estimator<E>,
     roi: Option<RotatedRect>,
     loss_thresh: f32,
     roi_padding: f32,
-    input_ratio: AspectRatio,
 }
 
-impl LandmarkTracker {
+impl<E: Estimation + Confidence> LandmarkTracker<E> {
     pub const DEFAULT_LOSS_THRESHOLD: f32 = 0.5;
 
     pub const DEFAULT_ROI_PADDING: f32 = 0.3;
 
     /// Creates a new [`LandmarkTracker`].
-    pub fn new(input_ratio: AspectRatio) -> Self {
+    pub fn new(estimator: Estimator<E>) -> Self {
         Self {
+            aspect_ratio: estimator.input_resolution().aspect_ratio().unwrap(),
+            estimator,
             roi: None,
             loss_thresh: Self::DEFAULT_LOSS_THRESHOLD,
             roi_padding: Self::DEFAULT_ROI_PADDING,
-            input_ratio,
         }
     }
 
@@ -436,22 +438,19 @@ impl LandmarkTracker {
     /// coordinates.
     ///
     /// `track` always has to be called on images of the same size, otherwise the tracking window
-    /// won't match between frames. The same estimator should also be used to ensure that landmark
-    /// and confidence value meanings stay the same across subsequent frames.
-    pub fn track<'e, E, V>(
-        &mut self,
-        estimator: &'e mut Estimator<E>,
-        full_image: &V,
-    ) -> Option<TrackingResult<'e, E>>
+    /// won't match between frames.
+    pub fn track<V>(&mut self, full_image: &V) -> Option<TrackingResult<'_, E>>
     where
-        E: Estimation + Confidence + Default,
         V: AsImageView,
     {
+        self.track_impl(full_image.as_view())
+    }
+
+    fn track_impl(&mut self, full_image: ImageView<'_>) -> Option<TrackingResult<'_, E>> {
         let roi = self.roi?;
-        let view_rect = roi.map(|rect| rect.grow_to_fit_aspect(self.input_ratio));
-        let full_image = full_image.as_view();
+        let view_rect = roi.map(|rect| rect.grow_to_fit_aspect(self.aspect_ratio));
         let view = full_image.view(view_rect);
-        let estimation = estimator.estimate(&view);
+        let estimation = self.estimator.estimate(&view);
         if estimation.confidence() < self.loss_thresh {
             log::trace!(
                 "LandmarkTracker: confidence {}, loss threshold {} -> LOST",

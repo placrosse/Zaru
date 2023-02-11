@@ -157,9 +157,7 @@ impl HandTracker {
 
         self.hands.extend(detections.iter().map(|det| {
             let roi = RotatedRect::new(det.bounding_rect().grow_rel(grow_by), det.angle());
-            let mut estimator = (self.make_estimator)();
-            let mut tracker =
-                LandmarkTracker::new(estimator.input_resolution().aspect_ratio().unwrap());
+            let mut tracker = LandmarkTracker::new((self.make_estimator)());
             tracker.set_roi_padding(ROI_PADDING);
             tracker.set_roi(roi);
             let roi_arc = Arc::new(Mutex::new(roi));
@@ -167,7 +165,7 @@ impl HandTracker {
             let mut worker = Worker::builder()
                 .name("hand tracker")
                 .spawn(move |(image, promise): (Arc<Image>, Promise<_>)| {
-                    match tracker.track(&mut estimator, &*image) {
+                    match tracker.track(&*image) {
                         Some(res) => {
                             *roi_arc2.lock().unwrap() = res.updated_roi();
 
