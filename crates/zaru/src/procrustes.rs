@@ -2,9 +2,7 @@
 //!
 //! [Procrustes analysis]: https://en.wikipedia.org/wiki/Procrustes_analysis
 
-use nalgebra::{
-    Const, Dynamic, Matrix, Matrix3, Matrix4, OMatrix, Rotation3, UnitQuaternion, Vector3,
-};
+use nalgebra::{Const, Dyn, Matrix, Matrix3, Matrix4, OMatrix, Rotation3, UnitQuaternion, Vector3};
 
 use crate::iter::zip_exact;
 
@@ -20,9 +18,9 @@ pub struct ProcrustesAnalyzer {
 
     buf: Vec<Vector3<f32>>,
     /// `Q` matrix for Kabsch algorithm, computed from reference points.
-    q: OMatrix<f32, Dynamic, Const<3>>,
+    q: OMatrix<f32, Dyn, Const<3>>,
     /// Transposed `P` matrix for Kabsch algorithm.
-    p_t: OMatrix<f32, Const<3>, Dynamic>,
+    p_t: OMatrix<f32, Const<3>, Dyn>,
 }
 
 impl ProcrustesAnalyzer {
@@ -49,10 +47,9 @@ impl ProcrustesAnalyzer {
         let scale = remove_scale(&mut reference);
         log::trace!("ref scale: {scale}, ref centroid: {centroid:?}");
 
-        let q = Matrix::from_fn_generic(Dynamic::new(reference.len()), Const, |row, col| {
-            reference[row][col]
-        });
-        let p_t = Matrix::zeros_generic(Const, Dynamic::new(reference.len()));
+        let q =
+            Matrix::from_fn_generic(Dyn(reference.len()), Const, |row, col| reference[row][col]);
+        let p_t = Matrix::zeros_generic(Const, Dyn(reference.len()));
 
         Self {
             ref_centroid: centroid,

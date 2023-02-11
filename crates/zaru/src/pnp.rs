@@ -2,7 +2,7 @@
 //!
 //! (experimental, might not work)
 
-use nalgebra::{Const, Dynamic, Matrix, Matrix3x4, OMatrix, Rotation3, Vector3};
+use nalgebra::{Const, Dyn, Matrix, Matrix3x4, OMatrix, Rotation3, Vector3};
 
 use crate::iter::zip_exact;
 
@@ -62,7 +62,7 @@ impl IntrinsicParams {
 /// 3D-to-2D point correspondences.
 pub struct Dlt {
     reference: Vec<[f32; 3]>,
-    matrix: OMatrix<f32, Dynamic, Const<12>>,
+    matrix: OMatrix<f32, Dyn, Const<12>>,
 }
 
 impl Dlt {
@@ -73,7 +73,7 @@ impl Dlt {
             "DLT needs at least 6 point correspondences"
         );
 
-        let matrix = Matrix::zeros_generic(Dynamic::new(reference.len() * 2), Const);
+        let matrix = Matrix::zeros_generic(Dyn(reference.len() * 2), Const);
 
         Self { reference, matrix }
     }
@@ -114,7 +114,7 @@ impl Dlt {
         }
 
         log::trace!("self.matrix={}", self.matrix);
-        let svd = self.matrix.slice_range(.., ..).svd(false, true);
+        let svd = self.matrix.view_range(.., ..).svd(false, true);
         log::trace!("v_t={}", svd.v_t.as_ref().unwrap());
         log::trace!("sigma={}", svd.singular_values);
         let p = svd.v_t.as_ref().unwrap().row(11);

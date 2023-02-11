@@ -14,7 +14,8 @@ use raw_window_handle::{HasRawDisplayHandle, RawDisplayHandle};
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopClosed, EventLoopProxy},
-    platform::unix::EventLoopBuilderExtUnix,
+    platform::wayland::EventLoopBuilderExtWayland as WaylandExt,
+    platform::x11::EventLoopBuilderExtX11 as X11Ext,
     window::WindowId,
 };
 
@@ -111,9 +112,10 @@ static DISPLAY: Lazy<Display> = Lazy::new(|| {
     std::thread::Builder::new()
         .name("gui".into())
         .spawn(move || {
-            let event_loop = EventLoopBuilder::with_user_event()
-                .with_any_thread(true)
-                .build();
+            let mut builder = EventLoopBuilder::with_user_event();
+            X11Ext::with_any_thread(&mut builder, true);
+            WaylandExt::with_any_thread(&mut builder, true);
+            let event_loop = builder.build();
             let proxy = event_loop.create_proxy();
             sender
                 .send(Display {
