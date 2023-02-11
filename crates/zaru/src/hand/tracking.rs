@@ -144,7 +144,7 @@ impl HandTracker {
                     .lock()
                     .unwrap()
                     .rect()
-                    .iou(&det.bounding_rect().to_rect().grow_rel(grow_by))
+                    .iou(&det.bounding_rect().grow_rel(grow_by))
                     >= self.iou_thresh
                 {
                     // Overlap
@@ -156,8 +156,7 @@ impl HandTracker {
         });
 
         self.hands.extend(detections.iter().map(|det| {
-            let roi =
-                RotatedRect::new(det.bounding_rect().to_rect().grow_rel(grow_by), det.angle());
+            let roi = RotatedRect::new(det.bounding_rect().grow_rel(grow_by), det.angle());
             let mut estimator = (self.make_estimator)();
             let mut tracker =
                 LandmarkTracker::new(estimator.input_resolution().aspect_ratio().unwrap());

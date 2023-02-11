@@ -1,6 +1,6 @@
 //! Palm detection.
 
-use crate::image::Resolution;
+use crate::image::{Rect, Resolution};
 use crate::nn::Outputs;
 use crate::num::sigmoid;
 use include_blob::include_blob;
@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use crate::{
     detection::{
         ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
-        BoundingRect, Detection, Detections, Network,
+        Detection, Detections, Network,
     },
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork},
 };
@@ -169,7 +169,7 @@ fn extract_detection(
 
     let mut det = Detection::with_keypoints(
         confidence,
-        BoundingRect::from_center(xc, yc, w, h),
+        Rect::from_center(xc, yc, w, h),
         vec![
             lm(box_params[4], box_params[5]),
             lm(box_params[6], box_params[7]),

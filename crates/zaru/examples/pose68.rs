@@ -30,7 +30,6 @@ fn main() -> anyhow::Result<()> {
         if let Some(det) = detector.detect(&image).iter().next() {
             let rect = det
                 .bounding_rect()
-                .to_rect()
                 .grow_rel(0.15)
                 .grow_to_fit_aspect(estimator.input_resolution().aspect_ratio().unwrap());
             draw::rect(&mut image, rect).color(Color::RED);

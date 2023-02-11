@@ -45,7 +45,6 @@ fn main() -> anyhow::Result<()> {
             for algo in &mut algos {
                 let rect = det
                     .bounding_rect()
-                    .to_rect()
                     .grow_rel(0.15)
                     .grow_to_fit_aspect(algo.estimator.input_resolution().aspect_ratio().unwrap());
                 draw::rect(&mut image, rect).color(algo.color);

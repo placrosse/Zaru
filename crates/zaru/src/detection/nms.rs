@@ -11,9 +11,9 @@
 //! detections. Since the latter reduces jitter between frames, and does not seem to have any
 //! appreciable drawbacks (outside of a minor computational cost), it is used by default.
 
-use crate::{iter::zip_exact, num::TotalF32};
+use crate::{image::Rect, iter::zip_exact, num::TotalF32};
 
-use super::{BoundingRect, Detection, Keypoint};
+use super::{Detection, Keypoint};
 
 /// A non-maximum suppression algorithm.
 pub struct NonMaxSuppression {
@@ -93,9 +93,13 @@ impl NonMaxSuppression {
                     });
 
                     // compute confidence-weighted average of the overlapping detections
-                    let mut acc_rect = BoundingRect::from_center(0.0, 0.0, 0.0, 0.0);
+                    let mut acc_rect_x = 0.0;
+                    let mut acc_rect_y = 0.0;
+                    let mut acc_rect_w = 0.0;
+                    let mut acc_rect_h = 0.0;
                     let mut acc_angle = 0.0;
-                    let mut acc = Detection::new(seed.confidence(), acc_rect);
+                    let mut acc =
+                        Detection::new(seed.confidence(), Rect::from_center(0.0, 0.0, 0.0, 0.0));
                     let mut divisor = 0.0;
                     for det in &self.avg_buf {
                         if acc.keypoints().is_empty() && !det.keypoints().is_empty() {
@@ -116,10 +120,10 @@ impl NonMaxSuppression {
                             acc.y += lm.y * factor;
                         }
                         let rect = det.bounding_rect();
-                        acc_rect.xc += rect.xc * factor;
-                        acc_rect.yc += rect.yc * factor;
-                        acc_rect.w += rect.w * factor;
-                        acc_rect.h += rect.h * factor;
+                        acc_rect_x += rect.x_center() * factor;
+                        acc_rect_y += rect.y_center() * factor;
+                        acc_rect_w += rect.width() * factor;
+                        acc_rect_h += rect.height() * factor;
                         acc_angle += det.angle * factor;
                     }
 
@@ -127,13 +131,15 @@ impl NonMaxSuppression {
                         lm.x /= divisor;
                         lm.y /= divisor;
                     }
-                    acc_rect.xc /= divisor;
-                    acc_rect.yc /= divisor;
-                    acc_rect.w /= divisor;
-                    acc_rect.h /= divisor;
+                    acc_rect_x /= divisor;
+                    acc_rect_y /= divisor;
+                    acc_rect_w /= divisor;
+                    acc_rect_h /= divisor;
                     acc_angle /= divisor;
 
-                    acc.set_bounding_rect(acc_rect);
+                    acc.set_bounding_rect(Rect::from_center(
+                        acc_rect_x, acc_rect_y, acc_rect_w, acc_rect_h,
+                    ));
                     acc.set_angle(acc_angle);
                     self.out_buf.push(acc);
                 }
@@ -165,7 +171,7 @@ mod tests {
         let mut nms = NonMaxSuppression::new();
         nms.set_mode(SuppressionMode::Remove);
 
-        let rect = BoundingRect::from_center(0.0, 0.0, 1.0, 1.0);
+        let rect = Rect::from_center(0.0, 0.0, 1.0, 1.0);
         let a = Detection::new(0.6, rect);
         let b = Detection::new(0.55, rect.scale(1.5));
         let detections = nms.process(&mut vec![a, b]).collect::<Vec<_>>();
@@ -174,10 +180,10 @@ mod tests {
         let d = &detections[0];
         let rect = d.bounding_rect();
         assert_eq!(d.confidence(), 0.6);
-        assert_eq!(rect.xc, 0.0);
-        assert_eq!(rect.yc, 0.0);
-        assert_eq!(rect.w, 1.0);
-        assert_eq!(rect.h, 1.0);
+        assert_eq!(rect.x_center(), 0.0);
+        assert_eq!(rect.y_center(), 0.0);
+        assert_eq!(rect.width(), 1.0);
+        assert_eq!(rect.height(), 1.0);
     }
 
     #[test]
@@ -185,8 +191,8 @@ mod tests {
         let mut nms = NonMaxSuppression::new();
         nms.set_mode(SuppressionMode::Remove);
 
-        let a = Detection::new(1.0, BoundingRect::from_center(0.0, 0.0, 1.0, 1.0));
-        let b = Detection::new(1.0, BoundingRect::from_center(5.0, 0.0, 1.0, 1.0));
+        let a = Detection::new(1.0, Rect::from_center(0.0, 0.0, 1.0, 1.0));
+        let b = Detection::new(1.0, Rect::from_center(5.0, 0.0, 1.0, 1.0));
 
         let detections = nms.process(&mut vec![a, b]).collect::<Vec<_>>();
         assert_eq!(detections.len(), 2);
@@ -198,7 +204,7 @@ mod tests {
         nms.set_mode(SuppressionMode::Average);
         nms.set_iou_thresh(0.0);
 
-        let rect = BoundingRect::from_center(-1.0, 3.0, 1.0, 1.0);
+        let rect = Rect::from_center(-1.0, 3.0, 1.0, 1.0);
         let a = Detection::new(1.0, rect);
         let b = Detection::new(0.5, rect.scale(4.0));
         let detections = nms.process(&mut vec![a, b]).collect::<Vec<_>>();
@@ -207,9 +213,9 @@ mod tests {
         let d = &detections[0];
         let rect = d.bounding_rect();
         assert_eq!(d.confidence(), 1.0);
-        assert_eq!(rect.xc, -1.0);
-        assert_eq!(rect.yc, 3.0);
-        assert_eq!(rect.w, 2.0);
-        assert_eq!(rect.h, 2.0);
+        assert_eq!(rect.x_center(), -1.0);
+        assert_eq!(rect.y_center(), 3.0);
+        assert_eq!(rect.width(), 2.0);
+        assert_eq!(rect.height(), 2.0);
     }
 }

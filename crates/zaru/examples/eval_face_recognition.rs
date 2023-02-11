@@ -77,7 +77,7 @@ fn main() -> anyhow::Result<()> {
 
                 let dets = det.detect(&image);
                 let rect = match dets.iter().next() {
-                    Some(det) => det.bounding_rect().to_rect(),
+                    Some(det) => det.bounding_rect(),
                     None => {
                         println!("No faces detected in '{}'", path.display());
                         return None;
