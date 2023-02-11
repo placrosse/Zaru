@@ -378,6 +378,16 @@ impl<E: Estimation + Confidence> LandmarkTracker<E> {
         }
     }
 
+    /// Returns a reference to the [`Estimator`] used to estimate landmarks.
+    pub fn estimator(&self) -> &Estimator<E> {
+        &self.estimator
+    }
+
+    /// Returns profiling timers of the internal [`Estimator`].
+    pub fn timers(&self) -> impl Iterator<Item = &Timer> {
+        self.estimator.timers()
+    }
+
     /// Sets the tracking loss threshold.
     ///
     /// If the confidence value of the predicted landmarks falls below this value, tracking is

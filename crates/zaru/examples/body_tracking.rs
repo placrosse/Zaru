@@ -8,7 +8,7 @@ use zaru::{
     detection::Detector,
     gui,
     image::{draw, Color, Image},
-    landmark::Estimator,
+    landmark::{Estimator, LandmarkTracker},
     num::TotalF32,
     rect::Rect,
     timer::FpsCounter,
@@ -52,41 +52,48 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut detector = Detector::new(PoseNetwork);
-    let mut landmarker = if USE_FULL_NETWORK {
+    let landmarker = if USE_FULL_NETWORK {
         Estimator::new(FullNetwork)
     } else {
         Estimator::new(LiteNetwork)
     };
+    let mut tracker = LandmarkTracker::new(landmarker);
+    tracker.set_roi_padding(0.15);
 
     let mut fps = FpsCounter::new("body pose");
     for result in video_source {
         let mut image = result?;
 
-        let detections = detector.detect(&image);
-        for detection in detections.iter() {
-            detection.draw(&mut image);
-        }
+        if let Some(result) = tracker.track(&image) {
+            result.estimation().draw(&mut image);
+        } else {
+            // Tracking lost, run detection.
 
-        if let Some(detection) = detections
-            .iter()
-            .max_by_key(|det| TotalF32(det.confidence()))
-        {
-            let hips = detection.keypoints()[Keypoint::Hips as usize];
-            let grow_by = 0.15;
-            let body_rect = Rect::bounding(detection.keypoints().iter().map(|kp| (kp.x(), kp.y())))
-                .unwrap()
-                .grow_move_center(hips.x(), hips.y())
-                .grow_to_fit_aspect(landmarker.input_resolution().aspect_ratio().unwrap())
-                .grow_rel(grow_by);
-            draw::rect(&mut image, body_rect).color(Color::BLUE);
-            let mut body_view = image.view_mut(body_rect);
-            let landmarks = landmarker.estimate(&body_view);
-            landmarks.draw(&mut body_view);
+            let detections = detector.detect(&image);
+            for detection in detections.iter() {
+                detection.draw(&mut image);
+            }
+
+            if let Some(detection) = detections
+                .iter()
+                .max_by_key(|det| TotalF32(det.confidence()))
+            {
+                // TODO: rotation?
+                let hips = detection.keypoints()[Keypoint::Hips as usize];
+                let grow_by = 0.15;
+                let body_rect =
+                    Rect::bounding(detection.keypoints().iter().map(|kp| (kp.x(), kp.y())))
+                        .unwrap()
+                        .grow_move_center(hips.x(), hips.y())
+                        .grow_rel(grow_by);
+                tracker.set_roi(body_rect);
+                draw::rect(&mut image, body_rect).color(Color::BLUE);
+            }
         }
 
         gui::show_image("pose detection", &image);
 
-        fps.tick_with(detector.timers().into_iter().chain(landmarker.timers()));
+        fps.tick_with(detector.timers().into_iter().chain(tracker.timers()));
     }
 
     Ok(())
