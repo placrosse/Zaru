@@ -152,17 +152,13 @@ fn negotiate_format(device: &Device, mut prefs: FramePrefs) -> anyhow::Result<(P
         log::debug!("failed to negotiate format with prefs {:?}", prefs);
         match prefs.pref {
             ParamPreference::Resolution => {
-                if prefs.resolution.take().is_none() {
-                    if prefs.fps.take().is_none() {
-                        break;
-                    }
+                if prefs.resolution.take().is_none() && prefs.fps.take().is_none() {
+                    break;
                 }
             }
             ParamPreference::Framerate => {
-                if prefs.fps.take().is_none() {
-                    if prefs.resolution.take().is_none() {
-                        break;
-                    }
+                if prefs.fps.take().is_none() && prefs.resolution.take().is_none() {
+                    break;
                 }
             }
         }

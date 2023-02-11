@@ -31,8 +31,8 @@ pub struct AlphaBetaState {
 
 impl AlphaBetaFilter {
     pub fn new(alpha: f32, beta: f32) -> Self {
-        assert!(0.0 <= alpha && alpha <= 1.0);
-        assert!(0.0 <= beta && beta <= 1.0);
+        assert!((0.0..=1.0).contains(&alpha));
+        assert!((0.0..=1.0).contains(&beta));
         Self { alpha, beta }
     }
 }

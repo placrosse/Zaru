@@ -188,7 +188,7 @@ impl HandTracker {
             worker.send((image.clone(), promise));
             TrackedHand {
                 id,
-                roi: roi_arc.clone(),
+                roi: roi_arc,
                 worker,
                 ph,
                 lm: None,
@@ -202,7 +202,7 @@ impl HandTracker {
             for j in 0..i {
                 let other_roi = *self.hands[j].roi.lock().unwrap();
                 // FIXME: IoU computation ignores rotation because hard
-                if roi.rect().iou(&other_roi.rect()) >= self.iou_thresh {
+                if roi.rect().iou(other_roi.rect()) >= self.iou_thresh {
                     self.hands.swap_remove(i);
                     break;
                 }

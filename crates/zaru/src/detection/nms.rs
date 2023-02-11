@@ -70,11 +70,7 @@ impl NonMaxSuppression {
                 SuppressionMode::Remove => {
                     detections.retain(|other| {
                         let iou = seed.bounding_rect().iou(&other.bounding_rect());
-                        if iou >= self.iou_thresh {
-                            false // remove from detection list
-                        } else {
-                            true
-                        }
+                        iou < self.iou_thresh
                     });
                     self.out_buf.push(seed);
                 }
@@ -148,6 +144,12 @@ impl NonMaxSuppression {
 
         self.avg_buf.clear();
         self.out_buf.drain(..)
+    }
+}
+
+impl Default for NonMaxSuppression {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

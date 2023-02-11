@@ -154,7 +154,7 @@ fn decode_jpeg_vaapi(jpeg: &[u8]) -> anyhow::Result<Image> {
                     }
                     Err(e) => {
                         log::warn!("failed to query VA-API vendor: {e}");
-                        return None;
+                        None
                     }
                 }
             });

@@ -122,10 +122,8 @@ impl LandmarkResult {
             .landmarks()
             .get(LandmarkIdx::RightEyeOuterCorner as _)
             .position();
-        let left_to_right_eye = Vector2::new(
-            (right_eye[0] - left_eye[0]) as f32,
-            (right_eye[1] - left_eye[1]) as f32,
-        );
+        let left_to_right_eye =
+            Vector2::new(right_eye[0] - left_eye[0], right_eye[1] - left_eye[1]);
         Rotation2::rotation_between(&Vector2::x(), &left_to_right_eye).angle()
     }
 
@@ -287,10 +285,10 @@ pub enum LandmarkIdx {
 }
 // FIXME: these are swapped or otherwise messed up
 
-impl Into<usize> for LandmarkIdx {
+impl From<LandmarkIdx> for usize {
     #[inline]
-    fn into(self) -> usize {
-        self as usize
+    fn from(idx: LandmarkIdx) -> usize {
+        idx as usize
     }
 }
 

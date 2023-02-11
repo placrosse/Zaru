@@ -161,10 +161,8 @@ fn extract_detection(
 
     let left_eye = det.keypoints()[Keypoint::LeftEye as usize];
     let right_eye = det.keypoints()[Keypoint::RightEye as usize];
-    let left_to_right_eye = Vector2::new(
-        (right_eye.x() - left_eye.x()) as f32,
-        (right_eye.y() - left_eye.y()) as f32,
-    );
+    let left_to_right_eye =
+        Vector2::new(right_eye.x() - left_eye.x(), right_eye.y() - left_eye.y());
     let angle = Rotation2::rotation_between(&Vector2::x(), &left_to_right_eye).angle();
     det.set_angle(angle);
 

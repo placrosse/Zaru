@@ -39,7 +39,7 @@ impl Window {
             .with_resizable(false) // TODO make resizeable
             .with_inner_size(PhysicalSize::new(resolution.width(), resolution.height()))
             .with_title(title)
-            .build(&event_loop)?;
+            .build(event_loop)?;
         Ok(Self {
             win: Rc::new(win),
             resolution,
@@ -238,7 +238,7 @@ impl RenderPipelines {
             layout: Some(
                 &device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: None,
-                    bind_group_layouts: &[&shared_bind_group_layout],
+                    bind_group_layouts: &[shared_bind_group_layout],
                     push_constant_ranges: &[],
                 }),
             ),
@@ -300,7 +300,7 @@ impl BindGroups {
         let sampler = device.create_sampler(&SamplerDescriptor::default());
         let textured_quad = device.create_bind_group(&BindGroupDescriptor {
             label: Some("shared_bind_group"),
-            layout: &shared_bind_group_layout,
+            layout: shared_bind_group_layout,
             entries: &[
                 BindGroupEntry {
                     binding: 0,

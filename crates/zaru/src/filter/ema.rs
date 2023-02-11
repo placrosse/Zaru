@@ -19,7 +19,7 @@ impl Ema {
     ///
     /// This method will panic if `alpha` is not in between 0.0 and 1.0 (inclusive).
     pub fn new(alpha: f32) -> Self {
-        assert!(alpha >= 0.0 && alpha <= 1.0);
+        assert!((0.0..=1.0).contains(&alpha));
         Self { alpha }
     }
 }

@@ -98,19 +98,6 @@ impl Image {
         }
     }
 
-    /// Saves an image to the file system.
-    ///
-    /// The path must have a supported file extension (`jpeg`, `jpg` or `png`).
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> anyhow::Result<()> {
-        self.save_impl(path.as_ref())
-    }
-
-    fn save_impl(&self, path: &Path) -> anyhow::Result<()> {
-        match ImageFormat::from_path(path)? {
-            _ => Ok(self.buf.save(path)?),
-        }
-    }
-
     /// Creates an empty image of a specified size.
     ///
     /// The image will start out black and fully transparent.

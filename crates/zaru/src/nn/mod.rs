@@ -179,7 +179,7 @@ impl<'a> Loader<'a> {
 
         let gpu = if self.enable_gpu {
             Some(pollster::block_on(wonnx::Session::from_bytes(
-                &*self.model_data,
+                &self.model_data,
             ))?)
         } else {
             None
@@ -281,7 +281,7 @@ impl NeuralNetwork {
                 let output_map = pollster::block_on(gpu.run(&inputs))?;
                 let mut outputs = TVec::new();
                 for info in self.outputs() {
-                    let tensor = &output_map[&*info.name()];
+                    let tensor = &output_map[info.name()];
                     match tensor {
                         OutputTensor::F32(tensor) => {
                             outputs.push(Tensor::from_iter(info.shape(), tensor.iter().copied()));

@@ -375,7 +375,7 @@ impl<'d> TensorView<'d> {
             self.shape(),
             indices
         );
-        let mut data = &*self.data;
+        let mut data = self.data;
         for (&stride, &index) in self.layout.strides().iter().zip(&indices) {
             data = &data[index * stride..(index + 1) * stride];
         }

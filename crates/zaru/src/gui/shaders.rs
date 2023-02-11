@@ -72,7 +72,7 @@ impl Loader {
 
         let module = self
             .parser
-            .parse(&stage.into(), &source)
+            .parse(&stage.into(), source)
             .map_err(|errs| anyhow::anyhow!("{}", errs.iter().format("\n")))
             .with_context(|| format!("failed to parse shader {}", path))?;
 
@@ -99,13 +99,8 @@ impl Shader {
         let mut vert_spv = Vec::with_capacity(32);
         let mut frag_spv = Vec::with_capacity(32);
 
-        loader.load_glsl(ShaderStage::Vertex, &vert_source, vert_name, &mut vert_spv)?;
-        loader.load_glsl(
-            ShaderStage::Fragment,
-            &frag_source,
-            frag_name,
-            &mut frag_spv,
-        )?;
+        loader.load_glsl(ShaderStage::Vertex, vert_source, vert_name, &mut vert_spv)?;
+        loader.load_glsl(ShaderStage::Fragment, frag_source, frag_name, &mut frag_spv)?;
 
         let vert = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some(vert_name),

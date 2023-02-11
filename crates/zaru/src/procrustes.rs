@@ -191,7 +191,7 @@ fn remove_scale(points: &mut [Vector3<f32>]) -> f32 {
     let scale = scale.sqrt();
 
     for point in points {
-        *point = *point / scale;
+        *point /= scale;
     }
 
     scale

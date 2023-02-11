@@ -329,15 +329,15 @@ impl<E: Estimation> Estimator<E> {
             .time(|| self.filter.filter(self.estimation.landmarks_mut()));
 
         // Map landmark coordinates back into the input image.
-        let scale = rect.width() as f32 / input_res.width() as f32;
+        let scale = rect.width() / input_res.width() as f32;
         for pos in self.estimation.landmarks_mut().positions_mut() {
             // Map all coordinates from the network's input coordinate system to `rect`'s system.
             *pos = pos.map(|t| t * scale);
 
             // Now remove the offset added by the oversized rectangle (this compensates for
             // "black bars" added to adjust the aspect ratio).
-            pos[0] = pos[0] + rect.x() as f32;
-            pos[1] = pos[1] + rect.y() as f32;
+            pos[0] += rect.x();
+            pos[1] += rect.y();
         }
 
         &mut self.estimation

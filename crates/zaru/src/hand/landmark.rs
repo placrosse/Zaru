@@ -85,9 +85,9 @@ impl LandmarkResult {
     /// A rotation of 0° means that fingers are pointed upwards.
     pub fn rotation_radians(&self) -> f32 {
         let [x, y, _] = self.landmark_position(LandmarkIdx::MiddleFingerMcp as usize);
-        let finger = Point2::new(x as f32, y as f32);
+        let finger = Point2::new(x, y);
         let [x, y, _] = self.landmark_position(LandmarkIdx::Wrist as usize);
-        let wrist = Point2::new(x as f32, y as f32);
+        let wrist = Point2::new(x, y);
 
         let rel = wrist - finger;
         Rotation2::rotation_between(&Vector2::y(), &rel).angle()

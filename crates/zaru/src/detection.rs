@@ -108,6 +108,12 @@ impl Detections {
     }
 }
 
+impl<C: Classes> Default for Detections<C> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Types that represent object classes.
 ///
 /// Some object detectors are able to detect and distinguish between a number of different types of
@@ -215,7 +221,7 @@ impl<C: Classes> Detector<C> {
         });
 
         // Map all coordinates back into the input image.
-        let scale = rect.width() as f32 / input_res.width() as f32;
+        let scale = rect.width() / input_res.width() as f32;
         for (_, det) in self.detections.all_detections_mut() {
             // Map all coordinates from the network's input coordinate system to `rect`'s system.
             let (xc, yc) = det.rect.center();
