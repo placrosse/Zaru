@@ -44,7 +44,7 @@ impl Embedding {
 }
 
 fn main() -> anyhow::Result<()> {
-    let face_dir = std::env::args_os().skip(1).next().unwrap();
+    let face_dir = std::env::args_os().nth(1).unwrap();
 
     let nn = NeuralNetwork::from_path("3rdparty/onnx/mobilefacenet.onnx")?.load()?;
     let cnn = Cnn::new(
@@ -120,7 +120,7 @@ fn main() -> anyhow::Result<()> {
 
         let mut max_diff = 0.0;
         for (a, b) in embeddings.iter().tuple_combinations() {
-            max_diff = max_diff.max(a.difference(*b));
+            max_diff = max_diff.max(a.difference(b));
         }
 
         max_intra_class_difference.push((*class, max_diff));

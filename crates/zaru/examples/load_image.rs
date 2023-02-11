@@ -7,7 +7,7 @@ use zaru::{
 fn main() -> anyhow::Result<()> {
     zaru::init_logger!();
 
-    let data = match std::env::args_os().skip(1).next() {
+    let data = match std::env::args_os().nth(1) {
         Some(path) => std::fs::read(&path)?,
         None => {
             eprintln!("usage: load_image <path>");

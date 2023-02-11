@@ -46,8 +46,8 @@ fn main() -> anyhow::Result<()> {
             draw::rotated_rect(target, view);
             draw::text(
                 target,
-                rect.center().0 as _,
-                rect.y() as _,
+                rect.x_center(),
+                rect.y(),
                 &format!("{:?}", hand.id()),
             )
             .align_top();

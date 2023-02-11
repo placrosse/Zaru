@@ -5,7 +5,7 @@ use zaru::{gui, timer::FpsCounter, video::httpcam::HttpStream};
 fn main() -> anyhow::Result<()> {
     zaru::init_logger!();
 
-    let Some(addr) = std::env::args().skip(1).next() else {
+    let Some(addr) = std::env::args().nth(1) else {
         eprintln!("usage: httpcam <addr:port>");
         std::process::exit(1);
     };

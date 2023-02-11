@@ -133,12 +133,11 @@ impl LandmarkResult {
 
         let [a_x, a_y, _] = self.landmark_position(LandmarkIdx::MiddleFingerMcp as usize);
         let [b_x, b_y, _] = self.landmark_position(LandmarkIdx::Wrist as usize);
-        draw::line(target, a_x as _, a_y as _, b_x as _, b_y as _)
-            .color(Color::from_rgb8(127, 127, 127));
+        draw::line(target, a_x, a_y, b_x, b_y).color(Color::from_rgb8(127, 127, 127));
         draw::text(
             target,
-            b_x as _,
-            b_y as _,
+            b_x,
+            b_y,
             &format!("{:.1} deg", self.rotation_radians().to_degrees()),
         )
         .align_top();
@@ -155,7 +154,7 @@ impl LandmarkResult {
             let [a_x, a_y, _] = self.landmark_position(*a as usize);
             let [b_x, b_y, _] = self.landmark_position(*b as usize);
 
-            draw::line(target, a_x as _, a_y as _, b_x as _, b_y as _).color(Color::GREEN);
+            draw::line(target, a_x, a_y, b_x, b_y).color(Color::GREEN);
         }
         for [x, y, _] in self.landmark_positions() {
             draw::marker(target, x, y);

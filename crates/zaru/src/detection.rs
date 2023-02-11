@@ -335,7 +335,7 @@ impl Detection {
         draw::rotated_rect(image, RotatedRect::new(self.bounding_rect(), self.angle()))
             .color(Color::from_rgb8(170, 0, 0));
         for lm in self.keypoints() {
-            draw::marker(image, lm.x() as _, lm.y() as _);
+            draw::marker(image, lm.x(), lm.y());
         }
 
         let color = match self.confidence() {

@@ -50,7 +50,7 @@ fn main() -> anyhow::Result<()> {
             );
 
             let [x, y, _] = lms.landmarks().average_position();
-            draw::quaternion(&mut view, x as _, y as _, rot);
+            draw::quaternion(&mut view, x, y, rot);
         }
         gui::show_image("facemarks", &image);
     }

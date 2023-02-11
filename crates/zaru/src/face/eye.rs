@@ -138,20 +138,14 @@ impl EyeLandmarks {
 
     fn draw_impl(&self, mut image: ImageViewMut<'_>) {
         let [x, y, _] = self.iris_center();
-        draw::marker(&mut image, x as _, y as _)
-            .size(3)
-            .color(Color::CYAN);
-        draw::circle(&mut image, x as _, y as _, self.iris_diameter()).color(Color::CYAN);
+        draw::marker(&mut image, x, y).size(3).color(Color::CYAN);
+        draw::circle(&mut image, x, y, self.iris_diameter()).color(Color::CYAN);
 
         for [x, y, _] in self.eye_contour().take(16) {
-            draw::marker(&mut image, x as _, y as _)
-                .size(1)
-                .color(Color::MAGENTA);
+            draw::marker(&mut image, x, y).size(1).color(Color::MAGENTA);
         }
         for [x, y, _] in self.eye_contour().skip(16) {
-            draw::marker(&mut image, x as _, y as _)
-                .size(1)
-                .color(Color::GREEN);
+            draw::marker(&mut image, x, y).size(1).color(Color::GREEN);
         }
     }
 }

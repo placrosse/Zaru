@@ -8,7 +8,7 @@ use zaru::{
 fn main() -> anyhow::Result<()> {
     zaru::init_logger!();
 
-    let image = match std::env::args().skip(1).next() {
+    let image = match std::env::args().nth(1) {
         Some(path) => std::fs::read(path)?,
         None => {
             bail!("usage: jpegbench <file>");

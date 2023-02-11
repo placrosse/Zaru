@@ -23,7 +23,7 @@ const USE_FULL_NETWORK: bool = false;
 fn main() -> anyhow::Result<()> {
     zaru::init_logger!();
 
-    let image_path = env::args_os().skip(1).next();
+    let image_path = env::args_os().nth(1);
 
     let video_source: Box<dyn Iterator<Item = anyhow::Result<Image>>> = match image_path {
         Some(path) => match Animation::from_path(&path) {
@@ -73,16 +73,11 @@ fn main() -> anyhow::Result<()> {
         {
             let hips = detection.keypoints()[Keypoint::Hips as usize];
             let grow_by = 0.15;
-            let body_rect = Rect::bounding(
-                detection
-                    .keypoints()
-                    .iter()
-                    .map(|kp| (kp.x() as _, kp.y() as _)),
-            )
-            .unwrap()
-            .grow_move_center(hips.x() as _, hips.y() as _)
-            .grow_to_fit_aspect(landmarker.input_resolution().aspect_ratio().unwrap())
-            .grow_rel(grow_by);
+            let body_rect = Rect::bounding(detection.keypoints().iter().map(|kp| (kp.x(), kp.y())))
+                .unwrap()
+                .grow_move_center(hips.x(), hips.y())
+                .grow_to_fit_aspect(landmarker.input_resolution().aspect_ratio().unwrap())
+                .grow_rel(grow_by);
             draw::rect(&mut image, body_rect).color(Color::BLUE);
             let mut body_view = image.view_mut(body_rect);
             let landmarks = landmarker.estimate(&body_view);

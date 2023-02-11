@@ -3,8 +3,7 @@ use zaru::{gui, video::anim::Animation};
 
 fn main() -> anyhow::Result<()> {
     let path = std::env::args()
-        .skip(1)
-        .next()
+        .nth(1)
         .ok_or_else(|| anyhow!("usage: animation <path-to-animation>"))?;
     let animation = Animation::from_path(&path)?;
 

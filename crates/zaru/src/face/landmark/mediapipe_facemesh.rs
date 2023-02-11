@@ -177,7 +177,7 @@ impl LandmarkResult {
 
     fn draw_impl(&self, image: &mut ImageViewMut<'_>) {
         for &[x, y, ..] in self.landmarks().positions() {
-            draw::marker(image, x as _, y as _).size(3);
+            draw::marker(image, x, y).size(3);
         }
 
         let color = match self.face_confidence() {
