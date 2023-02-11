@@ -141,7 +141,7 @@ impl LandmarkResult {
             .into_iter()
             .map(|idx| {
                 let [x, y, ..] = self.landmarks().landmark(idx as usize).position();
-                (x as i32, y as i32)
+                (x, y)
             }),
         )
         .unwrap()
@@ -160,7 +160,7 @@ impl LandmarkResult {
             .into_iter()
             .map(|idx| {
                 let [x, y, ..] = self.landmarks().landmark(idx as usize).position();
-                (x as i32, y as i32)
+                (x, y)
             }),
         )
         .unwrap()

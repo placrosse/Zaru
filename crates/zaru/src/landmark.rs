@@ -427,15 +427,12 @@ impl LandmarkTracker {
 
         // Map all landmarks to the image coordinate system.
         for [x, y, _] in estimation.landmarks_mut().positions_mut() {
-            [*x, *y] = view_rect.transform_out_f32(*x, *y);
+            [*x, *y] = view_rect.transform_out(*x, *y);
         }
 
         let updated_roi = RotatedRect::bounding(
             angle,
-            estimation
-                .landmarks_mut()
-                .iter()
-                .map(|lm| (lm.x().round() as i32, lm.y().round() as i32)),
+            estimation.landmarks_mut().iter().map(|lm| (lm.x(), lm.y())),
         )
         .unwrap();
 

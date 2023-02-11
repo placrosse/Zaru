@@ -144,7 +144,7 @@ impl Image {
     /// The rectangle will be positioned at `(0, 0)` and have the width and height of the image.
     #[inline]
     pub fn rect(&self) -> Rect {
-        Rect::from_top_left(0, 0, self.width(), self.height())
+        Rect::from_top_left(0.0, 0.0, self.width() as f32, self.height() as f32)
     }
 
     /// Resizes this image to a new size, adding black bars to keep the original aspect ratio.
@@ -267,10 +267,10 @@ impl ViewData {
         let radians = self.rect.rotation_radians() + rect.rotation_radians();
 
         let (cx, cy) = rect.rect().center();
-        let [cx, cy] = self.rect.transform_out_f32(cx - 0.5, cy - 0.5);
+        let [cx, cy] = self.rect.transform_out(cx, cy);
         let [x, y] = [
-            (cx + 0.5 - rect.rect().width() as f32 / 2.0).round() as i32,
-            (cy + 0.5 - rect.rect().height() as f32 / 2.0).round() as i32,
+            cx - rect.rect().width() / 2.0,
+            cy - rect.rect().height() / 2.0,
         ];
 
         Self {
@@ -279,24 +279,26 @@ impl ViewData {
     }
 
     fn rect(&self) -> Rect {
-        Rect::from_top_left(0, 0, self.width(), self.height())
+        Rect::from_top_left(0.0, 0.0, self.width(), self.height())
     }
 
-    fn width(&self) -> u32 {
+    fn width(&self) -> f32 {
         self.rect.rect().width()
     }
 
-    fn height(&self) -> u32 {
+    fn height(&self) -> f32 {
         self.rect.rect().height()
     }
 
     fn image_coord(&self, x: u32, y: u32, image: &Image) -> Option<(u32, u32)> {
-        let [x, y] = self
-            .rect
-            .transform_out(x.try_into().ok()?, y.try_into().ok()?);
+        let [x, y] = self.rect.transform_out(x as f32 + 0.5, y as f32 + 0.5);
+        let [x, y] = [(x - 0.5).round(), (y - 0.5).round()];
 
-        let x: u32 = x.try_into().ok()?;
-        let y: u32 = y.try_into().ok()?;
+        if x < 0.0 || y < 0.0 || x.ceil() >= u32::MAX as f32 || y.ceil() >= u32::MAX as f32 {
+            return None;
+        }
+
+        let [x, y] = [x.round() as u32, y.round() as u32];
         if x >= image.width() || y >= image.height() {
             return None;
         }
@@ -343,12 +345,12 @@ impl<'a> ImageView<'a> {
 
     /// Returns the width of this view, in pixels.
     pub fn width(&self) -> u32 {
-        self.data.width()
+        self.data.width() as u32
     }
 
     /// Returns the height of this view, in pixels.
     pub fn height(&self) -> u32 {
-        self.data.height()
+        self.data.height() as u32
     }
 
     /// Returns the size of this view.
@@ -416,6 +418,8 @@ impl<'a> ImageView<'a> {
     /// For performance (as this runs on the CPU), this uses nearest neighbor interpolation, so the
     /// result won't look very good, but it should suffice for most use cases.
     pub fn aspect_aware_resize(&self, new_res: Resolution) -> Image {
+        // TODO remove in favor of oversized image views
+
         let (cur_ratio, new_ratio) =
             match (self.resolution().aspect_ratio(), new_res.aspect_ratio()) {
                 (Some(a), Some(b)) => (a, b),
@@ -440,8 +444,8 @@ impl<'a> ImageView<'a> {
         let target_rect = new_res.fit_aspect_ratio(cur_ratio);
         let mut target_view = out.view_mut(target_rect);
 
-        for dest_y in 0..target_rect.height() {
-            for dest_x in 0..target_rect.width() {
+        for dest_y in 0..target_rect.height() as u32 {
+            for dest_x in 0..target_rect.width() as u32 {
                 let src_x = ((dest_x as f32 + 0.5) / target_rect.width() as f32
                     * self.width() as f32) as u32;
                 let src_y = ((dest_y as f32 + 0.5) / target_rect.height() as f32
@@ -515,12 +519,12 @@ impl<'a> ImageViewMut<'a> {
 
     /// Returns the width of this view, in pixels.
     pub fn width(&self) -> u32 {
-        self.data.width()
+        self.data.width() as u32
     }
 
     /// Returns the height of this view, in pixels.
     pub fn height(&self) -> u32 {
-        self.data.height()
+        self.data.height() as u32
     }
 
     /// Returns the size of this view.
@@ -729,7 +733,12 @@ pub trait AsImageViewMut: AsImageView {
 
 impl AsImageView for Image {
     fn as_view(&self) -> ImageView<'_> {
-        self.view(Rect::from_top_left(0, 0, self.width(), self.height()))
+        self.view(Rect::from_top_left(
+            0.0,
+            0.0,
+            self.width() as f32,
+            self.height() as f32,
+        ))
     }
 }
 
@@ -741,7 +750,12 @@ impl<'a> AsImageView for ImageView<'a> {
 
 impl AsImageViewMut for Image {
     fn as_view_mut(&mut self) -> ImageViewMut<'_> {
-        self.view_mut(Rect::from_top_left(0, 0, self.width(), self.height()))
+        self.view_mut(Rect::from_top_left(
+            0.0,
+            0.0,
+            self.width() as f32,
+            self.height() as f32,
+        ))
     }
 }
 

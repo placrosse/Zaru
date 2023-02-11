@@ -60,7 +60,9 @@ impl Resolution {
 
         let to_ratio = match self.aspect_ratio() {
             Some(ratio) => ratio,
-            None => return Rect::from_top_left(0, 0, self.width(), self.height()),
+            None => {
+                return Rect::from_top_left(0.0, 0.0, self.width() as f32, self.height() as f32)
+            }
         };
 
         let from_ratio = ratio.as_f32();
@@ -70,22 +72,22 @@ impl Resolution {
         if from_ratio > to_ratio {
             // Input has wider aspect ratio than output.
             // => Resulting size is limited by target width. Add Letterboxing.
-            w = self.width();
-            h = (self.width() as f32 / from_ratio) as u32;
+            w = self.width() as f32;
+            h = self.width() as f32 / from_ratio;
 
-            x_min = 0;
-            y_min = (self.height() - h) / 2;
+            x_min = 0.0;
+            y_min = (self.height() as f32 - h) / 2.0;
         } else {
             // Output has wider (or equal) aspect ratio than input.
             // => Resulting size is limited by target height. Add Pillarboxing.
-            w = (self.height() as f32 * from_ratio) as u32;
-            h = self.height();
+            w = self.height() as f32 * from_ratio;
+            h = self.height() as f32;
 
-            x_min = (self.width() - w) / 2;
-            y_min = 0;
+            x_min = (self.width() as f32 - w) / 2.0;
+            y_min = 0.0;
         }
 
-        let rect = Rect::from_top_left(x_min as _, y_min as _, w, h);
+        let rect = Rect::from_top_left(x_min, y_min, w, h);
         log::trace!(
             "fit aspect ratio {} in resolution {} -> {:?}",
             ratio,
@@ -199,15 +201,15 @@ mod tests {
     fn test_fit_aspect_ratio() {
         assert_eq!(
             Resolution::new(16, 16).fit_aspect_ratio(AspectRatio::new(16, 8).unwrap()),
-            Rect::from_ranges(0..=15, 4..=11)
+            Rect::from_ranges(0.0..=16.0, 4.0..=12.0)
         );
         assert_eq!(
             Resolution::new(16, 16).fit_aspect_ratio(AspectRatio::new(8, 16).unwrap()),
-            Rect::from_ranges(4..=11, 0..=15)
+            Rect::from_ranges(4.0..=12.0, 0.0..=16.0)
         );
         assert_eq!(
             Resolution::new(16, 8).fit_aspect_ratio(AspectRatio::new(16, 8).unwrap()),
-            Rect::from_ranges(0..=15, 0..=7)
+            Rect::from_ranges(0.0..=16.0, 0.0..=8.0)
         );
     }
 }
