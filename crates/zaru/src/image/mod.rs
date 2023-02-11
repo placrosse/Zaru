@@ -404,52 +404,6 @@ impl<'a> ImageView<'a> {
             .unwrap();
         image
     }
-
-    /// Resizes this image to a new size, adding black bars to keep the original aspect ratio.
-    ///
-    /// For performance (as this runs on the CPU), this uses nearest neighbor interpolation, so the
-    /// result won't look very good, but it should suffice for most use cases.
-    pub fn aspect_aware_resize(&self, new_res: Resolution) -> Image {
-        // TODO remove in favor of oversized image views
-
-        let (cur_ratio, new_ratio) =
-            match (self.resolution().aspect_ratio(), new_res.aspect_ratio()) {
-                (Some(a), Some(b)) => (a, b),
-                _ => {
-                    // old or new res contains zero pixels, just return an empty image of the right size
-                    return Image::new(new_res.width(), new_res.height());
-                }
-            };
-
-        log::trace!(
-            "aspect-aware resize from {} -> {} ({} -> {})",
-            self.resolution(),
-            new_res,
-            cur_ratio,
-            new_ratio,
-        );
-
-        let mut out = Image {
-            buf: ImageBuffer::new(new_res.width(), new_res.height()),
-        };
-
-        let target_rect = new_res.fit_aspect_ratio(cur_ratio);
-        let mut target_view = out.view_mut(target_rect);
-
-        for dest_y in 0..target_rect.height() as u32 {
-            for dest_x in 0..target_rect.width() as u32 {
-                let src_x = ((dest_x as f32 + 0.5) / target_rect.width() as f32
-                    * self.width() as f32) as u32;
-                let src_y = ((dest_y as f32 + 0.5) / target_rect.height() as f32
-                    * self.height() as f32) as u32;
-
-                let pixel = self.get(src_x, src_y);
-                target_view.set(dest_x, dest_y, pixel);
-            }
-        }
-
-        out
-    }
 }
 
 impl fmt::Debug for ImageView<'_> {

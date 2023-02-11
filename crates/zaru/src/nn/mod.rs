@@ -2,7 +2,7 @@
 
 pub mod tensor;
 
-use crate::image::{AsImageView, AspectRatio, Color, ImageView, Resolution};
+use crate::image::{AsImageView, Color, ImageView, Resolution};
 use tensor::Tensor;
 use tract_onnx::prelude::{
     tvec, Framework, Graph, InferenceModelExt, SimplePlan, TValue, TVec, TypedFact, TypedOp,
@@ -134,42 +134,6 @@ pub fn create_linear_color_mapper(target_range: RangeInclusive<f32>) -> impl Fn(
         let rgb = [color.r(), color.g(), color.b()];
         rgb.map(|col| col as f32 * adjust_range + start)
     }
-}
-
-// TODO: remove the next 2 functions
-
-/// Adjusts `f32` coordinates from a 1:1 aspect ratio back to `orig_ratio`.
-///
-/// This assumes that `orig_ratio` was originally fitted to a 1:1 ratio by adding black bars
-/// (`Image::aspect_aware_resize`).
-pub fn unadjust_aspect_ratio(mut x: f32, mut y: f32, orig_aspect: AspectRatio) -> (f32, f32) {
-    let ratio = orig_aspect.as_f32();
-    if ratio > 1.0 {
-        // going from 1:1 to something wider, undo letterboxing
-        y = (y - 0.5) * ratio + 0.5;
-    } else {
-        // going from 1:1 to something taller, undo pillarboxing
-        x = (x - 0.5) / ratio + 0.5;
-    }
-
-    (x, y)
-}
-
-/// Translates `f32` coordinates back to coordinates of an image with resolution `full_res`.
-///
-/// The input coordinates are assumed to be in range `[0.0, 1.0]` (and thus from a square image with
-/// aspect ratio 1:1). The original image may have any aspect ratio, but this function assumes that
-/// it was translated to a 1:1 ratio using `Image::aspect_aware_resize`.
-pub fn point_to_img(x: f32, y: f32, full_res: &Resolution) -> (i32, i32) {
-    let orig_aspect = match full_res.aspect_ratio() {
-        Some(ratio) => ratio,
-        None => return (0, 0),
-    };
-    let (x, y) = unadjust_aspect_ratio(x, y, orig_aspect);
-
-    let x = (x * full_res.width() as f32) as i32;
-    let y = (y * full_res.height() as f32) as i32;
-    (x, y)
 }
 
 /// Describes in what order a CNN expects its input image data.
