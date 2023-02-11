@@ -146,6 +146,7 @@ impl Network for LiteNetwork {
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()
+                    .with_output_selection([0, 1])
                     .load()
                     .unwrap(),
                 CnnInputShape::NCHW,
@@ -173,6 +174,7 @@ impl Network for FullNetwork {
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
                     .unwrap()
+                    .with_output_selection([0, 1])
                     .load()
                     .unwrap(),
                 CnnInputShape::NCHW,
@@ -193,19 +195,20 @@ impl Network for FullNetwork {
 // should already perform pretty well.
 
 fn extract(outputs: &Outputs, estimation: &mut LandmarkResult) {
-    // TODO tell tract to only compute the first 2 outputs
     let screen_landmarks = &outputs[0];
     let pose_flag = &outputs[1];
-    let segmentation = &outputs[2];
+
+    // Other outputs are turned off during load.
+    /*let segmentation = &outputs[2];
     let heatmap = &outputs[3];
-    let world_landmarks = &outputs[4];
+    let world_landmarks = &outputs[4];*/
 
     // 33 pose landmarks (`LandmarkIdx`), 6 auxiliary landmarks -> 39 total
     assert_eq!(screen_landmarks.shape(), &[1, 39 * 5]); // 5 values each
     assert_eq!(pose_flag.shape(), &[1, 1]);
-    assert_eq!(segmentation.shape(), &[1, 256, 256, 1]);
+    /*assert_eq!(segmentation.shape(), &[1, 256, 256, 1]);
     assert_eq!(heatmap.shape(), &[1, 64, 64, 39]);
-    assert_eq!(world_landmarks.shape(), &[1, 39 * 3]); // 3 values each
+    assert_eq!(world_landmarks.shape(), &[1, 39 * 3]); // 3 values each*/
 
     estimation.pose_presence = pose_flag.index([0, 0]).as_singular();
 

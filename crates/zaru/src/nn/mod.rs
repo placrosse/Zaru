@@ -153,10 +153,19 @@ pub enum CnnInputShape {
 /// Neural network loader.
 pub struct Loader<'a> {
     model_data: Cow<'a, [u8]>,
+    outputs: Option<Vec<usize>>,
     enable_gpu: bool,
 }
 
 impl<'a> Loader<'a> {
+    fn new(data: Cow<'a, [u8]>) -> Self {
+        Self {
+            model_data: data,
+            outputs: None,
+            enable_gpu: false,
+        }
+    }
+
     /// Instructs the neural network loader to enable GPU support for this network.
     ///
     /// If this method is called and the GPU backend does not support the network, [`Loader::load`]
@@ -169,13 +178,40 @@ impl<'a> Loader<'a> {
         self
     }
 
+    /// Only compute the specified outputs during inference.
+    ///
+    /// This takes a list of [`usize`]s corresponding to network output indices. When called, the
+    /// [`Outputs`] returned from [`NeuralNetwork::estimate`] will only contain the chosen output
+    /// tensors.
+    ///
+    /// # Example
+    ///
+    /// A network computes 5 output tensors by default: `A`, `B`, `C`, `D`, and `E`. We only want
+    /// `A`, `D`, and `E`, so we pass `[0, 3, 4]` to [`Loader::with_output_selection`]. The loaded
+    /// [`NeuralNetwork`] will now return 3 [`Tensor`]s in its [`Outputs`], corresponding to `A`,
+    /// `D`, and `E`.
+    pub fn with_output_selection<O>(mut self, outputs: O) -> Self
+    where
+        O: Into<Vec<usize>>,
+    {
+        self.outputs = Some(outputs.into());
+        self
+    }
+
     /// Loads and optimizes the network.
     ///
     /// Returns an error if the network data is malformed, if the network data is incomplete, or if
     /// the network uses unimplemented operations.
     pub fn load(self) -> anyhow::Result<NeuralNetwork> {
-        let graph = tract_onnx::onnx().model_for_read(&mut &*self.model_data)?;
-        let model = graph.into_optimized()?.into_runnable()?;
+        let graph = tract_onnx::onnx()
+            .model_for_read(&mut &*self.model_data)?
+            .into_optimized()?;
+        let outputs = graph.output_outlets()?;
+        let selected_outputs = match self.outputs {
+            Some(indices) => indices.iter().map(|&i| outputs[i]).collect::<Vec<_>>(),
+            None => outputs.to_vec(),
+        };
+        let model = SimplePlan::new_for_outputs(graph, &selected_outputs)?;
 
         let gpu = if self.enable_gpu {
             Some(pollster::block_on(wonnx::Session::from_bytes(
@@ -218,18 +254,12 @@ impl NeuralNetwork {
         }
 
         let model_data = std::fs::read(path)?;
-        Ok(Loader {
-            model_data: model_data.into(),
-            enable_gpu: false,
-        })
+        Ok(Loader::new(model_data.into()))
     }
 
     /// Loads a pre-trained model from an in-memory ONNX file.
     pub fn from_onnx(raw: &[u8]) -> anyhow::Result<Loader<'_>> {
-        Ok(Loader {
-            model_data: raw.into(),
-            enable_gpu: false,
-        })
+        Ok(Loader::new(raw.into()))
     }
 
     /// Returns the number of input nodes of the network.

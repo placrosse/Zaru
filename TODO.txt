@@ -2,15 +2,7 @@
 - "smart" MJPG decoding with backpressure
   - use a `WorkerSet` for decoding
   - if the `t_dequeue` time is near zero, we're bottlenecked on decoding or on the consumer
-- split crate to reduce build time
-  - zaru-image
-  - zaru-nn (CNN stuff needs zaru-image dep)
-  - zaru-cnn?
-  - zaru-filter
-  - zaru-video for animations, webcam and IP cam access?
-  - zaru-vision for landmarks, detections, and the MediaPipe solution ports?
 - rewrite the "UI" to be more fully featured
   - having an interactive thing that lets you configure any video/image source
     and apply tools to it would also be cool
-- port body landmarks to the new infra
 - remove the fast-but-wrong JPEG decoder after testing the tuned mozjpeg on the laptop
