@@ -13,5 +13,5 @@
   - having an interactive thing that lets you configure any video/image source
     and apply tools to it would also be cool
 - port body landmarks to the new infra
-- consolidate `Rect` and `BoundingRect` in the same f32-based type
 - remove the fast-but-wrong JPEG decoder after testing the tuned mozjpeg on the laptop
+- run clippy to detect redundant casts

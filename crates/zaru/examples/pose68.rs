@@ -49,7 +49,7 @@ fn main() -> anyhow::Result<()> {
                 y.to_degrees(),
             );
 
-            let [x, y, _] = lms.landmarks().average();
+            let [x, y, _] = lms.landmarks().average_position();
             draw::quaternion(&mut view, x as _, y as _, rot);
         }
         gui::show_image("facemarks", &image);

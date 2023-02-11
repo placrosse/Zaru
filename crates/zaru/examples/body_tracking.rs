@@ -3,11 +3,12 @@ use std::{env, iter, thread, time::Instant};
 use zaru::{
     body::{
         detection::{Keypoint, PoseNetwork},
-        landmark::{FullNetwork, Landmarker, LiteNetwork},
+        landmark::{FullNetwork, LiteNetwork},
     },
     detection::Detector,
     gui,
     image::{draw, Color, Image},
+    landmark::Estimator,
     num::TotalF32,
     rect::Rect,
     timer::FpsCounter,
@@ -52,9 +53,9 @@ fn main() -> anyhow::Result<()> {
 
     let mut detector = Detector::new(PoseNetwork);
     let mut landmarker = if USE_FULL_NETWORK {
-        Landmarker::new(FullNetwork)
+        Estimator::new(FullNetwork)
     } else {
-        Landmarker::new(LiteNetwork)
+        Estimator::new(LiteNetwork)
     };
 
     let mut fps = FpsCounter::new("body pose");
@@ -84,7 +85,7 @@ fn main() -> anyhow::Result<()> {
             .grow_rel(grow_by);
             draw::rect(&mut image, body_rect).color(Color::BLUE);
             let mut body_view = image.view_mut(body_rect);
-            let landmarks = landmarker.compute(&body_view);
+            let landmarks = landmarker.estimate(&body_view);
             landmarks.draw(&mut body_view);
         }
 

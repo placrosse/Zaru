@@ -116,11 +116,11 @@ impl LandmarkResult {
     pub fn rotation_radians(&self) -> f32 {
         let left_eye = self
             .landmarks()
-            .landmark(LandmarkIdx::LeftEyeOuterCorner as _)
+            .get(LandmarkIdx::LeftEyeOuterCorner as _)
             .position();
         let right_eye = self
             .landmarks()
-            .landmark(LandmarkIdx::RightEyeOuterCorner as _)
+            .get(LandmarkIdx::RightEyeOuterCorner as _)
             .position();
         let left_to_right_eye = Vector2::new(
             (right_eye[0] - left_eye[0]) as f32,
@@ -141,7 +141,7 @@ impl LandmarkResult {
             ]
             .into_iter()
             .map(|idx| {
-                let [x, y, ..] = self.landmarks().landmark(idx as usize).position();
+                let [x, y, ..] = self.landmarks().get(idx as usize).position();
                 (x, y)
             }),
         )
@@ -160,7 +160,7 @@ impl LandmarkResult {
             ]
             .into_iter()
             .map(|idx| {
-                let [x, y, ..] = self.landmarks().landmark(idx as usize).position();
+                let [x, y, ..] = self.landmarks().get(idx as usize).position();
                 (x, y)
             }),
         )
@@ -215,11 +215,11 @@ impl LandmarkResult {
 
         let left_eye = self
             .landmarks()
-            .landmark(LandmarkIdx::LeftEyeOuterCorner as _)
+            .get(LandmarkIdx::LeftEyeOuterCorner as _)
             .position();
         let right_eye = self
             .landmarks()
-            .landmark(LandmarkIdx::RightEyeOuterCorner as _)
+            .get(LandmarkIdx::RightEyeOuterCorner as _)
             .position();
         draw::line(image, left_eye[0], left_eye[1], right_eye[0], right_eye[1]).color(Color::WHITE);
         draw::text(

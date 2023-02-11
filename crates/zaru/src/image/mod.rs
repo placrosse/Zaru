@@ -147,14 +147,6 @@ impl Image {
         Rect::from_top_left(0.0, 0.0, self.width() as f32, self.height() as f32)
     }
 
-    /// Resizes this image to a new size, adding black bars to keep the original aspect ratio.
-    ///
-    /// For performance (as this runs on the CPU), this uses nearest neighbor interpolation, so the
-    /// result won't look very good, but it should suffice for most use cases.
-    pub fn aspect_aware_resize(&self, new_res: Resolution) -> Image {
-        self.as_view().aspect_aware_resize(new_res)
-    }
-
     /// Gets the image color at the given pixel coordinates.
     ///
     /// # Panics

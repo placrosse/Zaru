@@ -14,9 +14,11 @@ use crate::{
 
 type Position = [f32; 3];
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct Landmarks {
-    positions: Vec<Position>,
+    positions: Box<[Position]>,
+    visibility: Option<Box<[f32]>>,
+    presence: Option<Box<[f32]>>,
 }
 
 impl Landmarks {
@@ -25,7 +27,9 @@ impl Landmarks {
     /// All landmarks will start with all coordinates at `0.0`.
     pub fn new(len: usize) -> Self {
         Self {
-            positions: vec![[0.0, 0.0, 0.0]; len],
+            positions: vec![[0.0, 0.0, 0.0]; len].into_boxed_slice(),
+            visibility: None,
+            presence: None,
         }
     }
 
@@ -34,12 +38,28 @@ impl Landmarks {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = Landmark> + Clone + '_ {
-        self.positions.iter().map(|&pos| Landmark { pos })
+        (0..self.positions.len()).map(|i| self.get(i))
     }
 
-    pub fn landmark(&self, index: usize) -> Landmark {
-        Landmark {
-            pos: self.positions[index],
+    pub fn get(&self, index: usize) -> Landmark {
+        let mut lm = Landmark::new(self.positions[index]);
+        if let Some(vis) = &self.visibility {
+            lm = lm.with_visibility(vis[index]);
+        }
+        if let Some(pres) = &self.presence {
+            lm = lm.with_presence(pres[index]);
+        }
+        lm
+    }
+
+    pub fn set(&mut self, index: usize, landmark: Landmark) {
+        let len = self.positions.len();
+        self.positions[index] = landmark.pos;
+        if let Some(vis) = landmark.visibility {
+            self.visibility.get_or_insert_with(|| vec![0.0; len].into())[index] = vis;
+        }
+        if let Some(pres) = landmark.presence {
+            self.presence.get_or_insert_with(|| vec![0.0; len].into())[index] = pres;
         }
     }
 
@@ -51,7 +71,7 @@ impl Landmarks {
         &mut self.positions
     }
 
-    pub fn average(&self) -> Position {
+    pub fn average_position(&self) -> Position {
         let mut center = [0.0; 3];
         for pos in self.positions() {
             center[0] += pos[0] / self.positions().len() as f32;
@@ -59,14 +79,6 @@ impl Landmarks {
             center[2] += pos[2] / self.positions().len() as f32;
         }
         center
-    }
-
-    pub fn apply_offset(&mut self, offset: Position) {
-        for pos in self.positions_mut() {
-            pos[0] += offset[0];
-            pos[1] += offset[1];
-            pos[2] += offset[2];
-        }
     }
 
     pub fn map_positions(&mut self, mut f: impl FnMut(Position) -> Position) {
@@ -80,9 +92,33 @@ impl Landmarks {
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub struct Landmark {
     pos: [f32; 3],
+    visibility: Option<f32>,
+    presence: Option<f32>,
 }
 
 impl Landmark {
+    pub fn new(position: [f32; 3]) -> Self {
+        Self {
+            pos: position,
+            visibility: None,
+            presence: None,
+        }
+    }
+
+    pub fn with_visibility(self, visibility: f32) -> Self {
+        Self {
+            visibility: Some(visibility),
+            ..self
+        }
+    }
+
+    pub fn with_presence(self, presence: f32) -> Self {
+        Self {
+            presence: Some(presence),
+            ..self
+        }
+    }
+
     #[inline]
     pub fn position(&self) -> Position {
         self.pos
@@ -146,7 +182,7 @@ impl LandmarkFilter {
 
         Self {
             filter: Box::new(move |landmarks| {
-                for (lm, state) in zip_exact(&mut landmarks.positions, &mut states) {
+                for (lm, state) in zip_exact(&mut *landmarks.positions, &mut states) {
                     for (coord, state) in zip_exact(lm, state) {
                         *coord = filter.filter(state, *coord);
                     }
