@@ -226,7 +226,7 @@ impl<C: Classes> Detector<C> {
             // Map all coordinates from the network's input coordinate system to `rect`'s system.
             let (xc, yc) = det.rect.center();
             let [w, h] = [det.rect.width(), det.rect.height()];
-            det.rect = Rect::from_center(xc * scale, yc * scale, w, h);
+            det.rect = Rect::from_center(xc * scale, yc * scale, w * scale, h * scale);
             for kp in &mut det.keypoints {
                 kp.x *= scale;
                 kp.y *= scale;
