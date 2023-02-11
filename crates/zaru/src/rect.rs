@@ -48,12 +48,6 @@ impl Rect {
         Self::span_inner(*x.start(), *y.start(), *x.end(), *y.end())
     }
 
-    /// Creates a rectangle from two opposing corner points.
-    pub fn from_corners(top_left: (f32, f32), bottom_right: (f32, f32)) -> Self {
-        // TODO remove in favor of `bounding`
-        Self::bounding([top_left, bottom_right]).unwrap()
-    }
-
     /// Computes the (axis-aligned) bounding rectangle that encompasses `points`.
     ///
     /// Returns [`None`] if `points` is an empty iterator.
@@ -212,7 +206,7 @@ impl Rect {
         if x_min > x_max || y_min > y_max {
             return Rect::from_top_left(x_min, y_min, 0.0, 0.0);
         }
-        Rect::from_corners((x_min, y_min), (x_max, y_max))
+        Rect::bounding([(x_min, y_min), (x_max, y_max)]).unwrap()
     }
 
     fn intersection_area(&self, other: &Self) -> f32 {
@@ -583,23 +577,23 @@ mod tests {
     fn test_bounding() {
         assert_eq!(
             Rect::bounding([(0.0, 0.0), (1.0, 1.0), (-1.0, -1.0)]).unwrap(),
-            Rect::from_corners((-1.0, -1.0), (1.0, 1.0)),
+            Rect::from_center(0.0, 0.0, 2.0, 2.0),
         );
         assert_eq!(
             Rect::bounding([(1.0, 1.0), (-1.0, -1.0)]).unwrap(),
-            Rect::from_corners((-1.0, -1.0), (1.0, 1.0)),
+            Rect::from_center(0.0, 0.0, 2.0, 2.0),
         );
         assert_eq!(
             Rect::bounding([(-1.0, -1.0), (1.0, 1.0)]).unwrap(),
-            Rect::from_corners((-1.0, -1.0), (1.0, 1.0)),
+            Rect::from_center(0.0, 0.0, 2.0, 2.0),
         );
         assert_eq!(
             Rect::bounding([(1.0, 1.0), (2.0, 2.0)]).unwrap(),
-            Rect::from_corners((1.0, 1.0), (2.0, 2.0)),
+            Rect::from_center(1.5, 1.5, 1.0, 1.0),
         );
         assert_eq!(
             Rect::bounding([(0.0, 0.0), (10.0, 0.0)]).unwrap(),
-            Rect::from_top_left(0.0, 0.0, 10.0, 0.0),
+            Rect::from_center(5.0, 0.0, 10.0, 0.0),
         );
     }
 
