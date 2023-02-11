@@ -3,7 +3,7 @@
 //! This is a higher-level module that provides a self-contained hand tracking solution that will
 //! detect and track any number of hands, and compute landmarks for each one.
 
-use crate::image::{Image, RotatedRect};
+use crate::{image::Image, rect::RotatedRect};
 use pawawwewism::{promise, Promise, PromiseHandle, Worker};
 use std::{
     sync::{Arc, Mutex},

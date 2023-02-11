@@ -7,8 +7,9 @@ use zaru::{
     },
     detection::Detector,
     gui,
-    image::{draw, Color, Image, Rect},
+    image::{draw, Color, Image},
     num::TotalF32,
+    rect::Rect,
     timer::FpsCounter,
     video::{
         anim::Animation,

@@ -5,9 +5,9 @@
 //!
 //! [Face Detection]: https://google.github.io/mediapipe/solutions/face_detection
 
-use crate::image::{Rect, Resolution};
 use crate::nn::Outputs;
 use crate::num::sigmoid;
+use crate::{image::Resolution, rect::Rect};
 use include_blob::include_blob;
 use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;

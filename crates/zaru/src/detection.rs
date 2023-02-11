@@ -8,11 +8,9 @@ pub mod ssd;
 
 use std::{fmt::Debug, marker::PhantomData};
 
-use crate::image::{
-    draw, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Rect, Resolution,
-    RotatedRect,
-};
+use crate::image::{draw, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Resolution};
 use crate::nn::{Cnn, Outputs};
+use crate::rect::{Rect, RotatedRect};
 use crate::timer::Timer;
 
 use self::nms::NonMaxSuppression;
@@ -247,8 +245,8 @@ impl<C: Classes> Detector<C> {
 
 /// A detected object.
 ///
-/// A [`Detection`] consists of a [`BoundingRect`] enclosing the detected object, a confidence
-/// value, an optional rotation angle of the object, and a possibly empty set of located keypoints.
+/// A [`Detection`] consists of a [`Rect`] enclosing the detected object, a confidence value, an
+/// optional rotation angle of the object, and a possibly empty set of located keypoints.
 ///
 /// Per convention, the confidence value lies between 0.0 and 1.0, which can be achieved by passing
 /// the raw network output through [`crate::num::sigmoid`] (but the network documentation should be

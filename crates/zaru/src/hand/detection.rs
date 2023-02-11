@@ -1,8 +1,8 @@
 //! Palm detection.
 
-use crate::image::{Rect, Resolution};
 use crate::nn::Outputs;
 use crate::num::sigmoid;
+use crate::{image::Resolution, rect::Rect};
 use include_blob::include_blob;
 use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;

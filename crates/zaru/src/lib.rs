@@ -43,6 +43,7 @@ pub mod nn;
 pub mod num;
 pub mod pnp;
 pub mod procrustes;
+pub mod rect;
 pub mod slice;
 pub mod timer;
 pub mod video;

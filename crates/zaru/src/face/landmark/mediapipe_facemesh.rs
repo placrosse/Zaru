@@ -14,7 +14,8 @@ use itertools::Itertools;
 use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
-use crate::image::{draw, AsImageViewMut, Color, ImageViewMut, RotatedRect};
+use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
+use crate::rect::RotatedRect;
 use crate::{
     iter::zip_exact,
     num::{sigmoid, TotalF32},

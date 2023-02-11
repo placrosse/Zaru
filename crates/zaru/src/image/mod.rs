@@ -11,7 +11,6 @@
 mod blend;
 pub mod draw;
 mod jpeg;
-mod rect;
 mod resolution;
 
 #[cfg(test)]
@@ -23,8 +22,9 @@ use embedded_graphics::{pixelcolor::raw::RawU32, prelude::PixelColor};
 use image::{GenericImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
 
 pub use blend::*;
-pub use rect::*;
 pub use resolution::*;
+
+use crate::rect::{Rect, RotatedRect};
 
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]

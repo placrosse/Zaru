@@ -1,4 +1,7 @@
-//! TODO: just make them use floats already
+//! Rectangle types.
+//!
+//! These are used throughout the library for image manipulation, object detection, regions of
+//! interest, etc.
 
 use std::{cmp, fmt, ops::RangeInclusive};
 

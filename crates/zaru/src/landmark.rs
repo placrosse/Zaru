@@ -2,9 +2,10 @@
 
 use std::iter;
 
-use crate::image::{AsImageView, AspectRatio, ImageView, Resolution, RotatedRect};
+use crate::image::{AsImageView, AspectRatio, ImageView, Resolution};
 use crate::iter::zip_exact;
 
+use crate::rect::RotatedRect;
 use crate::{
     filter::Filter,
     nn::{Cnn, Outputs},
@@ -376,7 +377,7 @@ impl LandmarkTracker {
 
     /// Sets the region of interest.
     ///
-    /// This can be passed either a [`Rect`][crate::image::Rect] or a [`RotatedRect`].
+    /// This can be passed either a [`Rect`][crate::rect::Rect] or a [`RotatedRect`].
     ///
     /// Note that this does not apply RoI padding. The rectangle is used as-is.
     pub fn set_roi(&mut self, roi: impl Into<RotatedRect>) {

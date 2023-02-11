@@ -2,10 +2,11 @@
 
 use crate::nn::Outputs;
 use crate::num::sigmoid;
+use crate::rect::Rect;
 use include_blob::include_blob;
 use once_cell::sync::Lazy;
 
-use crate::image::{Rect, Resolution};
+use crate::image::Resolution;
 use crate::{
     detection::{
         ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
