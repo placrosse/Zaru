@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 
 use crate::{
     iter::zip_exact,
-    landmark::{Estimation, Landmarks, Network},
+    landmark::{Estimate, Landmarks, Network},
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
     slice::SliceExt,
 };
@@ -35,7 +35,7 @@ impl Default for LandmarkResult {
     }
 }
 
-impl Estimation for LandmarkResult {
+impl Estimate for LandmarkResult {
     fn landmarks_mut(&mut self) -> &mut Landmarks {
         &mut self.landmarks
     }
@@ -68,11 +68,11 @@ impl Network for PeppaFacialLandmark {
         &MODEL
     }
 
-    fn extract(&self, outputs: &Outputs, estimation: &mut Self::Output) {
+    fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
         let res = self.cnn().input_resolution();
         for (&[x, y], out) in zip_exact(
             outputs[0].index([0]).as_slice()[..NUM_LANDMARKS * 2].array_chunks_exact::<2>(),
-            estimation.landmarks.positions_mut(),
+            estimate.landmarks.positions_mut(),
         ) {
             out[0] = x * res.width() as f32;
             out[1] = y * res.height() as f32;
@@ -109,11 +109,11 @@ impl Network for FaceOnnx {
         &MODEL
     }
 
-    fn extract(&self, outputs: &Outputs, estimation: &mut Self::Output) {
+    fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
         let res = self.cnn().input_resolution();
         for (&[x, y], out) in zip_exact(
             outputs[0].index([0]).as_slice()[..NUM_LANDMARKS * 2].array_chunks_exact::<2>(),
-            estimation.landmarks.positions_mut(),
+            estimate.landmarks.positions_mut(),
         ) {
             out[0] = x * res.width() as f32;
             out[1] = y * res.height() as f32;

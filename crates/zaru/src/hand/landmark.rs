@@ -7,7 +7,7 @@ use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
 use crate::{
-    landmark::{Confidence, Estimation, Landmarks, Network},
+    landmark::{Confidence, Estimate, Landmarks, Network},
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
     slice::SliceExt,
 };
@@ -162,7 +162,7 @@ impl LandmarkResult {
     }
 }
 
-impl Estimation for LandmarkResult {
+impl Estimate for LandmarkResult {
     fn landmarks_mut(&mut self) -> &mut Landmarks {
         &mut self.landmarks
     }
@@ -294,8 +294,8 @@ impl Network for LiteNetwork {
         &MODEL
     }
 
-    fn extract(&self, outputs: &Outputs, estimation: &mut Self::Output) {
-        extract(outputs, estimation);
+    fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
+        extract(outputs, estimate);
     }
 }
 
@@ -324,12 +324,12 @@ impl Network for FullNetwork {
         &MODEL
     }
 
-    fn extract(&self, outputs: &Outputs, estimation: &mut Self::Output) {
-        extract(outputs, estimation);
+    fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
+        extract(outputs, estimate);
     }
 }
 
-fn extract(outputs: &Outputs, estimation: &mut LandmarkResult) {
+fn extract(outputs: &Outputs, estimate: &mut LandmarkResult) {
     let screen_landmarks = &outputs[0];
     let presence_flag = &outputs[1];
     let handedness = &outputs[2];
@@ -340,14 +340,14 @@ fn extract(outputs: &Outputs, estimation: &mut LandmarkResult) {
     assert_eq!(handedness.shape(), &[1, 1]);
     assert_eq!(metric_landmarks.shape(), &[1, 63]);
 
-    estimation.presence = presence_flag.index([0, 0]).as_singular();
-    estimation.raw_handedness = handedness.index([0, 0]).as_singular();
+    estimate.presence = presence_flag.index([0, 0]).as_singular();
+    estimate.raw_handedness = handedness.index([0, 0]).as_singular();
     for (&[x, y, z], out) in zip_exact(
         screen_landmarks
             .index([0])
             .as_slice()
             .array_chunks_exact::<3>(),
-        estimation.landmarks.positions_mut(),
+        estimate.landmarks.positions_mut(),
     ) {
         out[0] = x;
         out[1] = y;

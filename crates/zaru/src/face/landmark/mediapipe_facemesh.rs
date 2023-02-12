@@ -57,14 +57,14 @@ impl landmark::Network for MediaPipeFaceMesh {
         &MODEL
     }
 
-    fn extract(&self, output: &Outputs, estimation: &mut Self::Output) {
-        estimation.face_flag = sigmoid(output[1].index([0, 0, 0, 0]).as_singular());
+    fn extract(&self, output: &Outputs, estimate: &mut Self::Output) {
+        estimate.face_flag = sigmoid(output[1].index([0, 0, 0, 0]).as_singular());
         for (&[x, y, z], out) in zip_exact(
             output[0]
                 .index([0, 0, 0])
                 .as_slice()
                 .array_chunks_exact::<3>(),
-            estimation.landmarks.positions_mut(),
+            estimate.landmarks.positions_mut(),
         ) {
             out[0] = x;
             out[1] = y;
@@ -231,7 +231,7 @@ impl LandmarkResult {
     }
 }
 
-impl landmark::Estimation for LandmarkResult {
+impl landmark::Estimate for LandmarkResult {
     fn landmarks_mut(&mut self) -> &mut Landmarks {
         &mut self.landmarks
     }

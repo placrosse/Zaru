@@ -12,7 +12,7 @@ use crate::image::{draw, AsImageViewMut, Color, ImageViewMut, Resolution};
 use crate::iter::zip_exact;
 
 use crate::{
-    landmark::{Estimation, Landmarks, Network},
+    landmark::{Estimate, Landmarks, Network},
     nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
     slice::SliceExt,
 };
@@ -45,13 +45,13 @@ impl Network for EyeNetwork {
         &MODEL
     }
 
-    fn extract(&self, outputs: &Outputs, estimation: &mut Self::Output) {
+    fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
         let eye_contour = &outputs[0];
         let iris_contour = &outputs[1];
 
         for (&[x, y, z], [out_x, out_y, out_z]) in zip_exact(
             eye_contour.index([0]).as_slice().array_chunks_exact::<3>(), // x, y, and z coordinates
-            estimation.landmarks.positions_mut()[5..].iter_mut(),
+            estimate.landmarks.positions_mut()[5..].iter_mut(),
         ) {
             *out_x = x;
             *out_y = y;
@@ -60,7 +60,7 @@ impl Network for EyeNetwork {
 
         for (&[x, y, z], [out_x, out_y, out_z]) in zip_exact(
             iris_contour.index([0]).as_slice().array_chunks_exact::<3>(), // x, y, and z coordinates
-            estimation.landmarks.positions_mut()[..5].iter_mut(),
+            estimate.landmarks.positions_mut()[..5].iter_mut(),
         ) {
             *out_x = x;
             *out_y = y;
@@ -150,7 +150,7 @@ impl EyeLandmarks {
     }
 }
 
-impl Estimation for EyeLandmarks {
+impl Estimate for EyeLandmarks {
     fn landmarks_mut(&mut self) -> &mut Landmarks {
         &mut self.landmarks
     }

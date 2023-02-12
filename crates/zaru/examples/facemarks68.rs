@@ -8,7 +8,7 @@ use zaru::{
     },
     gui,
     image::{draw, Color},
-    landmark::{Estimation, Estimator, Network},
+    landmark::{Estimate, Estimator, Network},
     timer::FpsCounter,
     video::webcam::{Webcam, WebcamOptions},
 };

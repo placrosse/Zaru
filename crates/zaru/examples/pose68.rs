@@ -12,7 +12,7 @@ use zaru::{
     },
     gui,
     image::{draw, Color},
-    landmark::{Estimation, Estimator},
+    landmark::{Estimate, Estimator},
     pnp,
     video::webcam::{Webcam, WebcamOptions},
 };

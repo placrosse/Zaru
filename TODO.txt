@@ -6,4 +6,3 @@
   - having an interactive thing that lets you configure any video/image source
     and apply tools to it would also be cool
 - remove the fast-but-wrong JPEG decoder after testing the tuned mozjpeg on the laptop
-- terminology: "estimation" sounds like the process of estimating, "estimate" sounds more like the output

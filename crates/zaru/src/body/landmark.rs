@@ -1,7 +1,7 @@
 //! Body pose landmark prediction. Not yet fully implemented.
 
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
-use crate::landmark::{Confidence, Estimation, Landmark, Landmarks, Network};
+use crate::landmark::{Confidence, Estimate, Landmark, Landmarks, Network};
 use crate::nn::Outputs;
 use crate::num::sigmoid;
 use include_blob::include_blob;
@@ -27,7 +27,7 @@ impl Default for LandmarkResult {
     }
 }
 
-impl Estimation for LandmarkResult {
+impl Estimate for LandmarkResult {
     #[inline]
     fn landmarks_mut(&mut self) -> &mut Landmarks {
         &mut self.landmarks
@@ -158,8 +158,8 @@ impl Network for LiteNetwork {
         &MODEL
     }
 
-    fn extract(&self, outputs: &Outputs, estimation: &mut Self::Output) {
-        extract(outputs, estimation);
+    fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
+        extract(outputs, estimate);
     }
 }
 
@@ -186,15 +186,15 @@ impl Network for FullNetwork {
         &MODEL
     }
 
-    fn extract(&self, outputs: &Outputs, estimation: &mut Self::Output) {
-        extract(outputs, estimation);
+    fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
+        extract(outputs, estimate);
     }
 }
 
 // NB: There's also a "heavy" network, but it's >25 MB, so we don't support it. The full network
 // should already perform pretty well.
 
-fn extract(outputs: &Outputs, estimation: &mut LandmarkResult) {
+fn extract(outputs: &Outputs, estimate: &mut LandmarkResult) {
     let screen_landmarks = &outputs[0];
     let pose_flag = &outputs[1];
 
@@ -210,7 +210,7 @@ fn extract(outputs: &Outputs, estimation: &mut LandmarkResult) {
     assert_eq!(heatmap.shape(), &[1, 64, 64, 39]);
     assert_eq!(world_landmarks.shape(), &[1, 39 * 3]); // 3 values each*/
 
-    estimation.pose_presence = pose_flag.index([0, 0]).as_singular();
+    estimate.pose_presence = pose_flag.index([0, 0]).as_singular();
 
     for (i, &[x, y, z, visibility, presence]) in screen_landmarks
         .index([0])
@@ -218,7 +218,7 @@ fn extract(outputs: &Outputs, estimation: &mut LandmarkResult) {
         .array_chunks_exact::<5>()
         .enumerate()
     {
-        estimation.landmarks.set(
+        estimate.landmarks.set(
             i,
             Landmark::new([x, y, z])
                 .with_visibility(sigmoid(visibility))

@@ -65,7 +65,7 @@ fn main() -> anyhow::Result<()> {
         let mut image = result?;
 
         if let Some(result) = tracker.track(&image) {
-            result.estimation().draw(&mut image);
+            result.estimate().draw(&mut image);
         } else {
             // Tracking lost, run detection.
 

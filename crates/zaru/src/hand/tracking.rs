@@ -169,7 +169,7 @@ impl HandTracker {
                         Some(res) => {
                             *roi_arc2.lock().unwrap() = res.updated_roi();
 
-                            let lm = res.estimation().clone();
+                            let lm = res.estimate().clone();
                             promise.fulfill(Some(lm));
                         }
                         None => {
