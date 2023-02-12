@@ -229,10 +229,10 @@ impl Rect {
             && self.y() + self.height() >= y
     }
 
-    pub fn corners(&self) -> [(f32, f32); 4] {
-        let (x, y) = (self.x(), self.y());
-        let (w, h) = (self.width(), self.height());
-        [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+    pub fn corners(&self) -> [[f32; 2]; 4] {
+        let [x, y] = [self.x(), self.y()];
+        let [w, h] = [self.width(), self.height()];
+        [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]
     }
 }
 
@@ -383,17 +383,17 @@ impl RotatedRect {
     /// The order is: top-left, top-right, bottom-right, bottom-left, as seen from the non-rotated
     /// rect: after the rotation is applied, the corners can be rotated anywhere else, but the order
     /// is retained.
-    pub fn rotated_corners(&self) -> [(f32, f32); 4] {
+    pub fn rotated_corners(&self) -> [[f32; 2]; 4] {
         let corners = self.rect.corners();
 
         let rotation = Rotation2::new(self.radians);
         let center = Point2::from(self.rect.center());
-        corners.map(|(x, y)| {
+        corners.map(|[x, y]| {
             let point = Point2::new(x, y);
             let rel = point - center;
             let rot = rotation * rel;
             let abs = center + rot;
-            (abs.x, abs.y)
+            [abs.x, abs.y]
         })
     }
 

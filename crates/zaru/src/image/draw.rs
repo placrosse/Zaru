@@ -41,7 +41,7 @@ impl DrawRect<'_> {
 impl Drop for DrawRect<'_> {
     fn drop(&mut self) {
         let corners = self.rect.corners();
-        for ((x1, y1), (x2, y2)) in corners.into_iter().circular_tuple_windows().take(4) {
+        for ([x1, y1], [x2, y2]) in corners.into_iter().circular_tuple_windows().take(4) {
             line(&mut self.image, x1, y1, x2, y2)
                 .color(self.color)
                 .stroke_width(self.stroke_width);
@@ -77,7 +77,7 @@ impl<'a> DrawRotatedRect<'a> {
 impl<'a> Drop for DrawRotatedRect<'a> {
     fn drop(&mut self) {
         let corners = self.rect.rotated_corners();
-        for ((x1, y1), (x2, y2)) in corners.into_iter().circular_tuple_windows().take(4) {
+        for ([x1, y1], [x2, y2]) in corners.into_iter().circular_tuple_windows().take(4) {
             line(&mut self.image, x1, y1, x2, y2)
                 .color(self.color)
                 .stroke_width(self.stroke_width);
