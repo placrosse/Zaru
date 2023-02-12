@@ -39,7 +39,10 @@ enum JpegBackend {
     FastButWrong,
 }
 
-const DEFAULT_VAAPI: VaApi = VaApi::On;
+/// Turned off by default, because VA-API does not work at all on Mesa/AMD, and on Intel the
+/// performance is too unpredictable (10-50ms for a 4K image) to be even remotely usable.
+const DEFAULT_VAAPI: VaApi = VaApi::Off;
+
 const DEFAULT_BACKEND: JpegBackend = JpegBackend::MozJpeg;
 
 static USE_VAAPI: Lazy<VaApi> = Lazy::new(|| match env::var("ZARU_JPEG_VAAPI") {

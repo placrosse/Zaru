@@ -66,10 +66,8 @@ pub fn init_logger(calling_crate: &'static str) {
 
 /// Initializes logging to *stderr*.
 ///
-/// If `cfg!(debug_assertions)` is enabled, the calling crate and Zaru will log at *trace* level.
-/// Otherwise, they will log at *debug* level.
-///
-/// `wgpu` will always log at *warn* level.
+/// By default, the calling crate and Zaru will log at *debug* level. Additionally, some internal
+/// crates may be configured to log warnings and errors.
 ///
 /// If a global logger is already registered, this macro will do nothing.
 #[macro_export]
