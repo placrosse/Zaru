@@ -177,8 +177,8 @@ impl Rect {
         self.w * self.h
     }
 
-    pub fn center(&self) -> (f32, f32) {
-        (self.xc, self.yc)
+    pub fn center(&self) -> [f32; 2] {
+        [self.xc, self.yc]
     }
 
     #[must_use]
@@ -347,7 +347,15 @@ impl RotatedRect {
         self
     }
 
-    pub fn center(&self) -> (f32, f32) {
+    pub fn x_center(&self) -> f32 {
+        self.rect.x_center()
+    }
+
+    pub fn y_center(&self) -> f32 {
+        self.rect.y_center()
+    }
+
+    pub fn center(&self) -> [f32; 2] {
         self.rect.center()
     }
 
@@ -379,8 +387,7 @@ impl RotatedRect {
         let corners = self.rect.corners();
 
         let rotation = Rotation2::new(self.radians);
-        let (cx, cy) = self.rect.center();
-        let center = Point2::new(cx, cy);
+        let center = Point2::from(self.rect.center());
         corners.map(|(x, y)| {
             let point = Point2::new(x, y);
             let rel = point - center;
