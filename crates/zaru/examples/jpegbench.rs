@@ -14,12 +14,13 @@ fn main() -> anyhow::Result<()> {
             bail!("usage: jpegbench <file>");
         }
     };
-    let timer = Timer::new("decode");
+    let t_decode = Timer::new("decode");
+    let t_display = Timer::new("display");
     let mut fps = FpsCounter::new("image");
     loop {
-        let image = timer.time(|| Image::decode_jpeg(&image))?;
-        fps.tick_with([&timer]);
+        let image = t_decode.time(|| Image::decode_jpeg(&image))?;
+        t_display.time(|| gui::show_image("jpegbench", &image));
 
-        gui::show_image("jpegbench", &image);
+        fps.tick_with([&t_decode, &t_display]);
     }
 }
