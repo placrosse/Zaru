@@ -1,4 +1,5 @@
 - unify webcams, IP cameras, and animations behind a single video streaming interface
+  - allow creation of a video stream using a unified syntax (URI?), port all examples over
 - "smart" MJPG decoding with backpressure
   - use a `WorkerSet` for decoding
   - if the `t_dequeue` time is near zero, we're bottlenecked on decoding or on the consumer

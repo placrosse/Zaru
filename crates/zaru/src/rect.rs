@@ -197,20 +197,20 @@ impl Rect {
 
     /// Computes the intersection of `self` and `other`.
     ///
-    /// Returns `None` when the intersection is empty (ie. the rectangles do not overlap).
-    pub fn intersection(&self, other: &Rect) -> Rect {
+    /// Returns [`None`] when the intersection is empty (ie. the rectangles do not overlap).
+    pub fn intersection(&self, other: &Rect) -> Option<Rect> {
         let x_min = self.x().max(other.x());
         let y_min = self.y().max(other.y());
         let x_max = (self.x() + self.width()).min(other.x() + other.width());
         let y_max = (self.y() + self.height()).min(other.y() + other.height());
         if x_min > x_max || y_min > y_max {
-            return Rect::from_top_left(x_min, y_min, 0.0, 0.0);
+            return None;
         }
-        Rect::bounding([(x_min, y_min), (x_max, y_max)]).unwrap()
+        Some(Rect::bounding([(x_min, y_min), (x_max, y_max)]).unwrap())
     }
 
     fn intersection_area(&self, other: &Self) -> f32 {
-        self.intersection(other).area()
+        self.intersection(other).map_or(0.0, |rect| rect.area())
     }
 
     fn union_area(&self, other: &Self) -> f32 {
@@ -519,17 +519,16 @@ mod tests {
         assert_eq!(
             Rect::from_ranges(0.0..=10.0, 0.0..=10.0)
                 .intersection(&Rect::from_ranges(5.0..=5.0, 5.0..=5.0)),
-            Rect::from_ranges(5.0..=5.0, 5.0..=5.0)
+            Some(Rect::from_ranges(5.0..=5.0, 5.0..=5.0))
         );
         assert_eq!(
             Rect::from_ranges(5.0..=5.0, 5.0..=5.0)
                 .intersection(&Rect::from_ranges(0.0..=10.0, 0.0..=10.0)),
-            Rect::from_ranges(5.0..=5.0, 5.0..=5.0)
+            Some(Rect::from_ranges(5.0..=5.0, 5.0..=5.0))
         );
         assert_eq!(
             Rect::from_ranges(5.0..=5.0, 5.0..=5.0)
-                .intersection(&Rect::from_ranges(6.0..=10.0, 0.0..=10.0))
-                .area(),
+                .intersection_area(&Rect::from_ranges(6.0..=10.0, 0.0..=10.0)),
             0.0,
         );
     }
@@ -542,7 +541,7 @@ mod tests {
         let also_zero = Rect::from_center(1.0, 0.0, 0.0, 0.0);
         assert_eq!(also_zero.area(), 0.0);
 
-        assert_eq!(zero.intersection(&also_zero).area(), 0.0);
+        assert_eq!(zero.intersection_area(&also_zero), 0.0);
         assert_eq!(zero.union_area(&also_zero), 0.0);
     }
 
@@ -555,7 +554,7 @@ mod tests {
         assert_eq!(smaller.area(), 1.0);
         assert_eq!(bigger.area(), 4.0);
 
-        let intersection = smaller.intersection(&bigger);
+        let intersection = smaller.intersection(&bigger).unwrap();
         assert_eq!(intersection.xc, smaller.xc);
         assert_eq!(intersection.yc, smaller.yc);
         assert_eq!(intersection.w, smaller.w);

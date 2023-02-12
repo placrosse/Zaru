@@ -28,6 +28,11 @@ static MODEL: Lazy<Cnn> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Body pose detection network.
+///
+/// Use with [`Detector`](crate::detection::Detector).
+///
+/// This network detects human bodies and computes several keypoints documented in [`Keypoint`].
 pub struct PoseNetwork;
 
 impl Network for PoseNetwork {
@@ -121,6 +126,9 @@ fn extract_detection(
     )
 }
 
+/// Keypoints estimated by the detection network.
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Keypoint {
     Hips = 0,
 }
