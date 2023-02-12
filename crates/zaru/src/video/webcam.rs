@@ -9,7 +9,7 @@ use crate::image::{Image, Resolution};
 use crate::timer::Timer;
 use anyhow::bail;
 use linuxvideo::{
-    format::{FrameIntervals, FrameSizes, PixFormat, Pixelformat},
+    format::{FrameIntervals, FrameSizes, PixFormat, PixelFormat},
     stream::ReadStream,
     BufType, CapabilityFlags, Device, Fract,
 };
@@ -103,8 +103,9 @@ fn negotiate_format(device: &Device, mut prefs: FramePrefs) -> anyhow::Result<(P
     let mut pixel_format = None;
     for format in device.formats(BufType::VIDEO_CAPTURE) {
         let format = format?;
-        if format.pixelformat() == Pixelformat::JPEG || format.pixelformat() == Pixelformat::MJPG {
-            pixel_format = Some(format.pixelformat());
+        if format.pixel_format() == PixelFormat::JPEG || format.pixel_format() == PixelFormat::MJPG
+        {
+            pixel_format = Some(format.pixel_format());
             break;
         }
     }
@@ -274,7 +275,7 @@ impl Webcam {
             1.0 / actual.as_f32(),
         );
 
-        let stream = capture.into_stream(2)?;
+        let stream = capture.into_stream()?;
 
         Ok(Some(Self {
             stream,
