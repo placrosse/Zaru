@@ -150,6 +150,7 @@ fn decode_jpeg_vaapi(jpeg: &[u8]) -> anyhow::Result<Image> {
                         }
 
                         log::debug!("using VA-API for JPEG decoding (vendor string: {vendor})");
+                        log::debug!("(set ZARU_JPEG_VAAPI=0 to disable)");
                         Some(display)
                     }
                     Err(e) => {
@@ -179,6 +180,11 @@ fn decode_jpeg_vaapi(jpeg: &[u8]) -> anyhow::Result<Image> {
         let sess = match &mut *cache {
             Some((i, sess)) if i.height() == info.height() || i.width() == info.width() => sess,
             _ => {
+                log::debug!(
+                    "creating new JPEG decode session for {}x{} images",
+                    info.width(),
+                    info.height()
+                );
                 let session = JpegDecodeSession::new(display, info.width(), info.height())?;
                 &mut cache.insert((info, session)).1
             }
