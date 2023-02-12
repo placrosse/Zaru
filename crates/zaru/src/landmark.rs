@@ -480,7 +480,7 @@ impl<E: Estimate + Confidence> LandmarkTracker<E> {
 
         let updated_roi = RotatedRect::bounding(
             angle,
-            estimate.landmarks_mut().iter().map(|lm| (lm.x(), lm.y())),
+            estimate.landmarks_mut().iter().map(|lm| [lm.x(), lm.y()]),
         )
         .unwrap();
 

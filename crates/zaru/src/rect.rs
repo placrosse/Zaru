@@ -51,13 +51,13 @@ impl Rect {
     /// Computes the (axis-aligned) bounding rectangle that encompasses `points`.
     ///
     /// Returns [`None`] if `points` is an empty iterator.
-    pub fn bounding<I: IntoIterator<Item = (f32, f32)>>(points: I) -> Option<Self> {
+    pub fn bounding<I: IntoIterator<Item = [f32; 2]>>(points: I) -> Option<Self> {
         let mut iter = points.into_iter();
 
-        let (x, y) = iter.next()?;
-        let (mut x_min, mut x_max, mut y_min, mut y_max) = (x, x, y, y);
+        let [x, y] = iter.next()?;
+        let [mut x_min, mut x_max, mut y_min, mut y_max] = [x, x, y, y];
 
-        for (x, y) in iter {
+        for [x, y] in iter {
             x_min = f32::min(x_min, x);
             x_max = f32::max(x_max, x);
             y_min = f32::min(y_min, y);
@@ -206,7 +206,7 @@ impl Rect {
         if x_min > x_max || y_min > y_max {
             return None;
         }
-        Some(Rect::bounding([(x_min, y_min), (x_max, y_max)]).unwrap())
+        Some(Rect::bounding([[x_min, y_min], [x_max, y_max]]).unwrap())
     }
 
     fn intersection_area(&self, other: &Self) -> f32 {
@@ -273,7 +273,7 @@ impl RotatedRect {
     /// Approximates the rotated bounding rectangle that encompasses `points`.
     ///
     /// Returns `None` if `points` is an empty iterator.
-    pub fn bounding<I: IntoIterator<Item = (f32, f32)>>(radians: f32, points: I) -> Option<Self> {
+    pub fn bounding<I: IntoIterator<Item = [f32; 2]>>(radians: f32, points: I) -> Option<Self> {
         let mut points = points.into_iter().peekable();
 
         // Make sure we have at least 1 point.
@@ -290,7 +290,7 @@ impl RotatedRect {
         let mut x_max = f32::MIN;
         let mut y_min = f32::MAX;
         let mut y_max = f32::MIN;
-        for (x, y) in points {
+        for [x, y] in points {
             let [x, y] = [
                 x * (-radians).cos() - y * (-radians).sin(),
                 x * (-radians).sin() + y * (-radians).cos(),
@@ -582,23 +582,23 @@ mod tests {
     #[test]
     fn test_bounding() {
         assert_eq!(
-            Rect::bounding([(0.0, 0.0), (1.0, 1.0), (-1.0, -1.0)]).unwrap(),
+            Rect::bounding([[0.0, 0.0], [1.0, 1.0], [-1.0, -1.0]]).unwrap(),
             Rect::from_center(0.0, 0.0, 2.0, 2.0),
         );
         assert_eq!(
-            Rect::bounding([(1.0, 1.0), (-1.0, -1.0)]).unwrap(),
+            Rect::bounding([[1.0, 1.0], [-1.0, -1.0]]).unwrap(),
             Rect::from_center(0.0, 0.0, 2.0, 2.0),
         );
         assert_eq!(
-            Rect::bounding([(-1.0, -1.0), (1.0, 1.0)]).unwrap(),
+            Rect::bounding([[-1.0, -1.0], [1.0, 1.0]]).unwrap(),
             Rect::from_center(0.0, 0.0, 2.0, 2.0),
         );
         assert_eq!(
-            Rect::bounding([(1.0, 1.0), (2.0, 2.0)]).unwrap(),
+            Rect::bounding([[1.0, 1.0], [2.0, 2.0]]).unwrap(),
             Rect::from_center(1.5, 1.5, 1.0, 1.0),
         );
         assert_eq!(
-            Rect::bounding([(0.0, 0.0), (10.0, 0.0)]).unwrap(),
+            Rect::bounding([[0.0, 0.0], [10.0, 0.0]]).unwrap(),
             Rect::from_center(5.0, 0.0, 10.0, 0.0),
         );
     }
@@ -714,7 +714,7 @@ mod tests {
     #[test]
     fn test_rotated_rect_bounding() {
         #[track_caller]
-        fn bounding<I: IntoIterator<Item = (f32, f32)>>(radians: f32, points: I) -> RotatedRect
+        fn bounding<I: IntoIterator<Item = [f32; 2]>>(radians: f32, points: I) -> RotatedRect
         where
             I::IntoIter: Clone,
         {
@@ -722,7 +722,7 @@ mod tests {
             let rect = RotatedRect::bounding(radians, points.clone()).unwrap();
 
             let dilated = rect.map(|rect| rect.grow_rel(0.005));
-            for (x, y) in points {
+            for [x, y] in points {
                 assert!(
                     dilated.contains_point(x, y),
                     "{dilated:?} does not contain {x},{y}"
@@ -735,25 +735,25 @@ mod tests {
         assert!(RotatedRect::bounding(0.0, []).is_none());
 
         assert_eq!(
-            bounding(0.0, [(0.0, 0.0), (1.0, 1.0)]),
+            bounding(0.0, [[0.0, 0.0], [1.0, 1.0]]),
             Rect::from_top_left(0.0, 0.0, 1.0, 1.0).into(),
         );
         assert_eq!(
-            bounding(0.0, [(0.0, 0.0), (10.0, 0.0)]),
+            bounding(0.0, [[0.0, 0.0], [10.0, 0.0]]),
             Rect::from_top_left(0.0, 0.0, 10.0, 0.0).into(),
         );
         assert_relative_eq!(
-            bounding(TAU / 2.0, [(0.0, 0.0), (1.0, 1.0)]),
+            bounding(TAU / 2.0, [[0.0, 0.0], [1.0, 1.0]]),
             RotatedRect::new(Rect::from_top_left(0.0, 0.0, 1.0, 1.0), TAU / 2.0),
             epsilon = 1e-7,
         );
         assert_relative_eq!(
-            bounding(TAU / 4.0, [(0.0, 0.0), (1.0, 1.0)]),
+            bounding(TAU / 4.0, [[0.0, 0.0], [1.0, 1.0]]),
             RotatedRect::new(Rect::from_top_left(0.0, 0.0, 1.0, 1.0), TAU / 4.0),
             epsilon = 1e-7,
         );
         assert_eq!(
-            bounding(TAU / 4.0, [(0.0, 0.0), (9.0, 9.0)]),
+            bounding(TAU / 4.0, [[0.0, 0.0], [9.0, 9.0]]),
             RotatedRect::new(Rect::from_top_left(0.0, 0.0, 9.0, 9.0), TAU / 4.0),
         );
     }

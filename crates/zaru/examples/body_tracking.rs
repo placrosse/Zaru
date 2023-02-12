@@ -82,7 +82,7 @@ fn main() -> anyhow::Result<()> {
                 let hips = detection.keypoints()[Keypoint::Hips as usize];
                 let grow_by = 0.15;
                 let body_rect =
-                    Rect::bounding(detection.keypoints().iter().map(|kp| (kp.x(), kp.y())))
+                    Rect::bounding(detection.keypoints().iter().map(|kp| [kp.x(), kp.y()]))
                         .unwrap()
                         .grow_move_center(hips.x(), hips.y())
                         .grow_rel(grow_by);

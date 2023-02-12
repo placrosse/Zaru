@@ -126,12 +126,12 @@ fn rotated_views() {
 fn view() {
     let image = mkimage([[C::RED, C::GREEN]]);
 
-    let view = image.view(Rect::bounding([(1.0, 0.0), (2.0, 1.0)]).unwrap());
+    let view = image.view(Rect::bounding([[1.0, 0.0], [2.0, 1.0]]).unwrap());
     assert_eq!(view.width(), 1);
     assert_eq!(view.height(), 1);
     assert_eq!(view.get(0, 0), C::GREEN);
 
-    let view = image.view(Rect::bounding([(1.0, 0.0), (100.0, 100.0)]).unwrap());
+    let view = image.view(Rect::bounding([[1.0, 0.0], [100.0, 100.0]]).unwrap());
     assert_eq!(view.width(), 99);
     assert_eq!(view.height(), 100);
     assert_eq!(view.get(0, 0), C::GREEN);
