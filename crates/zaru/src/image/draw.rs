@@ -403,7 +403,10 @@ struct Target<'a>(ImageViewMut<'a>);
 
 impl Dimensions for Target<'_> {
     fn bounding_box(&self) -> Rectangle {
-        let (width, height) = (self.0.width(), self.0.height());
+        let (width, height) = (
+            self.0.rect().width().ceil() as u32,
+            self.0.rect().height().ceil() as u32,
+        );
 
         Rectangle {
             top_left: Point { x: 0, y: 0 },
@@ -424,9 +427,9 @@ impl DrawTarget for Target<'_> {
         for pixel in pixels {
             let rgb = pixel.1 .0;
             if pixel.0.x >= 0
-                && (pixel.0.x as u32) < self.0.width()
+                && (pixel.0.x as u32) < self.0.rect().width().ceil() as u32
                 && pixel.0.y >= 0
-                && (pixel.0.y as u32) < self.0.height()
+                && (pixel.0.y as u32) < self.0.rect().height().ceil() as u32
             {
                 self.0.set(pixel.0.x as _, pixel.0.y as _, Color(rgb));
             }

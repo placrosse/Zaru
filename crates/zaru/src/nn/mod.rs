@@ -43,8 +43,8 @@ impl Cnn {
         let (h, w) = (input_res.height() as usize, input_res.width() as usize);
 
         fn sample(view: &ImageView<'_>, u: f32, v: f32) -> Color {
-            let x = (u * view.resolution().width() as f32).round() as u32;
-            let y = (v * view.resolution().height() as f32).round() as u32;
+            let x = (u * view.rect().width()).round() as u32;
+            let y = (v * view.rect().height()).round() as u32;
             view.get(x, y)
         }
 

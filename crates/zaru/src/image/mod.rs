@@ -79,6 +79,11 @@ impl Image {
         jpeg::decode_jpeg(data)
     }
 
+    /// Creates an [`Image`] from raw, preexisting RGBA pixel data.
+    ///
+    /// `buf` needs to contain data in the following interleaved pixel format:
+    /// `rrrrrrrr gggggggg bbbbbbbb aaaaaaaa`. Its length needs to be exactly `width * height * 4`,
+    /// or this function will panic.
     pub fn from_rgba8(res: Resolution, buf: &[u8]) -> Self {
         let expected_size = res.width() as usize * res.height() as usize * 4;
         assert_eq!(
@@ -282,11 +287,15 @@ impl<'a> ImageView<'a> {
             type Pixel = Rgba<u8>;
 
             fn dimensions(&self) -> (u32, u32) {
-                (self.0.width(), self.0.height())
+                (
+                    self.0.rect().width().ceil() as u32,
+                    self.0.rect().height().ceil() as u32,
+                )
             }
 
             fn bounds(&self) -> (u32, u32, u32, u32) {
-                (0, 0, self.0.width(), self.0.height())
+                let (w, h) = self.dimensions();
+                (0, 0, w, h)
             }
 
             fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
@@ -297,25 +306,10 @@ impl<'a> ImageView<'a> {
         Wrapper(*self)
     }
 
-    /// Returns the width of this view, in pixels.
-    pub fn width(&self) -> u32 {
-        self.data.width() as u32
-    }
-
-    /// Returns the height of this view, in pixels.
-    pub fn height(&self) -> u32 {
-        self.data.height() as u32
-    }
-
-    /// Returns the size of this view.
-    #[inline]
-    pub fn resolution(&self) -> Resolution {
-        Resolution::new(self.width(), self.height())
-    }
-
     /// Returns a [`Rect`] of the size of this view.
     ///
-    /// The rectangle will be positioned at `(0, 0)` and have the width and height of the view.
+    /// The rectangle will be positioned at `(0, 0)` and have the width and height of the view. Note
+    /// that view sizes are allowed to be fractional.
     #[inline]
     pub fn rect(&self) -> Rect {
         self.data.rect()
@@ -358,8 +352,15 @@ impl<'a> ImageView<'a> {
     }
 
     /// Copies the contents of this view into a new [`Image`].
+    ///
+    /// The returned [`Image`] will have the size of `self`. If the width or height of `self` is not
+    /// an integer, it is rounded up to the next integer.
     pub fn to_image(&self) -> Image {
-        let mut image = Image::new(self.width(), self.height());
+        let [w, h] = [
+            self.rect().width().ceil() as u32,
+            self.rect().height().ceil() as u32,
+        ];
+        let mut image = Image::new(w, h);
         image
             .buf
             .copy_from(&self.as_generic_image_view(), 0, 0)
@@ -370,7 +371,7 @@ impl<'a> ImageView<'a> {
 
 impl fmt::Debug for ImageView<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}x{} ImageView", self.width(), self.height())
+        write!(f, "ImageView @ {:?}", self.data.rect)
     }
 }
 
@@ -388,11 +389,15 @@ impl<'a> ImageViewMut<'a> {
             type Pixel = Rgba<u8>;
 
             fn dimensions(&self) -> (u32, u32) {
-                (self.0.width(), self.0.height())
+                (
+                    self.0.rect().width().ceil() as u32,
+                    self.0.rect().height().ceil() as u32,
+                )
             }
 
             fn bounds(&self) -> (u32, u32, u32, u32) {
-                (0, 0, self.0.width(), self.0.height())
+                let (w, h) = self.dimensions();
+                (0, 0, w, h)
             }
 
             fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
@@ -425,25 +430,10 @@ impl<'a> ImageViewMut<'a> {
         Wrapper(self.reborrow(), Rgba([0, 0, 0, 0]))
     }
 
-    /// Returns the width of this view, in pixels.
-    pub fn width(&self) -> u32 {
-        self.data.width() as u32
-    }
-
-    /// Returns the height of this view, in pixels.
-    pub fn height(&self) -> u32 {
-        self.data.height() as u32
-    }
-
-    /// Returns the size of this view.
-    #[inline]
-    pub fn resolution(&self) -> Resolution {
-        Resolution::new(self.width(), self.height())
-    }
-
     /// Returns a [`Rect`] of the size of this view.
     ///
-    /// The rectangle will be positioned at `(0, 0)` and have the width and height of the view.
+    /// The rectangle will be positioned at `(0, 0)` and have the width and height of the view. Note
+    /// that view sizes are allowed to be fractional.
     #[inline]
     pub fn rect(&self) -> Rect {
         self.data.rect()
@@ -512,6 +502,9 @@ impl<'a> ImageViewMut<'a> {
     }
 
     /// Copies the contents of this view into a new [`Image`].
+    ///
+    /// The returned [`Image`] will have the size of `self`. If the width or height of `self` is not
+    /// an integer, it is rounded up to the next integer.
     pub fn to_image(&self) -> Image {
         self.as_view().to_image()
     }
@@ -519,7 +512,7 @@ impl<'a> ImageViewMut<'a> {
 
 impl fmt::Debug for ImageViewMut<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}x{} ImageViewMut", self.width(), self.height())
+        write!(f, "ImageViewMut @ {:?}", self.data.rect)
     }
 }
 

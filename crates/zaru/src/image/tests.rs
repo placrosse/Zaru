@@ -127,13 +127,13 @@ fn view() {
     let image = mkimage([[C::RED, C::GREEN]]);
 
     let view = image.view(Rect::bounding([[1.0, 0.0], [2.0, 1.0]]).unwrap());
-    assert_eq!(view.width(), 1);
-    assert_eq!(view.height(), 1);
+    assert_eq!(view.rect().width(), 1.0);
+    assert_eq!(view.rect().height(), 1.0);
     assert_eq!(view.get(0, 0), C::GREEN);
 
     let view = image.view(Rect::bounding([[1.0, 0.0], [100.0, 100.0]]).unwrap());
-    assert_eq!(view.width(), 99);
-    assert_eq!(view.height(), 100);
+    assert_eq!(view.rect().width(), 99.0);
+    assert_eq!(view.rect().height(), 100.0);
     assert_eq!(view.get(0, 0), C::GREEN);
     assert_eq!(view.get(0, 1), C::NULL);
     assert_eq!(view.get(1, 0), C::NULL);
