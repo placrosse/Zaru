@@ -351,7 +351,7 @@ impl<'a> ImageView<'a> {
     ///
     /// This will panic if `(x, y)` is outside the bounds of this view.
     #[inline]
-    pub fn get(&self, x: u32, y: u32) -> Color {
+    pub(crate) fn get(&self, x: u32, y: u32) -> Color {
         Color(self.as_generic_image_view().get_pixel(x, y).0)
     }
 
