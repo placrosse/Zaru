@@ -138,29 +138,3 @@ fn view() {
     assert_eq!(view.get(0, 1), C::NULL);
     assert_eq!(view.get(1, 0), C::NULL);
 }
-
-#[test]
-fn blend() {
-    let mut image = mkimage([[C::RED]]);
-    let overlay = mkimage([[C::GREEN.with_alpha(0)]]);
-    image.blend_from(&overlay).mode(BlendMode::Alpha);
-    assert_eq!(image.get(0, 0), C::RED); // no change
-
-    let mut image = mkimage([[C::RED]]);
-    let overlay = mkimage([[C::GREEN.with_alpha(0)]]);
-    image.blend_from(&overlay).mode(BlendMode::Overwrite);
-    assert_eq!(image.get(0, 0), C::GREEN.with_alpha(0)); // overwrite blending
-
-    let mut image = mkimage([[C::RED]]);
-    let overlay = mkimage([[C::GREEN]]);
-    image.blend_from(&overlay).mode(BlendMode::Alpha);
-    assert_eq!(image.get(0, 0), C::GREEN); // alpha overwrite
-
-    let mut image = mkimage([[C::RED]]);
-    let overlay = mkimage([[C::from_rgb8(127, 0, 100)]]);
-    image.blend_from(&overlay).mode(BlendMode::Multiply);
-    assert_eq!(image.get(0, 0), C::from_rgb8(127, 0, 0));
-    // FIXME: is this right? 127 seems correct only for linear colors
-
-    // FIXME: very incomplete!
-}

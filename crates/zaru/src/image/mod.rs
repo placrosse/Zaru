@@ -7,7 +7,6 @@
 //! - The [`AsImageView`] and [`AsImageViewMut`] traits to abstract over images and views.
 //! - A variety of [`draw`] functions to quickly visualize objects.
 
-mod blend;
 pub mod draw;
 mod jpeg;
 mod resolution;
@@ -20,7 +19,6 @@ use std::{fmt, ops::Index, path::Path};
 use embedded_graphics::{pixelcolor::raw::RawU32, prelude::PixelColor};
 use image::{GenericImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
 
-pub use blend::*;
 pub use resolution::*;
 
 use crate::rect::{Rect, RotatedRect};
@@ -133,17 +131,6 @@ impl Image {
         Rect::from_top_left(0.0, 0.0, self.width() as f32, self.height() as f32)
     }
 
-    /// Gets the image color at the given pixel coordinates.
-    ///
-    /// # Panics
-    ///
-    /// This will panic if `(x, y)` is outside the bounds of this image.
-    #[cfg(test)]
-    fn get(&self, x: u32, y: u32) -> Color {
-        let rgb = &self.buf[(x, y)];
-        Color(rgb.0)
-    }
-
     /// Sets the image color at the given pixel coordinates.
     ///
     /// # Panics
@@ -196,17 +183,6 @@ impl Image {
 
     pub fn flip_vertical_in_place(&mut self) {
         image::imageops::flip_vertical_in_place(&mut self.buf);
-    }
-
-    /// Overwrites the data in `self` with a `src` image, stretching or shrinking `src` as
-    /// necessary.
-    ///
-    /// Note that this always blends the *entire* `src` with the *entire* destination. A smaller
-    /// source/destination area can be selected by creating a sub-view first.
-    ///
-    /// By default, this performs alpha blending.
-    pub fn blend_from<'b, V: AsImageView>(&'b mut self, src: &'b V) -> Blend<'b> {
-        Blend::new(self.as_view_mut(), src.as_view())
     }
 
     /// Clears the image, setting every pixel value to `color`.
@@ -473,17 +449,6 @@ impl<'a> ImageViewMut<'a> {
         self.data.rect()
     }
 
-    /// Gets the image color at the given pixel coordinates.
-    ///
-    /// # Panics
-    ///
-    /// This will panic if `(x, y)` is outside the bounds of this view.
-    #[inline]
-    fn get(&self, x: u32, y: u32) -> Color {
-        let rgb = self.as_view().as_generic_image_view().get_pixel(x, y);
-        Color(rgb.0)
-    }
-
     /// Sets the image color at the given pixel coordinates.
     ///
     /// # Panics
@@ -549,17 +514,6 @@ impl<'a> ImageViewMut<'a> {
     /// Copies the contents of this view into a new [`Image`].
     pub fn to_image(&self) -> Image {
         self.as_view().to_image()
-    }
-
-    /// Overwrites the data in `self` with a `src` image, stretching or shrinking `src` as
-    /// necessary.
-    ///
-    /// Note that this always blends the *entire* `src` with the *entire* destination. A smaller
-    /// source/destination area can be selected by creating a sub-view first.
-    ///
-    /// By default, this performs alpha blending.
-    pub fn blend_from<'b, V: AsImageView>(&'b mut self, src: &'b V) -> Blend<'b> {
-        Blend::new(self.as_view_mut(), src.as_view())
     }
 }
 
