@@ -1,3 +1,5 @@
+//! Functions for drawing onto images.
+
 use std::convert::Infallible;
 
 use embedded_graphics::{

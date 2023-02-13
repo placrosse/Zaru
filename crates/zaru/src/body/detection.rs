@@ -1,6 +1,6 @@
 //! Human body detection.
 
-use crate::nn::Outputs;
+use crate::nn::{ColorMapper, Outputs};
 use crate::num::sigmoid;
 use crate::rect::Rect;
 use include_blob::include_blob;
@@ -12,7 +12,7 @@ use crate::{
         ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
         Detection, Detections, Network,
     },
-    nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork},
+    nn::{Cnn, CnnInputShape, NeuralNetwork},
 };
 
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
@@ -23,7 +23,7 @@ static MODEL: Lazy<Cnn> = Lazy::new(|| {
             .load()
             .unwrap(),
         CnnInputShape::NCHW,
-        create_linear_color_mapper(-1.0..=1.0),
+        ColorMapper::linear(-1.0..=1.0),
     )
     .unwrap()
 });

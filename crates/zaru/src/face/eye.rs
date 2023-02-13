@@ -11,9 +11,10 @@ use once_cell::sync::Lazy;
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut, Resolution};
 use crate::iter::zip_exact;
 
+use crate::nn::ColorMapper;
 use crate::{
     landmark::{Estimate, Landmarks, Network},
-    nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
+    nn::{Cnn, CnnInputShape, NeuralNetwork, Outputs},
     slice::SliceExt,
 };
 
@@ -25,7 +26,7 @@ static MODEL: Lazy<Cnn> = Lazy::new(|| {
             .load()
             .unwrap(),
         CnnInputShape::NCHW,
-        create_linear_color_mapper(-1.0..=1.0),
+        ColorMapper::linear(-1.0..=1.0),
     )
     .unwrap()
 });

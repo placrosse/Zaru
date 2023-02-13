@@ -37,7 +37,7 @@ impl Cnn {
     pub fn new(
         nn: NeuralNetwork,
         shape: CnnInputShape,
-        color_map: impl Fn(Color) -> [f32; 3] + Send + Sync + 'static,
+        color_mapper: ColorMapper,
     ) -> anyhow::Result<Self> {
         let input_res = Self::get_input_res(&nn, shape)?;
         let (h, w) = (input_res.height() as usize, input_res.width() as usize);
@@ -53,12 +53,12 @@ impl Cnn {
         let image_map: Arc<dyn Fn(ImageView<'_>) -> _ + Send + Sync> = match shape {
             CnnInputShape::NCHW => Arc::new(move |view| {
                 Tensor::from_array_shape_fn([1, 3, h, w], |[_, c, y, x]| {
-                    color_map(sample(&view, x as f32 / w as f32, y as f32 / h as f32))[c]
+                    color_mapper.map(sample(&view, x as f32 / w as f32, y as f32 / h as f32))[c]
                 })
             }),
             CnnInputShape::NHWC => Arc::new(move |view| {
                 Tensor::from_array_shape_fn([1, h, w, 3], |[_, y, x, c]| {
-                    color_map(sample(&view, x as f32 / w as f32, y as f32 / h as f32))[c]
+                    color_mapper.map(sample(&view, x as f32 / w as f32, y as f32 / h as f32))[c]
                 })
             }),
         };
@@ -117,22 +117,43 @@ impl Cnn {
     }
 }
 
-/// Creates a simple color mapper that uniformly maps sRGB values to `target_range`.
-///
-/// The returned object can be passed directly to [`Cnn::new`] as its color map.
-///
-/// Note that this operates on *non-linear* sRGB colors, but maps them linearly to the target range.
-/// The assumption is that sRGB is the color space most (all?) CNNs expect their inputs to be in,
-/// but in practice none of them document this.
-pub fn create_linear_color_mapper(target_range: RangeInclusive<f32>) -> impl Fn(Color) -> [f32; 3] {
-    let start = *target_range.start();
-    let end = *target_range.end();
-    assert!(end > start);
+enum ColorMapperKind {
+    Linear { target_range: RangeInclusive<f32> },
+}
 
-    let adjust_range = (end - start) / 255.0;
-    move |color| {
-        let rgb = [color.r(), color.g(), color.b()];
-        rgb.map(|col| col as f32 * adjust_range + start)
+pub struct ColorMapper {
+    kind: ColorMapperKind,
+}
+
+impl ColorMapper {
+    /// Creates a simple color mapper that uniformly maps sRGB values to `target_range`.
+    ///
+    /// The returned object can be passed directly to [`Cnn::new`] as its color map.
+    ///
+    /// Note that this operates on *non-linear* sRGB colors, but maps them linearly to the target range.
+    /// The assumption is that sRGB is the color space most (all?) CNNs expect their inputs to be in,
+    /// but in practice none of them document this.
+    pub fn linear(target_range: RangeInclusive<f32>) -> Self {
+        let start = *target_range.start();
+        let end = *target_range.end();
+        assert!(end > start);
+
+        Self {
+            kind: ColorMapperKind::Linear { target_range },
+        }
+    }
+
+    fn map(&self, color: Color) -> [f32; 3] {
+        match &self.kind {
+            ColorMapperKind::Linear { target_range } => {
+                let start = *target_range.start();
+                let end = *target_range.end();
+
+                let adjust_range = (end - start) / 255.0;
+                let rgb = [color.r(), color.g(), color.b()];
+                rgb.map(|col| col as f32 * adjust_range + start)
+            }
+        }
     }
 }
 
@@ -540,12 +561,12 @@ mod tests {
 
     #[test]
     fn color_mapper() {
-        let mapper = create_linear_color_mapper(-1.0..=1.0);
-        assert_eq!(mapper(Color::BLACK), [-1.0, -1.0, -1.0]);
-        assert_eq!(mapper(Color::WHITE), [1.0, 1.0, 1.0]);
+        let mapper = ColorMapper::linear(-1.0..=1.0);
+        assert_eq!(mapper.map(Color::BLACK), [-1.0, -1.0, -1.0]);
+        assert_eq!(mapper.map(Color::WHITE), [1.0, 1.0, 1.0]);
 
-        let mapper = create_linear_color_mapper(1.0..=2.0);
-        assert_eq!(mapper(Color::BLACK), [1.0, 1.0, 1.0]);
-        assert_eq!(mapper(Color::WHITE), [2.0, 2.0, 2.0]);
+        let mapper = ColorMapper::linear(1.0..=2.0);
+        assert_eq!(mapper.map(Color::BLACK), [1.0, 1.0, 1.0]);
+        assert_eq!(mapper.map(Color::WHITE), [2.0, 2.0, 2.0]);
     }
 }

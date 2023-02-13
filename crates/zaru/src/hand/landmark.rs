@@ -2,13 +2,14 @@
 
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
 use crate::iter::zip_exact;
+use crate::nn::ColorMapper;
 use include_blob::include_blob;
 use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
 use crate::{
     landmark::{Confidence, Estimate, Landmarks, Network},
-    nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
+    nn::{Cnn, CnnInputShape, NeuralNetwork, Outputs},
     slice::SliceExt,
 };
 
@@ -286,7 +287,7 @@ impl Network for LiteNetwork {
                     .load()
                     .unwrap(),
                 CnnInputShape::NCHW,
-                create_linear_color_mapper(0.0..=1.0),
+                ColorMapper::linear(0.0..=1.0),
             )
             .unwrap()
         });
@@ -316,7 +317,7 @@ impl Network for FullNetwork {
                     .load()
                     .unwrap(),
                 CnnInputShape::NCHW,
-                create_linear_color_mapper(0.0..=1.0),
+                ColorMapper::linear(0.0..=1.0),
             )
             .unwrap()
         });

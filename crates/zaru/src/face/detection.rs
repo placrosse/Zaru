@@ -5,7 +5,7 @@
 //!
 //! [Face Detection]: https://google.github.io/mediapipe/solutions/face_detection
 
-use crate::nn::Outputs;
+use crate::nn::{ColorMapper, Outputs};
 use crate::num::sigmoid;
 use crate::{image::Resolution, rect::Rect};
 use include_blob::include_blob;
@@ -17,7 +17,7 @@ use crate::{
         ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
         Detection, Detections, Network,
     },
-    nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork},
+    nn::{Cnn, CnnInputShape, NeuralNetwork},
 };
 
 pub enum Keypoint {
@@ -36,7 +36,7 @@ static SHORT_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
             .load()
             .unwrap(),
         CnnInputShape::NCHW,
-        create_linear_color_mapper(-1.0..=1.0),
+        ColorMapper::linear(-1.0..=1.0),
     )
     .unwrap()
 });
@@ -72,7 +72,7 @@ static FULL_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
             .load()
             .unwrap(),
         CnnInputShape::NCHW,
-        create_linear_color_mapper(-1.0..=1.0),
+        ColorMapper::linear(-1.0..=1.0),
     )
     .unwrap()
 });

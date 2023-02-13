@@ -11,7 +11,7 @@ use once_cell::sync::Lazy;
 use crate::{
     iter::zip_exact,
     landmark::{Estimate, Landmarks, Network},
-    nn::{create_linear_color_mapper, Cnn, CnnInputShape, NeuralNetwork, Outputs},
+    nn::{Cnn, CnnInputShape, ColorMapper, NeuralNetwork, Outputs},
     slice::SliceExt,
 };
 
@@ -60,7 +60,7 @@ impl Network for PeppaFacialLandmark {
                     .load()
                     .unwrap(),
                 CnnInputShape::NCHW,
-                create_linear_color_mapper(-1.0..=1.0),
+                ColorMapper::linear(-1.0..=1.0),
             )
             .unwrap()
         });
@@ -101,7 +101,7 @@ impl Network for FaceOnnx {
                     .load()
                     .unwrap(),
                 CnnInputShape::NCHW,
-                create_linear_color_mapper(0.0..=1.0),
+                ColorMapper::linear(0.0..=1.0),
             )
             .unwrap()
         });
