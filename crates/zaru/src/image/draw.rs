@@ -1,4 +1,9 @@
 //! Functions for drawing onto images.
+//!
+//! The functions in this module all return a guard type that will perform the operation when
+//! dropped. This type may provide methods that can be used to customize the default style of the
+//! object being drawn. This results in a pretty ergonomic fluent builder-like API, without
+//! requiring any unnecessary method calls.
 
 use std::convert::Infallible;
 
@@ -21,7 +26,6 @@ pub struct DrawRect<'a> {
     image: ImageViewMut<'a>,
     rect: Rect,
     color: Color,
-    stroke_width: u32,
 }
 
 impl DrawRect<'_> {
@@ -30,23 +34,13 @@ impl DrawRect<'_> {
         self.color = color;
         self
     }
-
-    /// Sets the rectangle's stroke width.
-    ///
-    /// By default, a stroke width of 1 is used.
-    pub fn stroke_width(&mut self, width: u32) -> &mut Self {
-        self.stroke_width = width;
-        self
-    }
 }
 
 impl Drop for DrawRect<'_> {
     fn drop(&mut self) {
         let corners = self.rect.corners();
         for ([x1, y1], [x2, y2]) in corners.into_iter().circular_tuple_windows().take(4) {
-            line(&mut self.image, x1, y1, x2, y2)
-                .color(self.color)
-                .stroke_width(self.stroke_width);
+            line(&mut self.image, x1, y1, x2, y2).color(self.color);
         }
     }
 }
@@ -57,7 +51,6 @@ pub struct DrawRotatedRect<'a> {
     image: ImageViewMut<'a>,
     rect: RotatedRect,
     color: Color,
-    stroke_width: u32,
 }
 
 impl<'a> DrawRotatedRect<'a> {
@@ -66,23 +59,13 @@ impl<'a> DrawRotatedRect<'a> {
         self.color = color;
         self
     }
-
-    /// Sets the stroke width.
-    ///
-    /// By default, a stroke width of 1 is used.
-    pub fn stroke_width(&mut self, width: u32) -> &mut Self {
-        self.stroke_width = width;
-        self
-    }
 }
 
 impl<'a> Drop for DrawRotatedRect<'a> {
     fn drop(&mut self) {
         let corners = self.rect.rotated_corners();
         for ([x1, y1], [x2, y2]) in corners.into_iter().circular_tuple_windows().take(4) {
-            line(&mut self.image, x1, y1, x2, y2)
-                .color(self.color)
-                .stroke_width(self.stroke_width);
+            line(&mut self.image, x1, y1, x2, y2).color(self.color);
         }
     }
 }
@@ -146,21 +129,12 @@ pub struct DrawLine<'a> {
     end_x: f32,
     end_y: f32,
     color: Color,
-    stroke_width: u32,
 }
 
 impl<'a> DrawLine<'a> {
     /// Sets the line's color.
     pub fn color(&mut self, color: Color) -> &mut Self {
         self.color = color;
-        self
-    }
-
-    /// Sets the line's stroke width.
-    ///
-    /// By default, a stroke width of 1 is used.
-    pub fn stroke_width(&mut self, width: u32) -> &mut Self {
-        self.stroke_width = width;
         self
     }
 }
@@ -171,7 +145,7 @@ impl<'a> Drop for DrawLine<'a> {
             Point::new(self.start_x.round() as i32, self.start_y.round() as i32),
             Point::new(self.end_x.round() as i32, self.end_y.round() as i32),
         )
-        .into_styled(PrimitiveStyle::with_stroke(self.color, self.stroke_width))
+        .into_styled(PrimitiveStyle::with_stroke(self.color, 1))
         .draw(&mut Target(self.image.reborrow()))
         {
             Ok(_) => {}
@@ -251,7 +225,6 @@ pub struct DrawCircle<'a> {
     x: f32,
     y: f32,
     diameter: f32,
-    stroke_width: u32,
     color: Color,
 }
 
@@ -259,14 +232,6 @@ impl<'a> DrawCircle<'a> {
     /// Sets the circle's color.
     pub fn color(&mut self, color: Color) -> &mut Self {
         self.color = color;
-        self
-    }
-
-    /// Sets the circle's stroke width.
-    ///
-    /// By default, a stroke width of 1 is used.
-    pub fn stroke_width(&mut self, width: u32) -> &mut Self {
-        self.stroke_width = width;
         self
     }
 }
@@ -282,7 +247,7 @@ impl<'a> Drop for DrawCircle<'a> {
             diameter: self.diameter as _,
         };
         match circle
-            .into_styled(PrimitiveStyle::with_stroke(self.color, self.stroke_width))
+            .into_styled(PrimitiveStyle::with_stroke(self.color, 1))
             .draw(&mut Target(self.image.reborrow()))
         {
             Ok(_) => {}
@@ -298,16 +263,9 @@ pub struct DrawQuaternion<'a> {
     y: f32,
     quaternion: UnitQuaternion<f32>,
     axis_length: f32,
-    stroke_width: u32,
 }
 
 impl<'a> DrawQuaternion<'a> {
-    /// Sets the stroke width of each coordinate axis.
-    pub fn stroke_width(&mut self, width: u32) -> &mut Self {
-        self.stroke_width = width;
-        self
-    }
-
     /// Sets the length of each coordinate axis, in pixels.
     pub fn axis_length(&mut self, length: f32) -> &mut Self {
         self.axis_length = length;
@@ -340,7 +298,6 @@ pub fn rect<I: AsImageViewMut>(image: &mut I, rect: Rect) -> DrawRect<'_> {
         image: image.as_view_mut(),
         rect,
         color: Color::RED,
-        stroke_width: 1,
     }
 }
 
@@ -350,7 +307,6 @@ pub fn rotated_rect<I: AsImageViewMut>(image: &mut I, rect: RotatedRect) -> Draw
         image: image.as_view_mut(),
         rect,
         color: Color::RED,
-        stroke_width: 1,
     }
 }
 
@@ -382,7 +338,6 @@ pub fn line<I: AsImageViewMut>(
         end_x,
         end_y,
         color: Color::from_rgb8(0, 0, 255),
-        stroke_width: 1,
     }
 }
 
@@ -418,7 +373,6 @@ pub fn circle<'a, I: AsImageViewMut>(
         x,
         y,
         diameter,
-        stroke_width: 1,
         color: Color::GREEN,
     }
 }
@@ -442,7 +396,6 @@ pub fn quaternion<'a, I: AsImageViewMut>(
         y,
         quaternion,
         axis_length: 10.0,
-        stroke_width: 1,
     }
 }
 

@@ -67,7 +67,7 @@ impl LandmarkResult {
         for (a, b) in COARSE_CONNECTIVITY {
             let a = self.get(*a);
             let b = self.get(*b);
-            draw::line(target, a.x(), a.y(), b.x(), b.y()).stroke_width(3);
+            draw::line(target, a.x(), a.y(), b.x(), b.y());
         }
 
         for lm in self.pose_landmarks() {
