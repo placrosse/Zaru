@@ -4,13 +4,12 @@ use super::*;
 use Color as C;
 
 fn mkimage<const W: usize, const H: usize>(data: [[Color; W]; H]) -> Image {
-    let mut image = Image::new(W as u32, H as u32);
-    for (y, row) in data.iter().enumerate() {
-        for (x, color) in row.iter().enumerate() {
-            image.set(x as u32, y as u32, *color);
-        }
-    }
-    image
+    let data = data
+        .into_iter()
+        .flat_map(|row| row.into_iter())
+        .flat_map(|col| col.0)
+        .collect::<Vec<_>>();
+    Image::from_rgba8(Resolution::new(W as u32, H as u32), &data)
 }
 
 #[test]

@@ -136,16 +136,6 @@ impl Image {
         Rect::from_top_left(0.0, 0.0, self.width() as f32, self.height() as f32)
     }
 
-    /// Sets the image color at the given pixel coordinates.
-    ///
-    /// # Panics
-    ///
-    /// This will panic if `(x, y)` is outside the bounds of this image.
-    #[cfg(test)]
-    fn set(&mut self, x: u32, y: u32, color: Color) {
-        self.buf[(x, y)] = Rgba(color.0);
-    }
-
     /// Creates an immutable view into an area of this image, specified by `rect`.
     ///
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
