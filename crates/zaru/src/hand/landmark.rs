@@ -32,23 +32,9 @@ impl Default for LandmarkResult {
 }
 
 impl LandmarkResult {
-    pub fn map_positions(&mut self, mut f: impl FnMut([f32; 3]) -> [f32; 3]) {
-        for pos in self.landmarks.positions_mut() {
-            *pos = f(*pos);
-        }
-    }
-
-    pub fn move_by(&mut self, x: f32, y: f32, z: f32) {
-        for pos in self.landmarks.positions_mut() {
-            pos[0] += x;
-            pos[1] += y;
-            pos[2] += z;
-        }
-    }
-
     /// Returns the 3D landmark positions in the input image's coordinate system.
     pub fn landmark_positions(&self) -> impl Iterator<Item = [f32; 3]> + '_ {
-        (0..self.landmark_count()).map(|index| self.landmark_position(index))
+        (0..self.landmarks.len()).map(|index| self.landmark_position(index))
     }
 
     /// Returns a landmark's position in the input image's coordinate system.
@@ -94,24 +80,10 @@ impl LandmarkResult {
         Rotation2::rotation_between(&Vector2::y(), &rel).angle()
     }
 
-    #[inline]
-    pub fn landmark_count(&self) -> usize {
-        self.landmarks.len()
-    }
-
-    /// Returns the presence flag, indicating the confidence of whether a hand was in the input
-    /// image.
-    ///
-    /// The value is between 0.0 and 1.0, with higher values indicating higher confidence that a
-    /// hand was present.
-    pub fn presence(&self) -> f32 {
-        self.presence
-    }
-
     /// Returns the estimated handedness of the hand in the image.
     ///
     /// This assumes that the camera image is passed in as-is, and the returned value should only be
-    /// relied on when `presence` is over some threshold.
+    /// relied on when the `presence` is over some threshold.
     pub fn handedness(&self) -> Handedness {
         if self.raw_handedness > 0.5 {
             Handedness::Right
@@ -148,7 +120,7 @@ impl LandmarkResult {
             target,
             palm_x,
             palm_y + 5.0,
-            &format!("presence={:.2}", self.presence()),
+            &format!("confidence={:.2}", self.confidence()),
         );
 
         for (a, b) in CONNECTIVITY {
@@ -164,6 +136,7 @@ impl LandmarkResult {
 }
 
 impl Estimate for LandmarkResult {
+    #[inline]
     fn landmarks_mut(&mut self) -> &mut Landmarks {
         &mut self.landmarks
     }
@@ -174,8 +147,9 @@ impl Estimate for LandmarkResult {
 }
 
 impl Confidence for LandmarkResult {
+    #[inline]
     fn confidence(&self) -> f32 {
-        self.presence()
+        self.presence
     }
 }
 
