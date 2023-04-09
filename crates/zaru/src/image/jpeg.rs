@@ -33,6 +33,9 @@ enum JpegBackend {
     /// Uses the `mozjpeg` crate, a wrapper around Mozilla's libjpeg fork. Robust and fast-ish, but
     /// C.
     MozJpeg,
+    /// Uses the `zune-jpeg` crate, a pure-Rust JPEG decoder somewhat faster than `jpeg-decoder`.
+    /// Tends to be much slower than `mozjpeg` still.
+    ZuneJpeg,
     /// Uses a specific patched commit of the `zune-jpeg` crate, which can perform better than
     /// mozjpeg, but errors on some valid images and incorrectly decodes some images. Only useful in
     /// specific circumstances.
@@ -67,6 +70,7 @@ static JPEG_BACKEND: Lazy<JpegBackend> = Lazy::new(|| {
     let backend = match env::var("ZARU_JPEG_BACKEND") {
         Ok(v) if v == "fast-but-wrong" => JpegBackend::FastButWrong,
         Ok(v) if v == "mozjpeg" => JpegBackend::MozJpeg,
+        Ok(v) if v == "zune-jpeg" => JpegBackend::ZuneJpeg,
         Ok(v) if v == "jpeg-decoder" => JpegBackend::JpegDecoder,
         Ok(v) => {
             eprintln!("invalid value set for `ZARU_JPEG_BACKEND` variable: '{v}'; exiting");
@@ -115,11 +119,31 @@ pub(super) fn decode_jpeg(data: &[u8]) -> anyhow::Result<Image> {
             )
             .expect("failed to create ImageBuffer")
         }
+        JpegBackend::ZuneJpeg => {
+            use zune_jpeg::zune_core::colorspace::ColorSpace;
+            use zune_jpeg::zune_core::options::DecoderOptions;
+
+            let mut decomp = zune_jpeg::JpegDecoder::new_with_options(
+                DecoderOptions::new_fast().jpeg_set_out_colorspace(ColorSpace::RGBA),
+                data,
+            );
+            decomp.decode_headers()?;
+            let colorspace = decomp.get_output_colorspace().unwrap();
+            if colorspace != ColorSpace::RGBA {
+                bail!("unsupported colorspace {colorspace:?} (expected RGBA)");
+            }
+
+            let mut buf = vec![0; decomp.output_buffer_size().unwrap()];
+            decomp.decode_into(&mut buf)?;
+            let (width, height) = decomp.dimensions().unwrap();
+            ImageBuffer::from_raw(width.into(), height.into(), buf)
+                .expect("failed to create ImageBuffer")
+        }
         JpegBackend::FastButWrong => {
-            let mut decomp = zune_jpeg::Decoder::new_with_options(
-                zune_jpeg::ZuneJpegOptions::new()
+            let mut decomp = fast_but_wrong::Decoder::new_with_options(
+                fast_but_wrong::ZuneJpegOptions::new()
                     .set_num_threads(NonZeroU32::new(1).unwrap())
-                    .set_out_colorspace(zune_jpeg::ColorSpace::RGBA),
+                    .set_out_colorspace(fast_but_wrong::ColorSpace::RGBA),
             );
             let buf = decomp.decode_buffer(data)?;
             let width = u32::from(decomp.width());
