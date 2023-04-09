@@ -6,9 +6,8 @@ use zaru::{
     video::webcam::{Webcam, WebcamOptions},
 };
 
+#[zaru::main]
 fn main() -> anyhow::Result<()> {
-    zaru::init_logger!();
-
     let mut detector = Detector::new(PoseNetwork);
 
     let mut fps = FpsCounter::new("body detection");

@@ -4,9 +4,8 @@ use zaru::{
     timer::{FpsCounter, Timer},
 };
 
+#[zaru::main]
 fn main() -> anyhow::Result<()> {
-    zaru::init_logger!();
-
     let data = match std::env::args_os().nth(1) {
         Some(path) => std::fs::read(&path)?,
         None => {

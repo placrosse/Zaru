@@ -17,9 +17,8 @@ use zaru::{
     video::webcam::{Webcam, WebcamOptions},
 };
 
+#[zaru::main]
 fn main() -> anyhow::Result<()> {
-    zaru::init_logger!();
-
     let mut detector = Detector::new(ShortRangeNetwork);
     let mut estimator = Estimator::new(multipie68::FaceOnnx);
     let mut dlt = pnp::Dlt::new(multipie68::reference_positions());

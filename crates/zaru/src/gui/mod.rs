@@ -5,21 +5,24 @@ mod shaders;
 
 use std::{
     collections::HashMap,
+    panic::{catch_unwind, AssertUnwindSafe},
+    process,
     rc::Rc,
-    sync::{mpsc::sync_channel, Mutex},
+    sync::Mutex,
 };
 
-use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
 use raw_window_handle::{HasRawDisplayHandle, RawDisplayHandle};
 use winit::{
     event::Event,
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopClosed, EventLoopProxy},
-    platform::wayland::EventLoopBuilderExtWayland as WaylandExt,
-    platform::x11::EventLoopBuilderExtX11 as X11Ext,
     window::WindowId,
 };
 
-use crate::image::{Image, Resolution};
+use crate::{
+    image::{Image, Resolution},
+    termination::Termination,
+};
 
 use self::renderer::{Gpu, Renderer, Window};
 
@@ -96,7 +99,7 @@ pub struct Display {
 
 impl Display {
     pub fn get() -> &'static Display {
-        &DISPLAY
+        DISPLAY.get().expect("display not initialized")
     }
 }
 
@@ -106,41 +109,57 @@ unsafe impl HasRawDisplayHandle for Display {
     }
 }
 
-static DISPLAY: Lazy<Display> = Lazy::new(|| {
-    let (sender, recv) = sync_channel(0);
-
-    std::thread::Builder::new()
-        .name("gui".into())
-        .spawn(move || {
-            let mut builder = EventLoopBuilder::with_user_event();
-            X11Ext::with_any_thread(&mut builder, true);
-            WaylandExt::with_any_thread(&mut builder, true);
-            let event_loop = builder.build();
-            let proxy = event_loop.create_proxy();
-            sender
-                .send(Display {
-                    raw: UnsafeSendSync(event_loop.raw_display_handle()),
-                    proxy: Mutex::new(proxy),
-                })
-                .unwrap();
-
-            let gui = Gui::new();
-            gui.run(event_loop);
-        })
-        .unwrap();
-
-    recv.recv().unwrap()
-});
+static DISPLAY: OnceCell<Display> = OnceCell::new();
 
 fn send(msg: Msg) {
     // TODO: backpressure
-    DISPLAY
+    Display::get()
         .proxy
         .lock()
         .unwrap()
         .send_event(msg)
         .map_err(|_closed| EventLoopClosed(()))
         .unwrap();
+}
+
+pub(crate) fn run<F, R>(cb: F) -> !
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Termination + Send,
+{
+    let event_loop = EventLoopBuilder::with_user_event().build();
+    let proxy = event_loop.create_proxy();
+    let display = Display {
+        raw: UnsafeSendSync(event_loop.raw_display_handle()),
+        proxy: Mutex::new(proxy),
+    };
+    DISPLAY
+        .set(display)
+        .ok()
+        .expect("display already initialized");
+
+    // Library is now initialized; spawn another thread to run the application code.
+    std::thread::spawn(move || {
+        let result = catch_unwind(AssertUnwindSafe(cb));
+        match result {
+            Ok(r) => {
+                if r.is_success() {
+                    process::exit(0);
+                } else {
+                    r.report(); // may print the error message
+                    process::exit(1);
+                }
+            }
+            Err(_payload) => {
+                // Panic handler has printed the panic message and backtrace already, exit with 101
+                // to mimick libstd behavior.
+                process::exit(101);
+            }
+        }
+    });
+
+    let gui = Gui::new();
+    gui.run(event_loop);
 }
 
 /// Displays an image in a window.

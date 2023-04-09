@@ -15,9 +15,8 @@ const USE_FULL_LANDMARK_NETWORK: bool = true;
 /// can make things easier to see.
 const DRAW_ON_BLANK_IMAGE: bool = false;
 
+#[zaru::main]
 fn main() -> anyhow::Result<()> {
-    zaru::init_logger!();
-
     let mut tracker = match (USE_FULL_DETECTION_NETWORK, USE_FULL_LANDMARK_NETWORK) {
         (false, false) => HandTracker::new(detection::LiteNetwork, landmark::LiteNetwork),
         (false, true) => HandTracker::new(detection::LiteNetwork, landmark::FullNetwork),

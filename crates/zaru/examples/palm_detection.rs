@@ -8,9 +8,8 @@ use zaru::{
 
 const USE_FULL_DETECTION_NETWORK: bool = true;
 
+#[zaru::main]
 fn main() -> anyhow::Result<()> {
-    zaru::init_logger!();
-
     let mut palm_detector = if USE_FULL_DETECTION_NETWORK {
         Detector::new(detection::FullNetwork)
     } else {

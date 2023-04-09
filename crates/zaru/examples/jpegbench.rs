@@ -5,9 +5,8 @@ use zaru::{
     timer::{FpsCounter, Timer},
 };
 
+#[zaru::main]
 fn main() -> anyhow::Result<()> {
-    zaru::init_logger!();
-
     let image = match std::env::args().nth(1) {
         Some(path) => std::fs::read(path)?,
         None => {

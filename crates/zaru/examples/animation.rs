@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use zaru::{gui, video::anim::Animation};
 
+#[zaru::main]
 fn main() -> anyhow::Result<()> {
     let path = std::env::args()
         .nth(1)

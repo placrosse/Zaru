@@ -29,9 +29,8 @@ impl Algo {
     }
 }
 
+#[zaru::main]
 fn main() -> anyhow::Result<()> {
-    zaru::init_logger!();
-
     let mut detector = Detector::new(ShortRangeNetwork);
     let mut algos = [
         Algo::new(multipie68::PeppaFacialLandmark, Color::GREEN),

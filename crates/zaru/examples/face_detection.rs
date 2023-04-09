@@ -8,9 +8,8 @@ use zaru::{
 
 const FULL_RANGE: bool = false;
 
+#[zaru::main]
 fn main() -> anyhow::Result<()> {
-    zaru::init_logger!();
-
     let mut detector = if FULL_RANGE {
         Detector::new(FullRangeNetwork)
     } else {

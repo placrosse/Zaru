@@ -29,8 +29,6 @@
 
 #![allow(illegal_floating_point_literal_pattern)] // let me have fun
 
-use log::LevelFilter;
-
 pub mod body;
 pub mod detection;
 pub mod face;
@@ -49,8 +47,21 @@ pub mod slice;
 pub mod timer;
 pub mod video;
 
+pub mod termination;
 #[cfg(test)]
 mod test;
+
+use log::LevelFilter;
+
+use termination::Termination;
+
+/// Wraps the program entry point and initializes Zaru.
+///
+/// When the program is executed, this performs the following actions:
+/// - Logging is initialized by calling [`zaru::init_logger`][init_logger!].
+/// - The library is initialized by calling [`zaru::run`][run] with the user-defined main function
+///   as its argument.
+pub use zaru_macros::main;
 
 /// macro-use only, not part of public API.
 #[doc(hidden)]
@@ -76,4 +87,44 @@ macro_rules! init_logger {
     () => {
         $crate::init_logger(env!("CARGO_CRATE_NAME"))
     };
+}
+
+/// Initializes the library and runs the event loop on the calling thread (which must be the main
+/// thread).
+///
+/// This function initializes the display server connection, which is required for any GPU
+/// functionality to work, so it *must* be called by the application before it uses the library. For
+/// convenience, the [`main`] macro can be applied to the program's main function to invoke this
+/// function automatically.
+///
+/// The function `cb` will be invoked on a separate thread after initialization is complete. This
+/// callback is typically where any application logic is placed.
+///
+/// # Panics
+///
+/// This function will panic if it is not called from the main thread.
+///
+/// # Examples
+///
+/// If the user code exits without panicking or returning an error, the application will exit
+/// successfully.
+///
+/// ```
+/// zaru::run(|| {});
+/// ```
+///
+/// Errors in the user code cause the application to exit:
+///
+/// ```should_panic
+/// // This will exit with an error status.
+/// zaru::run(|| -> Result<(), _> {
+///     anyhow::bail!("an error occurred");
+/// })
+/// ```
+pub fn run<F, R>(cb: F) -> !
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Termination + Send,
+{
+    gui::run(cb);
 }

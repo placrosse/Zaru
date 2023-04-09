@@ -43,6 +43,7 @@ impl Embedding {
     }
 }
 
+#[zaru::main]
 fn main() -> anyhow::Result<()> {
     let face_dir = std::env::args_os().nth(1).unwrap();
 

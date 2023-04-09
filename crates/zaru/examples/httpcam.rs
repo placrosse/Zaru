@@ -2,9 +2,8 @@ use std::net::SocketAddr;
 
 use zaru::{gui, timer::FpsCounter, video::httpcam::HttpStream};
 
+#[zaru::main]
 fn main() -> anyhow::Result<()> {
-    zaru::init_logger!();
-
     let Some(addr) = std::env::args().nth(1) else {
         eprintln!("usage: httpcam <addr:port>");
         std::process::exit(1);

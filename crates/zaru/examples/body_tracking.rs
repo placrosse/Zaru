@@ -20,9 +20,8 @@ use zaru::{
 
 const USE_FULL_NETWORK: bool = false;
 
+#[zaru::main]
 fn main() -> anyhow::Result<()> {
-    zaru::init_logger!();
-
     let image_path = env::args_os().nth(1);
 
     let video_source: Box<dyn Iterator<Item = anyhow::Result<Image>>> = match image_path {
