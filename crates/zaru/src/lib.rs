@@ -15,6 +15,7 @@
 //!
 //! * `ZARU_JPEG_BACKEND`: Configures the JPEG image decoder to use. Allowed values are:
 //!   * `mozjpeg`: uses the [mozjpeg] library to decode JPEG images.
+//!   * `zune-jpeg`: uses the [zune-jpeg] crate to decode JPEG images.
 //!   * `fast-but-wrong`: uses a specific patched revision of the [zune-jpeg] crate, which can
 //!     perform better than mozjpeg, but incorrectly decodes (or fails to decode) some images.
 //!   * `jpeg-decoder`: uses the [jpeg-decoder] crate.
