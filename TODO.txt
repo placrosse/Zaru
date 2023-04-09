@@ -6,4 +6,5 @@
 - rewrite the "UI" to be more fully featured
   - having an interactive thing that lets you configure any video/image source
     and apply tools to it would also be cool
-- remove the fast-but-wrong JPEG decoder after testing the tuned mozjpeg on the laptop
+- replace the fast-but-wrong JPEG decoder with something less awful
+- `Detection` having an angle is weird, maybe the wrapper approach of landmark networks could be used instead?

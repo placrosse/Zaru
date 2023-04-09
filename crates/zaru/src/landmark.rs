@@ -221,6 +221,10 @@ pub trait Estimate: Send + Sync + 'static {
 }
 
 /// Trait for network inference results that contain a confidence value.
+///
+/// The confidence value can be used to detect when the object becomes obscured or leaves the
+/// camera's field of view. It is required by [`LandmarkTracker`] in order to decide when to stop
+/// tracking a particular region of interest.
 pub trait Confidence {
     /// Confidence value indicating whether the tracked object is in view.
     ///
@@ -228,6 +232,8 @@ pub trait Confidence {
     /// tracked object is probably still in view. If a different range is used, the tracking loss
     /// threshold probably needs adjusting.
     fn confidence(&self) -> f32;
+
+    // FIXME: should this be named `presence` instead? confidence is a very broad term
 }
 
 /// Trait implemented by wrapper types around neural networks that estimate landmarks.

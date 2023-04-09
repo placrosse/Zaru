@@ -159,8 +159,12 @@ pub struct Detector<C: Classes> {
 }
 
 impl<C: Classes> Detector<C> {
+    /// The default detection threshold.
+    ///
+    /// The detection threshold can be changed by calling [`Detector::set_threshold`].
     pub const DEFAULT_THRESHOLD: f32 = 0.5;
 
+    /// Creates a new [`Detector`] that will use the given [`Network`] to detect objects.
     pub fn new<N: Network<Classes = C>>(network: N) -> Self {
         Self {
             network: Box::new(network),
@@ -178,15 +182,31 @@ impl<C: Classes> Detector<C> {
         self.network.cnn().input_resolution()
     }
 
+    /// Sets the detection threshold.
+    ///
+    /// If this isn't called, [`Detector::DEFAULT_THRESHOLD`] is used.
     #[inline]
     pub fn set_threshold(&mut self, thresh: f32) {
         self.thresh = thresh;
     }
 
+    /// Returns a mutable reference to the [`NonMaxSuppression`] that this [`Detector`] will use.
+    ///
+    /// Non-maximum suppression (NMS) is applied to all detections output by the network. This
+    /// method allows configuring the exact parameters used for NMS.
+    #[inline]
     pub fn nms_mut(&mut self) -> &mut NonMaxSuppression {
         &mut self.nms
     }
 
+    /// Performs object detection on an input image.
+    ///
+    /// This will feed the image data into the underlying [`Cnn`], extract all detection with a
+    /// confidence value above the configured threshold, perform non-maximum suppression, and return
+    /// the resulting [`Detections`] collection.
+    ///
+    /// Detection coordinates are in the coordinate system of the input image (adjustment to and
+    /// from network coordinates is performed automatically).
     pub fn detect<V: AsImageView>(&mut self, image: &V) -> &Detections<C> {
         self.detect_impl(image.as_view())
     }
@@ -244,6 +264,7 @@ impl<C: Classes> Detector<C> {
         &self.detections
     }
 
+    /// Returns profiling timers of this [`Detector`].
     pub fn timers(&self) -> impl Iterator<Item = &Timer> + '_ {
         [&self.t_infer, &self.t_extract, &self.t_nms].into_iter()
     }

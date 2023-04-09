@@ -3,6 +3,10 @@
 /// Extensions for immutable slices.
 pub trait SliceExt<'a, T> {
     /// Returns an iterator that yields array chunks of `N` elements.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if `N` is `0`, or if the length of the slice is not divisible by `N`.
     fn array_chunks_exact<const N: usize>(self) -> ArrayChunksExact<'a, N, T>;
 }
 
