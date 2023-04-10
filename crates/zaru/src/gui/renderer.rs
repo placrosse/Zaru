@@ -2,24 +2,19 @@
 //! its own library at this point but I'm not sure how a good API would look so I guess I'll keep
 //! copying it around.
 
-use std::{iter, mem::size_of, num::NonZeroU32, rc::Rc};
+use std::{iter, num::NonZeroU32, rc::Rc};
 
 use anyhow::anyhow;
-use bytemuck::{Pod, Zeroable};
 use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
     Adapter, Backends, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, Buffer, BufferAddress,
-    BufferUsages, Color, ColorWrites, Device, Extent3d, Features, ImageDataLayout, Origin3d,
-    PrimitiveTopology, Queue, RenderPipeline, SamplerBindingType, SamplerDescriptor, ShaderStages,
-    Surface, TextureDescriptor, TextureFormat, TextureUsages, VertexAttribute, VertexBufferLayout,
-    VertexFormat, VertexStepMode,
+    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, Color, ColorWrites, Device,
+    Extent3d, Features, ImageDataLayout, Origin3d, Queue, RenderPipeline, SamplerBindingType,
+    SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, Surface,
+    TextureDescriptor, TextureFormat, TextureUsages,
 };
 use winit::{dpi::PhysicalSize, event_loop::EventLoopWindowTarget, window::WindowBuilder};
 
 use crate::image::Resolution;
-
-use super::shaders::Shaders;
 
 const BACKGROUND: Color = Color::BLACK;
 
@@ -178,61 +173,18 @@ impl Texture {
     }
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Pod, Zeroable)]
-struct Vertex {
-    pos: [f32; 2],
-    tex: [f32; 2],
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Pod, Zeroable)]
-struct Instance {
-    pos: [f32; 2],
-    color: [f32; 3],
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Pod, Zeroable)]
-struct SharedUniforms {
-    view: [[f32; 4]; 3],
-    quad_scale: f32,
-    pad: [f32; 3],
-}
-
 struct RenderPipelines {
-    /// Renders a textured `screen_space_quad`.
+    /// Renders a full-screen texture.
     textured_quad: RenderPipeline,
-    /// A `[-1.0,-1.0]` to `[1.0,1.0]` 2D quad.
-    screen_space_quad: Buffer,
 }
 
 impl RenderPipelines {
     fn create(
         surface_format: TextureFormat,
         device: &Device,
-        shaders: &Shaders,
+        shader: &ShaderModule,
         shared_bind_group_layout: &BindGroupLayout,
     ) -> Self {
-        fn v(x: f32, y: f32, u: f32, v: f32) -> Vertex {
-            Vertex {
-                pos: [x, y],
-                tex: [u, v],
-            }
-        }
-        let screen_space_quad = [
-            v(-1.0, 1.0, 0.0, 0.0),  // top left
-            v(1.0, 1.0, 1.0, 0.0),   // top right
-            v(-1.0, -1.0, 0.0, 1.0), // bottom left
-            v(1.0, -1.0, 1.0, 1.0),  // bottom right
-        ];
-
-        let screen_space_quad = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("screen_space_quad"),
-            contents: bytemuck::bytes_of(&screen_space_quad),
-            usage: BufferUsages::VERTEX,
-        });
-
         let textured_quad = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("textured_quad"),
             layout: Some(
@@ -243,47 +195,26 @@ impl RenderPipelines {
                 }),
             ),
             vertex: wgpu::VertexState {
-                module: &shaders.textured_quad.vert,
-                entry_point: "main",
-                buffers: &[VertexBufferLayout {
-                    array_stride: size_of::<Vertex>() as BufferAddress,
-                    step_mode: VertexStepMode::Vertex,
-                    attributes: &[
-                        VertexAttribute {
-                            format: VertexFormat::Float32x2,
-                            offset: 0,
-                            shader_location: 0,
-                        },
-                        VertexAttribute {
-                            format: VertexFormat::Float32x2,
-                            offset: 4 * 2,
-                            shader_location: 1,
-                        },
-                    ],
-                }],
+                module: shader,
+                entry_point: "vert",
+                buffers: &[],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shaders.textured_quad.frag,
-                entry_point: "main",
+                module: shader,
+                entry_point: "frag",
                 targets: &[Some(wgpu::ColorTargetState {
                     format: surface_format,
                     write_mask: ColorWrites::ALL,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    blend: None,
                 })],
             }),
-            primitive: wgpu::PrimitiveState {
-                topology: PrimitiveTopology::TriangleStrip,
-                ..Default::default()
-            },
+            primitive: wgpu::PrimitiveState::default(),
             depth_stencil: None,
             multisample: Default::default(),
             multiview: None,
         });
 
-        Self {
-            textured_quad,
-            screen_space_quad,
-        }
+        Self { textured_quad }
     }
 }
 
@@ -336,11 +267,14 @@ pub struct Renderer {
 impl Renderer {
     pub fn new(window: Window, gpu: Rc<Gpu>) -> anyhow::Result<Self> {
         let surface = unsafe { gpu.instance.create_surface(&*window.win) };
-        let shaders = Shaders::load(&gpu.device)?;
-        Ok(Self::with_surface(window, gpu, shaders, surface))
+        let shader = gpu.device.create_shader_module(ShaderModuleDescriptor {
+            label: Some("fullscreen texture shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+        });
+        Ok(Self::with_surface(window, gpu, shader, surface))
     }
 
-    fn with_surface(window: Window, gpu: Rc<Gpu>, shaders: Shaders, surface: Surface) -> Self {
+    fn with_surface(window: Window, gpu: Rc<Gpu>, shader: ShaderModule, surface: Surface) -> Self {
         let surface_format = *surface
             .get_supported_formats(&gpu.adapter)
             .get(0)
@@ -373,7 +307,7 @@ impl Renderer {
         let render_pipelines = RenderPipelines::create(
             surface_format,
             &gpu.device,
-            &shaders,
+            &shader,
             &shared_bind_group_layout,
         );
 
@@ -447,9 +381,8 @@ impl Renderer {
             });
 
             rpass.set_pipeline(&self.render_pipelines.textured_quad);
-            rpass.set_vertex_buffer(0, self.render_pipelines.screen_space_quad.slice(..));
             rpass.set_bind_group(0, &self.bind_groups.textured_quad, &[]);
-            rpass.draw(0..4, 0..1);
+            rpass.draw(0..3, 0..1);
         }
 
         self.gpu.queue.submit(iter::once(encoder.finish()));

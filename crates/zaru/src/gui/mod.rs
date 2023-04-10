@@ -1,7 +1,6 @@
 //! A simple, high-level debug GUI.
 
 mod renderer;
-mod shaders;
 
 use std::{
     collections::HashMap,
