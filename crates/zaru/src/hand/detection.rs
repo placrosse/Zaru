@@ -1,5 +1,7 @@
 //! Palm detection.
 
+// TODO(GPU/wonnx): support mode=linear for `Resize` node
+
 use crate::nn::{ColorMapper, Outputs};
 use crate::num::sigmoid;
 use crate::{image::Resolution, rect::Rect};

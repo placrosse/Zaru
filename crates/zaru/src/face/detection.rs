@@ -33,6 +33,7 @@ static SHORT_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
     Cnn::new(
         NeuralNetwork::from_onnx(model_data)
             .unwrap()
+            .with_gpu_support()
             .load()
             .unwrap(),
         CnnInputShape::NCHW,
@@ -63,6 +64,8 @@ impl Network for ShortRangeNetwork {
 /// A larger detection network with a greater detection range, but slower inference speed (around 5
 /// times that of [`ShortRangeNetwork`]).
 pub struct FullRangeNetwork;
+
+// TODO(GPU/wonnx): support mode=linear for `Resize` node
 
 static FULL_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
     let model_data = include_blob!("../../3rdparty/onnx/face_detection_full_range.onnx");

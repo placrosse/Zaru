@@ -121,6 +121,7 @@ enum ColorMapperKind {
     Linear { target_range: RangeInclusive<f32> },
 }
 
+/// Describes how pixel colors in an image are mapped to a [`Cnn`]'s input tensors.
 pub struct ColorMapper {
     kind: ColorMapperKind,
 }

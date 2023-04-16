@@ -13,3 +13,7 @@ panic = "abort"
 
 [profile.dev.package.'*']
 opt-level = 3
+
+# For wonnx development:
+#[patch."https://github.com/webonnx/wonnx.git"]
+#wonnx = { path = "../wonnx/wonnx" }

@@ -42,7 +42,7 @@ raw-window-handle = "0.5.0"
 # neural nets
 tract-onnx = "0.19.1"
 tinyvec = { version = "1.6.0", features = ["alloc"] }
-wonnx = { git = "https://github.com/webonnx/wonnx.git", rev = "315d66a318515f1cc5e42684ddb8bd22ec01d378" }
+wonnx = { git = "https://github.com/webonnx/wonnx.git", rev = "868e8827393b57f888fe28ac3bea8f197375893e" }
 
 # tracker-only deps
 serde = { version = "1.0.136", features = ["derive"] }

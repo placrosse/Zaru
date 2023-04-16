@@ -1,5 +1,7 @@
 //! Body pose landmark prediction. Not yet fully implemented.
 
+// TODO(GPU/wonnx): support mode=linear for `Resize` node
+
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
 use crate::landmark::{Confidence, Estimate, Landmark, Landmarks, Network};
 use crate::nn::{ColorMapper, Outputs};

@@ -1,5 +1,7 @@
 //! Human body detection.
 
+// TODO(GPU/wonnx): support mode=linear for `Resize` node
+
 use crate::nn::{ColorMapper, Outputs};
 use crate::num::sigmoid;
 use crate::rect::Rect;
