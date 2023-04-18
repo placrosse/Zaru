@@ -6,7 +6,7 @@ use zaru::{
     video::webcam::{Webcam, WebcamOptions},
 };
 
-const FULL_RANGE: bool = true;
+const FULL_RANGE: bool = false;
 
 #[zaru::main]
 fn main() -> anyhow::Result<()> {

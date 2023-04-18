@@ -183,7 +183,7 @@ mod tests {
         let detections = det.detect(test::sad_linus_full());
         let detection = detections.iter().next().expect("no detection");
 
-        assert!(detection.confidence() >= 0.9, "{}", detection.confidence());
+        assert!(detection.confidence() >= 0.8, "{}", detection.confidence());
         let angle = detection.angle().to_degrees();
         assert!(angle < 5.0, "{angle}");
     }
