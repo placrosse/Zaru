@@ -35,14 +35,14 @@ nalgebra = "0.32.1"
 
 # GUI
 winit = "0.28.1"
-wgpu = "0.14.0"
+wgpu = "0.16.0"
 pollster = "0.3.0"
 raw-window-handle = "0.5.0"
 
 # neural nets
 tract-onnx = "0.19.1"
 tinyvec = { version = "1.6.0", features = ["alloc"] }
-wonnx = { git = "https://github.com/webonnx/wonnx.git", rev = "868e8827393b57f888fe28ac3bea8f197375893e" }
+wonnx = "0.5.0"
 
 [build-dependencies]
 include-blob = "0.1.0"

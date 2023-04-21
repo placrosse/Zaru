@@ -2,7 +2,7 @@
 //! its own library at this point but I'm not sure how a good API would look so I guess I'll keep
 //! copying it around.
 
-use std::{iter, num::NonZeroU32, rc::Rc};
+use std::{iter, rc::Rc};
 
 use anyhow::anyhow;
 use wgpu::{
@@ -53,7 +53,10 @@ pub struct Gpu {
 impl Gpu {
     pub async fn open() -> anyhow::Result<Self> {
         let backends = Backends::PRIMARY;
-        let instance = wgpu::Instance::new(backends);
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends,
+            ..Default::default()
+        });
 
         log::info!("available graphics adapters:");
         for adapter in instance.enumerate_adapters(backends) {
@@ -118,6 +121,7 @@ impl Texture {
                 dimension: wgpu::TextureDimension::D2,
                 usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
                 format,
+                view_formats: &[],
             }),
             size: Extent3d::default(),
             format,
@@ -148,6 +152,7 @@ impl Texture {
                 dimension: wgpu::TextureDimension::D2,
                 format: self.format,
                 usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+                view_formats: &[],
             });
             self.size = size;
         }
@@ -162,8 +167,7 @@ impl Texture {
             data,
             ImageDataLayout {
                 offset: 0,
-                // FIXME breaks with empty textures
-                bytes_per_row: Some(NonZeroU32::new(size.width * 4).unwrap()),
+                bytes_per_row: Some(size.width * 4),
                 rows_per_image: None,
             },
             size,
@@ -266,7 +270,7 @@ pub struct Renderer {
 
 impl Renderer {
     pub fn new(window: Window, gpu: Rc<Gpu>) -> anyhow::Result<Self> {
-        let surface = unsafe { gpu.instance.create_surface(&*window.win) };
+        let surface = unsafe { gpu.instance.create_surface(&*window.win)? };
         let shader = gpu.device.create_shader_module(ShaderModuleDescriptor {
             label: Some("fullscreen texture shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
@@ -276,7 +280,8 @@ impl Renderer {
 
     fn with_surface(window: Window, gpu: Rc<Gpu>, shader: ShaderModule, surface: Surface) -> Self {
         let surface_format = *surface
-            .get_supported_formats(&gpu.adapter)
+            .get_capabilities(&gpu.adapter)
+            .formats
             .get(0)
             .expect("adapter cannot render to window surface");
 
@@ -413,7 +418,8 @@ impl Renderer {
     fn recreate_swapchain(&mut self) {
         let surface_format = *self
             .surface()
-            .get_supported_formats(&self.gpu.adapter)
+            .get_capabilities(&self.gpu.adapter)
+            .formats
             .get(0)
             .expect("adapter cannot render to window surface");
         let res = self.window.win.inner_size();
@@ -442,6 +448,7 @@ impl Renderer {
             height: self.window.resolution.height(),
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            view_formats: Vec::new(),
         };
 
         self.surface().configure(&self.gpu.device, &config);
