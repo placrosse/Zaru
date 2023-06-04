@@ -225,9 +225,16 @@ impl<'a> Loader<'a> {
     /// Returns an error if the network data is malformed, if the network data is incomplete, or if
     /// the network uses unimplemented operations.
     pub fn load(self) -> anyhow::Result<NeuralNetwork> {
-        let graph = tract_onnx::onnx()
-            .model_for_read(&mut &*self.model_data)?
-            .into_optimized()?;
+        let graph = tract_onnx::onnx().model_for_read(&mut &*self.model_data)?;
+
+        // tract optimization can change the name of the output nodes, so grab them first
+        let output_names = graph
+            .outputs
+            .iter()
+            .map(|i| graph.outlet_label(*i).unwrap().to_string())
+            .collect::<Vec<_>>();
+
+        let graph = graph.into_optimized()?;
         let outputs = graph.output_outlets()?;
         let selected_outputs = match self.outputs {
             Some(indices) => indices.iter().map(|&i| outputs[i]).collect::<Vec<_>>(),
@@ -245,6 +252,7 @@ impl<'a> Loader<'a> {
 
         Ok(NeuralNetwork(Arc::new(NeuralNetworkImpl {
             inner: model,
+            output_names,
             gpu,
         })))
     }
@@ -258,6 +266,8 @@ pub struct NeuralNetwork(Arc<NeuralNetworkImpl>);
 
 struct NeuralNetworkImpl {
     inner: Model,
+    /// Output node names from the model file.
+    output_names: Vec<String>,
     gpu: Option<wonnx::Session>,
 }
 
@@ -333,7 +343,13 @@ impl NeuralNetwork {
                 let output_map = pollster::block_on(gpu.run(&inputs))?;
                 let mut outputs = TVec::new();
                 for info in self.outputs() {
-                    let tensor = &output_map[info.name()];
+                    let tensor = output_map.get(info.name()).unwrap_or_else(|| {
+                        panic!(
+                            "output '{}' missing in result map (map contains {:?})",
+                            info.name(),
+                            output_map.keys(),
+                        );
+                    });
                     match tensor {
                         OutputTensor::F32(tensor) => {
                             outputs.push(Tensor::from_iter(info.shape(), tensor.iter().copied()));
@@ -426,14 +442,12 @@ impl<'a> Iterator for OutputInfoIter<'a> {
         let model = &self.net.0.inner.model();
         let fact = model.output_fact(id).expect("`output_fact` returned error");
 
-        let node = model.output_outlets().unwrap()[id].node;
-
         Some(OutputInfo {
             shape: fact.shape.as_concrete().expect(
                 "symbolic network output shape, this makes no \
                 sense, by which I mean I don't understand what this means",
             ),
-            name: &model.node(node).name,
+            name: &self.net.0.output_names[id],
         })
     }
 }
