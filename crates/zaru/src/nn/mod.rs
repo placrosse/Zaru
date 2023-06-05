@@ -2,10 +2,14 @@
 
 pub mod tensor;
 
-use crate::image::{AsImageView, Color, ImageView, Resolution};
+use crate::{
+    image::{AsImageView, Color, ImageView, Resolution},
+    iter::zip_exact,
+};
 use tensor::Tensor;
 use tract_onnx::prelude::{
-    tvec, Framework, Graph, InferenceModelExt, SimplePlan, TValue, TVec, TypedFact, TypedOp,
+    tvec, DatumType, Framework, Graph, InferenceModelExt, SimplePlan, TValue, TVec, TypedFact,
+    TypedOp,
 };
 use wonnx::utils::{InputTensor, OutputTensor};
 
@@ -16,7 +20,7 @@ use std::{
     sync::Arc,
 };
 
-type Model = SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
+type ModelPlan = SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
 
 /// A convolutional neural network (CNN) that operates on image data.
 ///
@@ -227,20 +231,68 @@ impl<'a> Loader<'a> {
     pub fn load(self) -> anyhow::Result<NeuralNetwork> {
         let graph = tract_onnx::onnx().model_for_read(&mut &*self.model_data)?;
 
-        // tract optimization can change the name of the output nodes, so grab them first
+        // tract optimization can change the name of the input/output nodes, so grab them first
+        // NB: input *outlets* don't seem to have names assigned to them, only the corresponding *node*
+        let input_names = graph
+            .inputs
+            .iter()
+            .map(|i| graph.node(i.node).name.clone())
+            .collect::<Vec<_>>();
         let output_names = graph
             .outputs
             .iter()
             .map(|i| graph.outlet_label(*i).unwrap().to_string())
             .collect::<Vec<_>>();
 
+        let selected_outputs = self
+            .outputs
+            .unwrap_or_else(|| (0..graph.outputs.len()).collect());
+
         let graph = graph.into_optimized()?;
         let outputs = graph.output_outlets()?;
-        let selected_outputs = match self.outputs {
-            Some(indices) => indices.iter().map(|&i| outputs[i]).collect::<Vec<_>>(),
-            None => outputs.to_vec(),
-        };
-        let model = SimplePlan::new_for_outputs(graph, &selected_outputs)?;
+        let selected_output_outlets = selected_outputs
+            .iter()
+            .map(|&i| outputs[i])
+            .collect::<Vec<_>>();
+        let plan = SimplePlan::new_for_outputs(graph, &selected_output_outlets)?;
+        let outputs = &plan.outputs;
+
+        // collect model input and output information
+        let output_info = selected_outputs
+            .iter()
+            .map(|&i| {
+                let outlet = outputs[i];
+                let fact = plan.model.outlet_fact(outlet).unwrap();
+                InputOutputDesc {
+                    name: output_names[i].clone(),
+                    shape: fact
+                        .shape
+                        .as_concrete()
+                        .expect("symbolic input/output tensor shape")
+                        .into(),
+                    datum_type: fact.datum_type,
+                }
+            })
+            .collect();
+
+        let input_info = plan
+            .model
+            .inputs
+            .iter()
+            .enumerate()
+            .map(|(i, &outlet)| {
+                let fact = plan.model.outlet_fact(outlet).unwrap();
+                InputOutputDesc {
+                    name: input_names[i].clone(),
+                    shape: fact
+                        .shape
+                        .as_concrete()
+                        .expect("symbolic input/output tensor shape")
+                        .into(),
+                    datum_type: fact.datum_type,
+                }
+            })
+            .collect();
 
         let gpu = if self.enable_gpu {
             Some(pollster::block_on(wonnx::Session::from_bytes(
@@ -251,8 +303,9 @@ impl<'a> Loader<'a> {
         };
 
         Ok(NeuralNetwork(Arc::new(NeuralNetworkImpl {
-            inner: model,
-            output_names,
+            inner: plan,
+            inputs: input_info,
+            outputs: output_info,
             gpu,
         })))
     }
@@ -265,10 +318,16 @@ impl<'a> Loader<'a> {
 pub struct NeuralNetwork(Arc<NeuralNetworkImpl>);
 
 struct NeuralNetworkImpl {
-    inner: Model,
-    /// Output node names from the model file.
-    output_names: Vec<String>,
+    inner: ModelPlan,
+    inputs: Vec<InputOutputDesc>,
+    outputs: Vec<InputOutputDesc>,
     gpu: Option<wonnx::Session>,
+}
+
+struct InputOutputDesc {
+    name: String,
+    shape: TVec<usize>,
+    datum_type: DatumType,
 }
 
 impl NeuralNetwork {
@@ -296,12 +355,12 @@ impl NeuralNetwork {
 
     /// Returns the number of input nodes of the network.
     pub fn num_inputs(&self) -> usize {
-        self.0.inner.model().inputs.len()
+        self.0.inputs.len()
     }
 
     /// Returns the number of output nodes of the network.
     pub fn num_outputs(&self) -> usize {
-        self.0.inner.model().outputs.len()
+        self.0.outputs.len()
     }
 
     /// Returns an iterator over the network's input node information.
@@ -361,12 +420,19 @@ impl NeuralNetwork {
                 Outputs { inner: outputs }
             }
             None => {
-                let outputs = self.0.inner.run(
-                    inputs
-                        .iter()
-                        .map(|t| TValue::from_const(Arc::new(t.to_tract())))
-                        .collect(),
-                )?;
+                let inputs: TVec<_> = zip_exact(&self.0.inputs, inputs.iter())
+                    .map(|(info, t)| {
+                        let mut tensor = t.to_tract();
+                        if tensor.datum_type() != info.datum_type {
+                            tensor = tensor
+                                .cast_to_dt(info.datum_type)
+                                .expect("tensor cast failed")
+                                .into_owned();
+                        }
+                        TValue::from_const(Arc::new(tensor))
+                    })
+                    .collect();
+                let outputs = self.0.inner.run(inputs)?;
                 let outputs = outputs
                     .into_iter()
                     .map(|tract| Tensor::from_tract(&tract))
@@ -391,17 +457,10 @@ impl<'a> Iterator for InputInfoIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let id = self.ids.next()?;
 
-        let model = &self.net.0.inner.model();
-        let fact = model.input_fact(id).expect("`input_fact` returned error");
-
-        let node = model.input_outlets().unwrap()[id].node;
-
+        let desc = &self.net.0.inputs[id];
         Some(InputInfo {
-            shape: fact.shape.as_concrete().expect(
-                "symbolic network input shape, this makes no \
-                sense, by which I mean I don't understand what this means",
-            ),
-            name: &model.node(node).name,
+            shape: &desc.shape,
+            name: &desc.name,
         })
     }
 }
@@ -439,15 +498,10 @@ impl<'a> Iterator for OutputInfoIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let id = self.ids.next()?;
 
-        let model = &self.net.0.inner.model();
-        let fact = model.output_fact(id).expect("`output_fact` returned error");
-
+        let desc = &self.net.0.outputs[id];
         Some(OutputInfo {
-            shape: fact.shape.as_concrete().expect(
-                "symbolic network output shape, this makes no \
-                sense, by which I mean I don't understand what this means",
-            ),
-            name: &self.net.0.output_names[id],
+            shape: &desc.shape,
+            name: &desc.name,
         })
     }
 }
@@ -537,7 +591,7 @@ impl Inputs {
         self.inner.len()
     }
 
-    fn iter(&self) -> impl Iterator<Item = &Tensor> {
+    fn iter(&self) -> impl ExactSizeIterator<Item = &Tensor> {
         self.inner.iter()
     }
 }
