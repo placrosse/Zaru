@@ -205,12 +205,25 @@ impl Tensor {
     }
 
     pub(super) fn from_tract(tract: &tract_onnx::prelude::Tensor) -> Self {
+        let tract = tract.cast_to::<f32>().unwrap();
         let mut iter = tract.as_slice::<f32>().unwrap().iter();
         Self::from_dyn_shape_fn(tract.shape(), |_| *iter.next().unwrap())
     }
 
     pub(super) fn to_tract(&self) -> tract_onnx::prelude::Tensor {
         tract_onnx::prelude::Tensor::from_shape(self.shape(), &self.data).unwrap()
+    }
+
+    pub(super) fn from_ndarray<S: ndarray::Data<Elem = f32>>(
+        array: &ndarray::ArrayBase<S, ndarray::IxDyn>,
+    ) -> Self {
+        let mut iter = array.iter();
+        Self::from_dyn_shape_fn(array.shape(), |_| *iter.next().unwrap())
+    }
+
+    pub(super) fn to_ndarray(&self) -> ndarray::ArrayD<f32> {
+        let mut iter = self.data.iter();
+        ndarray::ArrayD::from_shape_simple_fn(self.shape(), || *iter.next().unwrap())
     }
 
     pub(super) fn as_raw_data(&self) -> &[f32] {

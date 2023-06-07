@@ -1,20 +1,25 @@
 //! Neural Network inference.
 
+mod backend;
 pub mod tensor;
 
 use crate::{
     image::{AsImageView, Color, ImageView, Resolution},
     iter::zip_exact,
 };
+use ort::{tensor::FromArray, InMemorySession};
 use tensor::Tensor;
-use tract_onnx::prelude::{
-    tvec, DatumType, Framework, Graph, InferenceModelExt, SimplePlan, TValue, TVec, TypedFact,
-    TypedOp,
+use tract_onnx::{
+    prelude::{
+        translator::Translate, tvec, DatumType, Framework, Graph, InferenceModelExt, SimplePlan,
+        TValue, TVec, TypedFact, TypedOp,
+    },
+    tract_core::half::HalfTranslator,
 };
-use wonnx::utils::{InputTensor, OutputTensor};
 
 use std::{
     borrow::Cow,
+    mem,
     ops::{Index, Range, RangeInclusive},
     path::Path,
     sync::Arc,
@@ -181,6 +186,7 @@ pub struct Loader<'a> {
     model_data: Cow<'a, [u8]>,
     outputs: Option<Vec<usize>>,
     enable_gpu: bool,
+    convert_to_f16: bool,
 }
 
 impl<'a> Loader<'a> {
@@ -189,6 +195,7 @@ impl<'a> Loader<'a> {
             model_data: data,
             outputs: None,
             enable_gpu: false,
+            convert_to_f16: false,
         }
     }
 
@@ -248,21 +255,23 @@ impl<'a> Loader<'a> {
             .outputs
             .unwrap_or_else(|| (0..graph.outputs.len()).collect());
 
-        let graph = graph.into_optimized()?;
+        let mut graph = graph.into_optimized()?;
+        if self.convert_to_f16 {
+            graph = HalfTranslator.translate_model(&graph)?;
+        }
         let outputs = graph.output_outlets()?;
         let selected_output_outlets = selected_outputs
             .iter()
             .map(|&i| outputs[i])
             .collect::<Vec<_>>();
         let plan = SimplePlan::new_for_outputs(graph, &selected_output_outlets)?;
-        let outputs = &plan.outputs;
 
         // collect model input and output information
         let output_info = selected_outputs
             .iter()
             .map(|&i| {
-                let outlet = outputs[i];
-                let fact = plan.model.outlet_fact(outlet).unwrap();
+                let outlet = selected_output_outlets[i];
+                let fact = plan.model().outlet_fact(outlet).unwrap();
                 InputOutputDesc {
                     name: output_names[i].clone(),
                     shape: fact
@@ -276,12 +285,12 @@ impl<'a> Loader<'a> {
             .collect();
 
         let input_info = plan
-            .model
+            .model()
             .inputs
             .iter()
             .enumerate()
             .map(|(i, &outlet)| {
-                let fact = plan.model.outlet_fact(outlet).unwrap();
+                let fact = plan.model().outlet_fact(outlet).unwrap();
                 InputOutputDesc {
                     name: input_names[i].clone(),
                     shape: fact
@@ -302,11 +311,31 @@ impl<'a> Loader<'a> {
             None
         };
 
+        let ort = if backend::get() == backend::OnnxBackend::OnnxRuntime {
+            let env = ort::Environment::builder()
+                .with_name("Zaru")
+                .with_log_level(ort::LoggingLevel::Info)
+                .build()?;
+
+            let model_data = self.model_data.to_vec().into_boxed_slice();
+            let sess =
+                ort::SessionBuilder::new(&env.into_arc())?.with_model_from_memory(&*model_data)?;
+            Some(OrtSession {
+                session: unsafe {
+                    mem::transmute::<InMemorySession<'_>, InMemorySession<'static>>(sess)
+                },
+                _model: model_data,
+            })
+        } else {
+            None
+        };
+
         Ok(NeuralNetwork(Arc::new(NeuralNetworkImpl {
             inner: plan,
             inputs: input_info,
             outputs: output_info,
             gpu,
+            ort,
         })))
     }
 }
@@ -322,6 +351,16 @@ struct NeuralNetworkImpl {
     inputs: Vec<InputOutputDesc>,
     outputs: Vec<InputOutputDesc>,
     gpu: Option<wonnx::Session>,
+    ort: Option<OrtSession>,
+}
+
+// FIXME: gross hack (manual self-referencing type), needed because `ort` doesn't allow non-borrowed in-memory models
+// in theory, this isn't needed for most models here (they're stored in `static`s), but in practice
+// this is the easiest API to implement
+struct OrtSession {
+    session: ort::InMemorySession<'static>,
+    // Model must be dropped after session.
+    _model: Box<[u8]>,
 }
 
 struct InputOutputDesc {
@@ -353,12 +392,12 @@ impl NeuralNetwork {
         Ok(Loader::new(raw.into()))
     }
 
-    /// Returns the number of input nodes of the network.
+    /// Returns the number of tensors the network expects as inputs.
     pub fn num_inputs(&self) -> usize {
         self.0.inputs.len()
     }
 
-    /// Returns the number of output nodes of the network.
+    /// Returns the number of tensors output by the network.
     pub fn num_outputs(&self) -> usize {
         self.0.outputs.len()
     }
@@ -374,6 +413,8 @@ impl NeuralNetwork {
     }
 
     /// Returns an iterator over the network's output node information.
+    ///
+    /// Only outputs selected during loading (via [`Loader::with_output_selection`]) are included.
     pub fn outputs(&self) -> OutputInfoIter<'_> {
         OutputInfoIter {
             net: self,
@@ -387,14 +428,14 @@ impl NeuralNetwork {
     /// Otherwise, it is done on the CPU.
     #[doc(alias = "infer")]
     pub fn estimate(&self, inputs: &Inputs) -> anyhow::Result<Outputs> {
-        let outputs = match &self.0.gpu {
-            Some(gpu) => {
+        let outputs = match (&self.0.gpu, &self.0.ort) {
+            (Some(gpu), _) => {
                 let inputs = self
                     .inputs()
                     .zip(inputs.iter())
                     .map(|(info, tensor)| {
                         let name = info.name().to_string();
-                        let input = InputTensor::F32(tensor.as_raw_data().into());
+                        let input = wonnx::utils::InputTensor::F32(tensor.as_raw_data().into());
                         (name, input)
                     })
                     .collect();
@@ -410,7 +451,7 @@ impl NeuralNetwork {
                         );
                     });
                     match tensor {
-                        OutputTensor::F32(tensor) => {
+                        wonnx::utils::OutputTensor::F32(tensor) => {
                             outputs.push(Tensor::from_iter(info.shape(), tensor.iter().copied()));
                         }
                         _ => unreachable!(),
@@ -419,7 +460,39 @@ impl NeuralNetwork {
 
                 Outputs { inner: outputs }
             }
-            None => {
+            (None, Some(ort)) => {
+                let inputs = zip_exact(&self.0.inputs, inputs.iter())
+                    .map(|(info, tensor)| {
+                        let array = tensor.to_ndarray();
+                        match info.datum_type {
+                            DatumType::F32 => ort::tensor::InputTensor::from_array(array),
+                            DatumType::F16 => ort::tensor::InputTensor::from_array(
+                                array.map(|&f| half::f16::from_f32(f)),
+                            ),
+                            _ => unimplemented!(),
+                        }
+                    })
+                    .collect::<TVec<_>>();
+                let outputs = ort.session.run(inputs)?;
+
+                let outputs = outputs
+                    .iter()
+                    .map(|t| match t.data_type() {
+                        ort::tensor::TensorElementDataType::Float32 => {
+                            Tensor::from_ndarray(&t.try_extract::<f32>().unwrap().view())
+                        }
+                        ort::tensor::TensorElementDataType::Float16 => {
+                            let half = t.try_extract::<half::f16>().unwrap();
+                            let float = half.view().map(|half| f32::from(*half));
+                            Tensor::from_ndarray(&float)
+                        }
+                        unk => unimplemented!("tensor data type {:?}", unk),
+                    })
+                    .collect();
+
+                Outputs { inner: outputs }
+            }
+            (None, None) => {
                 let inputs: TVec<_> = zip_exact(&self.0.inputs, inputs.iter())
                     .map(|(info, t)| {
                         let mut tensor = t.to_tract();
