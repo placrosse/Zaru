@@ -303,39 +303,33 @@ impl<'a> Loader<'a> {
             })
             .collect();
 
-        let gpu = if self.enable_gpu {
-            Some(pollster::block_on(wonnx::Session::from_bytes(
+        let session = match (self.enable_gpu, backend::get()) {
+            (true, _) => Session::Wonnx(pollster::block_on(wonnx::Session::from_bytes(
                 &self.model_data,
-            ))?)
-        } else {
-            None
-        };
+            ))?),
+            (false, backend::OnnxBackend::Tract) => Session::Tract(plan),
+            (false, backend::OnnxBackend::OnnxRuntime) => {
+                let env = ort::Environment::builder()
+                    .with_name("Zaru")
+                    .with_log_level(ort::LoggingLevel::Info)
+                    .build()?;
 
-        let ort = if backend::get() == backend::OnnxBackend::OnnxRuntime {
-            let env = ort::Environment::builder()
-                .with_name("Zaru")
-                .with_log_level(ort::LoggingLevel::Info)
-                .build()?;
-
-            let model_data = self.model_data.to_vec().into_boxed_slice();
-            let sess =
-                ort::SessionBuilder::new(&env.into_arc())?.with_model_from_memory(&*model_data)?;
-            Some(OrtSession {
-                session: unsafe {
-                    mem::transmute::<InMemorySession<'_>, InMemorySession<'static>>(sess)
-                },
-                _model: model_data,
-            })
-        } else {
-            None
+                let model_data = self.model_data.to_vec().into_boxed_slice();
+                let sess = ort::SessionBuilder::new(&env.into_arc())?
+                    .with_model_from_memory(&*model_data)?;
+                Session::Ort(OrtSession {
+                    session: unsafe {
+                        mem::transmute::<InMemorySession<'_>, InMemorySession<'static>>(sess)
+                    },
+                    _model: model_data,
+                })
+            }
         };
 
         Ok(NeuralNetwork(Arc::new(NeuralNetworkImpl {
-            inner: plan,
             inputs: input_info,
             outputs: output_info,
-            gpu,
-            ort,
+            session,
         })))
     }
 }
@@ -347,11 +341,15 @@ impl<'a> Loader<'a> {
 pub struct NeuralNetwork(Arc<NeuralNetworkImpl>);
 
 struct NeuralNetworkImpl {
-    inner: ModelPlan,
     inputs: Vec<InputOutputDesc>,
     outputs: Vec<InputOutputDesc>,
-    gpu: Option<wonnx::Session>,
-    ort: Option<OrtSession>,
+    session: Session,
+}
+
+enum Session {
+    Tract(ModelPlan),
+    Wonnx(wonnx::Session),
+    Ort(OrtSession),
 }
 
 // FIXME: gross hack (manual self-referencing type), needed because `ort` doesn't allow non-borrowed in-memory models
@@ -428,8 +426,8 @@ impl NeuralNetwork {
     /// Otherwise, it is done on the CPU.
     #[doc(alias = "infer")]
     pub fn estimate(&self, inputs: &Inputs) -> anyhow::Result<Outputs> {
-        let outputs = match (&self.0.gpu, &self.0.ort) {
-            (Some(gpu), _) => {
+        let outputs = match &self.0.session {
+            Session::Wonnx(gpu) => {
                 let inputs = self
                     .inputs()
                     .zip(inputs.iter())
@@ -460,7 +458,7 @@ impl NeuralNetwork {
 
                 Outputs { inner: outputs }
             }
-            (None, Some(ort)) => {
+            Session::Ort(ort) => {
                 let inputs = zip_exact(&self.0.inputs, inputs.iter())
                     .map(|(info, tensor)| {
                         let array = tensor.to_ndarray();
@@ -492,7 +490,7 @@ impl NeuralNetwork {
 
                 Outputs { inner: outputs }
             }
-            (None, None) => {
+            Session::Tract(plan) => {
                 let inputs: TVec<_> = zip_exact(&self.0.inputs, inputs.iter())
                     .map(|(info, t)| {
                         let mut tensor = t.to_tract();
@@ -505,7 +503,7 @@ impl NeuralNetwork {
                         TValue::from_const(Arc::new(tensor))
                     })
                     .collect();
-                let outputs = self.0.inner.run(inputs)?;
+                let outputs = plan.run(inputs)?;
                 let outputs = outputs
                     .into_iter()
                     .map(|tract| Tensor::from_tract(&tract))
