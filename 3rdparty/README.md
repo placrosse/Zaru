@@ -16,6 +16,7 @@ Note that files may have been converted from other formats.
 | `onnx/face_detection_full_range.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/face_detection_short_range.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/face_landmark.onnx` | [MediaPipe] | Apache-2.0
+| `onnx/face_landmarks_detector.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/hand_landmark_full.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/hand_landmark_lite.onnx` | [MediaPipe] | Apache-2.0
 | `onnx/iris_landmark.onnx` | [MediaPipe] | Apache-2.0

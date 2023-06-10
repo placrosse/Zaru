@@ -15,6 +15,7 @@ use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
 
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
+use crate::landmark::{Confidence, Landmark};
 use crate::nn::ColorMapper;
 use crate::rect::RotatedRect;
 use crate::{
@@ -27,8 +28,21 @@ use crate::{
     slice::SliceExt,
 };
 
-static MODEL: Lazy<Cnn> = Lazy::new(|| {
+static MODEL_V1: Lazy<Cnn> = Lazy::new(|| {
     let model_data = include_blob!("../../3rdparty/onnx/face_landmark.onnx");
+    Cnn::new(
+        NeuralNetwork::from_onnx(model_data)
+            .unwrap()
+            .load()
+            .unwrap(),
+        CnnInputShape::NCHW,
+        ColorMapper::linear(-1.0..=1.0),
+    )
+    .unwrap()
+});
+
+static MODEL_V2: Lazy<Cnn> = Lazy::new(|| {
+    let model_data = include_blob!("../../3rdparty/onnx/face_landmarks_detector.onnx");
     Cnn::new(
         NeuralNetwork::from_onnx(model_data)
             .unwrap()
@@ -49,22 +63,21 @@ static MODEL: Lazy<Cnn> = Lazy::new(|| {
 /// face and pass an upright view to the network.
 ///
 /// [`LandmarkTracker`]: crate::landmark::LandmarkTracker
-pub struct MediaPipeFaceMesh;
+pub struct FaceMeshV1;
 
-impl landmark::Network for MediaPipeFaceMesh {
+impl landmark::Network for FaceMeshV1 {
     type Output = LandmarkResult;
 
     fn cnn(&self) -> &Cnn {
-        &MODEL
+        &MODEL_V1
     }
 
-    fn extract(&self, output: &Outputs, estimate: &mut Self::Output) {
-        estimate.face_flag = sigmoid(output[1].index([0, 0, 0, 0]).as_singular());
+    fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
+        estimate.face_flag = sigmoid(outputs[1].index([0, 0, 0, 0]).as_singular());
+
+        let landmark_coords = outputs[0].index([0, 0, 0]);
         for (&[x, y, z], out) in zip_exact(
-            output[0]
-                .index([0, 0, 0])
-                .as_slice()
-                .array_chunks_exact::<3>(),
+            landmark_coords.as_slice().array_chunks_exact::<3>(),
             estimate.landmarks.positions_mut(),
         ) {
             out[0] = x;
@@ -74,7 +87,41 @@ impl landmark::Network for MediaPipeFaceMesh {
     }
 }
 
-/// Landmark results estimated by [`MediaPipeFaceMesh`].
+/// Estimates facial and iris landmarks using the improved MediaPipe Face Mesh network.
+///
+/// This network estimates the same set of landmarks as [`FaceMeshV1`] (the reference positions can
+/// be obtained via [`reference_positions`]), and augments these landmarks with 5 iris landmarks per
+/// eye that can be used for eye tracking without requiring a separate iris landmark network.
+/// Additionally, this network also computes a `tongueOut` blendshape that indicates whether the
+/// pictured person is sticking their tongue out, which can be used for animations.
+pub struct FaceMeshV2;
+
+impl landmark::Network for FaceMeshV2 {
+    type Output = LandmarkResultV2;
+
+    fn cnn(&self) -> &Cnn {
+        &MODEL_V2
+    }
+
+    fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
+        estimate.face_flag = sigmoid(outputs[1].index([0, 0, 0, 0]).as_singular());
+
+        // (sigmoid applied inside model)
+        estimate.tongue_out = outputs[2].index([0, 0]).as_singular();
+
+        let landmark_coords = outputs[0].index([0, 0, 0]);
+        for (&[x, y, z], out) in zip_exact(
+            landmark_coords.as_slice().array_chunks_exact::<3>(),
+            estimate.landmarks.positions_mut(),
+        ) {
+            out[0] = x;
+            out[1] = y;
+            out[2] = z;
+        }
+    }
+}
+
+/// Landmark results estimated by [`FaceMeshV1`].
 #[derive(Clone)]
 pub struct LandmarkResult {
     landmarks: Landmarks,
@@ -101,17 +148,6 @@ impl LandmarkResult {
     #[inline]
     pub fn landmarks_mut(&mut self) -> &mut Landmarks {
         &mut self.landmarks
-    }
-
-    /// Returns the confidence that the input image contains a proper face.
-    ///
-    /// The returned value is in range 0.0 to 1.0.
-    ///
-    /// This can be used to estimate the fit quality, or to re-run face detection if that isn't done
-    /// each frame.
-    #[inline]
-    pub fn face_confidence(&self) -> f32 {
-        self.face_flag
     }
 
     pub fn rotation_radians(&self) -> f32 {
@@ -181,7 +217,7 @@ impl LandmarkResult {
             draw::marker(image, x, y).size(3);
         }
 
-        let color = match self.face_confidence() {
+        let color = match self.confidence() {
             0.75.. => Color::GREEN,
             0.5..=0.75 => Color::YELLOW,
             _ => Color::RED,
@@ -207,7 +243,7 @@ impl LandmarkResult {
             image,
             x,
             y - 3.0,
-            &format!("lm_conf={:.01}", self.face_confidence()),
+            &format!("conf={:.01}", self.confidence()),
         )
         .align_bottom()
         .color(color);
@@ -233,18 +269,188 @@ impl LandmarkResult {
 }
 
 impl landmark::Estimate for LandmarkResult {
+    #[inline]
     fn landmarks_mut(&mut self) -> &mut Landmarks {
         &mut self.landmarks
     }
 
+    #[inline]
     fn angle_radians(&self) -> Option<f32> {
         Some(self.rotation_radians())
     }
 }
 
 impl landmark::Confidence for LandmarkResult {
+    #[inline]
     fn confidence(&self) -> f32 {
-        self.face_confidence()
+        self.face_flag
+    }
+}
+
+#[derive(Clone)]
+pub struct LandmarkResultV2 {
+    landmarks: Landmarks,
+    face_flag: f32,
+    tongue_out: f32,
+}
+
+impl Default for LandmarkResultV2 {
+    fn default() -> Self {
+        Self {
+            landmarks: Landmarks::new(Self::NUM_LANDMARKS),
+            face_flag: 0.0,
+            tongue_out: 0.0,
+        }
+    }
+}
+
+impl LandmarkResultV2 {
+    pub const NUM_LANDMARKS: usize = 478;
+
+    #[inline]
+    pub fn landmarks(&self) -> &Landmarks {
+        &self.landmarks
+    }
+
+    #[inline]
+    pub fn landmarks_mut(&mut self) -> &mut Landmarks {
+        &mut self.landmarks
+    }
+
+    /// Returns an iterator over the landmarks corresponding to the reference mesh (ie. without the
+    /// iris landmarks, which are not part of the reference mesh).
+    pub fn mesh_landmarks(&self) -> impl Iterator<Item = Landmark> + '_ {
+        self.landmarks.iter().take(LandmarkResult::NUM_LANDMARKS)
+    }
+
+    /// Returns the 5 landmarks marking the left iris (from the perspective of the camera).
+    ///
+    /// The first landmark is the center of the iris, the 4 other surround the iris on the left,
+    /// right, top and bottom.
+    pub fn left_iris(&self) -> impl Iterator<Item = Landmark> + '_ {
+        self.landmarks
+            .iter()
+            .skip(LandmarkResult::NUM_LANDMARKS)
+            .take(5)
+    }
+
+    /// Returns the 5 landmarks surrounding the right iris (from the perspective of the camera).
+    ///
+    /// The first landmark is the center of the iris, the 4 other surround the iris on the left,
+    /// right, top and bottom.
+    pub fn right_iris(&self) -> impl Iterator<Item = Landmark> + '_ {
+        self.landmarks
+            .iter()
+            .skip(LandmarkResult::NUM_LANDMARKS + 5)
+    }
+
+    /// Returns the value of the *tongue out* blendshape (in range 0..=1).
+    ///
+    /// Note that this is not a *confidence* value, but a blendshape. Any value above ~0.1 typically
+    /// means that the tongue is visibly out.
+    #[inline]
+    pub fn tongue_out(&self) -> f32 {
+        self.tongue_out
+    }
+
+    pub fn rotation_radians(&self) -> f32 {
+        let left_eye = self
+            .landmarks()
+            .get(LandmarkIdx::LeftEyeOuterCorner as _)
+            .position();
+        let right_eye = self
+            .landmarks()
+            .get(LandmarkIdx::RightEyeOuterCorner as _)
+            .position();
+        let left_to_right_eye =
+            Vector2::new(right_eye[0] - left_eye[0], right_eye[1] - left_eye[1]);
+        Rotation2::rotation_between(&Vector2::x(), &left_to_right_eye).angle()
+    }
+
+    /// Draws the landmark result onto an image.
+    ///
+    /// # Panics
+    ///
+    /// The image must have the same resolution as the image the detection was performed on,
+    /// otherwise this method will panic.
+    pub fn draw<I: AsImageViewMut>(&self, image: &mut I) {
+        self.draw_impl(&mut image.as_view_mut());
+    }
+
+    fn draw_impl(&self, image: &mut ImageViewMut<'_>) {
+        for lm in self.mesh_landmarks() {
+            draw::marker(image, lm.x(), lm.y()).size(3);
+        }
+        for (i, lm) in self.left_iris().enumerate() {
+            let size = if i == 0 { 3 } else { 1 };
+            draw::marker(image, lm.x(), lm.y())
+                .size(size)
+                .color(Color::GREEN);
+        }
+        for (i, lm) in self.right_iris().enumerate() {
+            let size = if i == 0 { 3 } else { 1 };
+            draw::marker(image, lm.x(), lm.y())
+                .size(size)
+                .color(Color::BLUE);
+        }
+
+        let color = match self.confidence() {
+            0.75.. => Color::GREEN,
+            0.5..=0.75 => Color::YELLOW,
+            _ => Color::RED,
+        };
+        let (x_min, x_max) = self
+            .landmarks()
+            .positions()
+            .iter()
+            .map(|[x, ..]| TotalF32(*x))
+            .minmax()
+            .into_option()
+            .unwrap();
+        let x = (x_min.0 + x_max.0) / 2.0;
+        let y = self
+            .landmarks()
+            .positions()
+            .iter()
+            .map(|[_, y, ..]| TotalF32(*y))
+            .min()
+            .unwrap()
+            .0;
+        draw::text(
+            image,
+            x,
+            y - 3.0,
+            &format!(
+                "conf={:.01}, tongue={:.01}",
+                self.confidence(),
+                self.tongue_out()
+            ),
+        )
+        .align_bottom()
+        .color(color);
+
+        draw::text(
+            image,
+            x,
+            y + 10.0,
+            &format!("{:.1} deg", self.rotation_radians().to_degrees()),
+        )
+        .align_bottom()
+        .color(color);
+    }
+}
+
+impl landmark::Estimate for LandmarkResultV2 {
+    #[inline]
+    fn landmarks_mut(&mut self) -> &mut Landmarks {
+        &mut self.landmarks
+    }
+}
+
+impl landmark::Confidence for LandmarkResultV2 {
+    #[inline]
+    fn confidence(&self) -> f32 {
+        self.face_flag
     }
 }
 
@@ -253,7 +459,7 @@ include!(concat!(
     "/../../3rdparty/3d/canonical_face_model.rs"
 ));
 
-/// Returns an iterator over the vertices of the reference face model.
+/// Returns an iterator over the vertices of the reference face mesh.
 ///
 /// Each point yielded by the returned iterator corresponds to the same point in the sequence
 /// of landmarks in the [`LandmarkResult`], but the scale and coordinate system does not: The points
@@ -267,6 +473,8 @@ pub fn reference_positions() -> impl Iterator<Item = (f32, f32, f32)> {
 /// Assigns a name to certain important landmark indices.
 ///
 /// "Left" and "Right" are relative to the input image, not from the PoV of the depicted person.
+///
+/// This enum is valid for the landmarks in both [`LandmarkResult`] and [`LandmarkResultV2`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LandmarkIdx {
     MouthLeft = 78,
@@ -297,6 +505,7 @@ impl From<LandmarkIdx> for usize {
 mod tests {
     use super::*;
     use crate::image::{AsImageView, ImageView};
+    use crate::landmark::Confidence;
     use crate::{landmark::Estimator, procrustes::ProcrustesAnalyzer, test};
 
     #[track_caller]
@@ -314,9 +523,9 @@ mod tests {
     fn check_landmarks(image: ImageView<'_>, degrees: f32) {
         let expected_radians = degrees.to_radians();
 
-        let mut lm = Estimator::new(MediaPipeFaceMesh);
+        let mut lm = Estimator::new(FaceMeshV1);
         let landmarks = lm.estimate(&image);
-        assert!(landmarks.face_confidence() > 0.9);
+        assert!(landmarks.confidence() > 0.9);
         check_angle(expected_radians, landmarks.rotation_radians());
         check_angle(expected_radians, landmarks.left_eye().rotation_radians());
         check_angle(expected_radians, landmarks.right_eye().rotation_radians());

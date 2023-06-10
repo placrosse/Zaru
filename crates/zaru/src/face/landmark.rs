@@ -2,5 +2,5 @@
 //!
 //! Also known as *face alignment* or *registration*.
 
-pub mod mediapipe_facemesh;
+pub mod mediapipe;
 pub mod multipie68;

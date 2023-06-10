@@ -8,3 +8,10 @@
     and apply tools to it would also be cool
 - replace the fast-but-wrong JPEG decoder with something less awful
 - `Detection` having an angle is weird, maybe the wrapper approach of landmark networks could be used instead?
+- generalize `HandTracker` to allow tracking any type of object with a detector and landmarker network
+- new MediaPipe models use f16 weights, but ONNX conversion discards this, which blows up file sizes
+  - wonnx/tract/onnxruntime-rs don't seem to support f16 weights well right now
+- GPU-backed `Image`
+  - how to handle the 256 Byte row alignment requirement on buffer<->texture copies
+  - what to replace the `draw::text` impl with?
+- figure out a way to make the `ImageView` to `Tensor` conversion always built with optimizations
