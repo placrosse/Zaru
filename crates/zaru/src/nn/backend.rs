@@ -4,19 +4,21 @@ use std::{
     sync::OnceLock,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(super) enum OnnxBackend {
     Tract,
+    #[default]
     OnnxRuntime,
 }
 
-static ONNX_RT: OnceLock<OnnxBackend> = OnceLock::new();
+static BACKEND: OnceLock<OnnxBackend> = OnceLock::new();
 
 pub(super) fn get() -> OnnxBackend {
-    *ONNX_RT.get_or_init(|| {
+    *BACKEND.get_or_init(|| {
         let backend = match env::var("ZARU_ONNX_BACKEND").as_deref() {
-            Ok("tract") | Err(VarError::NotPresent) => OnnxBackend::Tract,
+            Ok("tract") => OnnxBackend::Tract,
             Ok("onnxruntime" | "ort") => OnnxBackend::OnnxRuntime,
+            Err(VarError::NotPresent) => OnnxBackend::default(),
             Ok(invalid) => {
                 eprintln!(
                     "invalid value set for `ZARU_ONNX_BACKEND` variable: '{invalid}'; exiting"
@@ -25,7 +27,7 @@ pub(super) fn get() -> OnnxBackend {
             }
             Err(VarError::NotUnicode(s)) => {
                 eprintln!(
-                    "invalid value set for `ZARU_ONNX_BACKEND` variable: {}; exiting",
+                    "invalid value set for `ZARU_ONNX_BACKEND` variable: '{}'; exiting",
                     s.to_string_lossy()
                 );
                 process::exit(1);
