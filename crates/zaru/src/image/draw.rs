@@ -318,7 +318,7 @@ pub fn marker<I: AsImageViewMut>(image: &mut I, x: f32, y: f32) -> DrawMarker<'_
         image: image.as_view_mut(),
         x,
         y,
-        color: Color::from_rgb8(255, 0, 0),
+        color: Color::RED,
         size: 5,
     }
 }
@@ -337,7 +337,7 @@ pub fn line<I: AsImageViewMut>(
         start_y,
         end_x,
         end_y,
-        color: Color::from_rgb8(0, 0, 255),
+        color: Color::BLUE,
     }
 }
 
@@ -355,7 +355,7 @@ pub fn text<'a, I: AsImageViewMut>(
         x,
         y,
         text,
-        color: Color::from_rgb8(255, 0, 0),
+        color: Color::RED,
         alignment: Alignment::Center,
         baseline: Baseline::Middle,
     }
