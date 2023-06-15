@@ -12,6 +12,12 @@ pub struct Resolution {
 }
 
 impl Resolution {
+    /// 4k "Ultra-HD" resolution: `3840x2160`
+    pub const RES_4K_UHD: Self = Self {
+        width: 3840,
+        height: 2160,
+    };
+
     /// 1080p resolution: `1920x1080`
     pub const RES_1080P: Self = Self {
         width: 1920,
