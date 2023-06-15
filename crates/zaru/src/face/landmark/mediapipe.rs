@@ -203,11 +203,6 @@ impl LandmarkResult {
     }
 
     /// Draws the landmark result onto an image.
-    ///
-    /// # Panics
-    ///
-    /// The image must have the same resolution as the image the detection was performed on,
-    /// otherwise this method will panic.
     pub fn draw<I: AsImageViewMut>(&self, image: &mut I) {
         self.draw_impl(&mut image.as_view_mut());
     }
@@ -323,6 +318,44 @@ impl LandmarkResultV2 {
         self.landmarks.iter().take(LandmarkResult::NUM_LANDMARKS)
     }
 
+    /// Returns a [`RotatedRect`] containing the left eye.
+    pub fn left_eye(&self) -> RotatedRect {
+        RotatedRect::bounding(
+            self.rotation_radians(),
+            [
+                LandmarkIdx::LeftEyeBottom,
+                LandmarkIdx::LeftEyeOuterCorner,
+                LandmarkIdx::LeftEyeInnerCorner,
+                LandmarkIdx::LeftEyeTop,
+            ]
+            .into_iter()
+            .map(|idx| {
+                let [x, y, ..] = self.landmarks().get(idx as usize).position();
+                [x, y]
+            }),
+        )
+        .unwrap()
+    }
+
+    /// Returns a [`RotatedRect`] containing the right eye.
+    pub fn right_eye(&self) -> RotatedRect {
+        RotatedRect::bounding(
+            self.rotation_radians(),
+            [
+                LandmarkIdx::RightEyeBottom,
+                LandmarkIdx::RightEyeInnerCorner,
+                LandmarkIdx::RightEyeOuterCorner,
+                LandmarkIdx::RightEyeTop,
+            ]
+            .into_iter()
+            .map(|idx| {
+                let [x, y, ..] = self.landmarks().get(idx as usize).position();
+                [x, y]
+            }),
+        )
+        .unwrap()
+    }
+
     /// Returns the 5 landmarks marking the left iris (from the perspective of the camera).
     ///
     /// The first landmark is the center of the iris, the 4 other surround the iris on the left,
@@ -342,6 +375,24 @@ impl LandmarkResultV2 {
         self.landmarks
             .iter()
             .skip(LandmarkResult::NUM_LANDMARKS + 5)
+    }
+
+    pub fn left_eye_contour(&self) -> [Landmark; 16] {
+        #[rustfmt::skip]
+        let indices = [
+            /* top */ 33, 246, 161, 160, 159, 158, 157, 173, 133,
+            /* bottom */ 7, 163, 144, 145, 153, 154, 155,
+        ];
+        indices.map(|i| self.landmarks.get(i))
+    }
+
+    pub fn right_eye_contour(&self) -> [Landmark; 16] {
+        #[rustfmt::skip]
+        let indices = [
+            /* top */ 362, 398, 384, 385, 386, 387, 388, 466, 263,
+            /* bottom */ 382, 381, 380, 374, 373, 390, 249,
+        ];
+        indices.map(|i| self.landmarks.get(i))
     }
 
     /// Returns the value of the *tongue out* blendshape (in range 0..=1).
@@ -368,11 +419,6 @@ impl LandmarkResultV2 {
     }
 
     /// Draws the landmark result onto an image.
-    ///
-    /// # Panics
-    ///
-    /// The image must have the same resolution as the image the detection was performed on,
-    /// otherwise this method will panic.
     pub fn draw<I: AsImageViewMut>(&self, image: &mut I) {
         self.draw_impl(&mut image.as_view_mut());
     }

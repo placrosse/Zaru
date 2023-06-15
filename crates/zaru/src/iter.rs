@@ -8,6 +8,7 @@ use std::iter::Zip;
 /// can lead to bugs when using it to copy or merge data and the iterators are created incorrectly.
 /// This function can be used when the iterators are expected to always have equal lengths to avoid
 /// bugs like that.
+#[track_caller]
 pub fn zip_exact<A, B>(a: A, b: B) -> Zip<A::IntoIter, B::IntoIter>
 where
     A: IntoIterator,
