@@ -491,6 +491,11 @@ impl landmark::Estimate for LandmarkResultV2 {
     fn landmarks_mut(&mut self) -> &mut Landmarks {
         &mut self.landmarks
     }
+
+    #[inline]
+    fn angle_radians(&self) -> Option<f32> {
+        Some(self.rotation_radians())
+    }
 }
 
 impl landmark::Confidence for LandmarkResultV2 {
