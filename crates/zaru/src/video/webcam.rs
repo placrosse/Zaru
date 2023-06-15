@@ -18,20 +18,14 @@ use linuxvideo::{
 ///
 /// By default, [`ParamPreference::Resolution`] is used, selecting the maximum resolution at the
 /// desired frame rate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ParamPreference {
     /// Prefer increased resolution over higher frame rates.
+    #[default]
     Resolution,
     /// Prefer higher frame rate over higher image resolution.
     Framerate,
-}
-
-impl Default for ParamPreference {
-    #[inline]
-    fn default() -> Self {
-        Self::Resolution
-    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
