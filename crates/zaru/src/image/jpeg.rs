@@ -2,6 +2,7 @@ use std::{
     cell::RefCell,
     env::{self, VarError},
     num::NonZeroU32,
+    panic::catch_unwind,
     process,
 };
 
@@ -102,22 +103,27 @@ pub(super) fn decode_jpeg(data: &[u8]) -> anyhow::Result<Image> {
             image::load_from_memory_with_format(data, image::ImageFormat::Jpeg)?.to_rgba8()
         }
         JpegBackend::MozJpeg => {
-            let mut decompress = mozjpeg::Decompress::new_mem(data)?;
+            // mozjpeg crate unfortunately reports errors only via unwinding
+            let (buf, width, height) = catch_unwind(|| -> anyhow::Result<_> {
+                let mut decompress = mozjpeg::Decompress::new_mem(data)?;
 
-            // Tune settings for decode performance.
-            decompress.do_fancy_upsampling(false);
-            decompress.dct_method(mozjpeg::DctMethod::IntegerFast);
+                // Tune settings for decode performance.
+                decompress.do_fancy_upsampling(false);
+                decompress.dct_method(mozjpeg::DctMethod::IntegerFast);
 
-            let mut decompress = decompress.rgba()?;
-            let buf = decompress
-                .read_scanlines_flat()
-                .ok_or_else(|| anyhow::anyhow!("failed to decode image"))?;
-            ImageBuffer::from_raw(
-                decompress.width().try_into().unwrap(),
-                decompress.height().try_into().unwrap(),
-                buf,
-            )
-            .expect("failed to create ImageBuffer")
+                let mut decompress = decompress.rgba()?;
+                let buf = decompress
+                    .read_scanlines_flat()
+                    .ok_or_else(|| anyhow::anyhow!("failed to decode image"))?;
+                Ok((buf, decompress.width(), decompress.height()))
+            })
+            .map_err(|payload| match payload.downcast::<String>() {
+                Ok(string) => anyhow::Error::msg(string),
+                Err(_) => anyhow::anyhow!("<unknown panic message>"),
+            })??;
+
+            ImageBuffer::from_raw(width.try_into().unwrap(), height.try_into().unwrap(), buf)
+                .expect("failed to create ImageBuffer")
         }
         JpegBackend::ZuneJpeg => {
             use zune_jpeg::zune_core::colorspace::ColorSpace;
