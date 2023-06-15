@@ -316,6 +316,11 @@ impl<'a> Loader<'a> {
 
                 let model_data = self.model_data.to_vec().into_boxed_slice();
                 let sess = ort::SessionBuilder::new(&env.into_arc())?
+                    // Make sure to turn *off* multi-threading. In the models I care about,
+                    // multi-threading increases CPU load by 12x while not actually making inference
+                    // any faster.
+                    .with_inter_threads(1)?
+                    .with_intra_threads(1)?
                     .with_model_from_memory(&*model_data)?;
                 Session::Ort(OrtSession {
                     session: unsafe {
