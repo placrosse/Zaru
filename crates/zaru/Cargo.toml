@@ -41,6 +41,7 @@ raw-window-handle = "0.5.0"
 
 # neural nets
 tract-onnx = "0.20.5"
+#tract-onnx = { git = "https://github.com/sonos/tract.git" }
 tinyvec = { version = "1.6.0", features = ["alloc"] }
 wonnx = "0.5.0"
 ort = { version = "1.14.8", features = ["load-dynamic"] }

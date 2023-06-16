@@ -50,10 +50,7 @@ pub struct LiteNetwork;
 static LITE_MODEL: Lazy<Cnn> = Lazy::new(|| {
     let model_data = include_blob!("../../3rdparty/onnx/palm_detection_lite.onnx");
     Cnn::new(
-        NeuralNetwork::from_onnx(model_data)
-            .unwrap()
-            .load()
-            .unwrap(),
+        NeuralNetwork::from_onnx(model_data).load().unwrap(),
         CnnInputShape::NCHW,
         ColorMapper::linear(0.0..=1.0),
     )
@@ -85,10 +82,7 @@ pub struct FullNetwork;
 static FULL_MODEL: Lazy<Cnn> = Lazy::new(|| {
     let model_data = include_blob!("../../3rdparty/onnx/palm_detection_full.onnx");
     Cnn::new(
-        NeuralNetwork::from_onnx(model_data)
-            .unwrap()
-            .load()
-            .unwrap(),
+        NeuralNetwork::from_onnx(model_data).load().unwrap(),
         CnnInputShape::NCHW,
         ColorMapper::linear(0.0..=1.0),
     )

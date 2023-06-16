@@ -147,7 +147,6 @@ impl Network for LiteNetwork {
             let model_data = include_blob!("../../3rdparty/onnx/pose_landmark_lite.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
-                    .unwrap()
                     .with_output_selection([0, 1])
                     .load()
                     .unwrap(),
@@ -175,7 +174,6 @@ impl Network for FullNetwork {
             let model_data = include_blob!("../../3rdparty/onnx/pose_landmark_full.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
-                    .unwrap()
                     .with_output_selection([0, 1])
                     .load()
                     .unwrap(),

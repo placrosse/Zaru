@@ -47,7 +47,7 @@ impl Embedding {
 fn main() -> anyhow::Result<()> {
     let face_dir = std::env::args_os().nth(1).unwrap();
 
-    let nn = NeuralNetwork::from_path("3rdparty/onnx/mobilefacenet.onnx")?.load()?;
+    let nn = NeuralNetwork::from_path("3rdparty/onnx/mobilefacenet.onnx").load()?;
     let cnn = Cnn::new(nn, CnnInputShape::NCHW, ColorMapper::linear(-1.0..=1.0))?;
     let target_aspect = cnn.input_resolution().aspect_ratio().unwrap();
 

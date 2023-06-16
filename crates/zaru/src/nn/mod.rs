@@ -19,9 +19,9 @@ use tract_onnx::{
 
 use std::{
     borrow::Cow,
-    mem,
+    fs, mem,
     ops::{Index, Range, RangeInclusive},
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -181,18 +181,39 @@ pub enum CnnInputShape {
     NHWC,
 }
 
+enum ModelSource<'a> {
+    Memory(Cow<'a, [u8]>),
+    Path(PathBuf),
+}
+
+impl<'a> ModelSource<'a> {
+    fn load(self) -> anyhow::Result<Cow<'a, [u8]>> {
+        match self {
+            ModelSource::Memory(bytes) => Ok(bytes),
+            ModelSource::Path(path) => {
+                match path.extension() {
+                    Some(ext) if ext == "onnx" => {}
+                    _ => anyhow::bail!("neural network file must have `.onnx` extension"),
+                }
+
+                Ok(fs::read(&path)?.into())
+            }
+        }
+    }
+}
+
 /// Neural network loader.
 pub struct Loader<'a> {
-    model_data: Cow<'a, [u8]>,
+    model_source: ModelSource<'a>,
     outputs: Option<Vec<usize>>,
     enable_gpu: bool,
     convert_to_f16: bool,
 }
 
 impl<'a> Loader<'a> {
-    fn new(data: Cow<'a, [u8]>) -> Self {
+    fn new(model_source: ModelSource<'a>) -> Self {
         Self {
-            model_data: data,
+            model_source,
             outputs: None,
             enable_gpu: false,
             convert_to_f16: false,
@@ -236,7 +257,9 @@ impl<'a> Loader<'a> {
     /// Returns an error if the network data is malformed, if the network data is incomplete, or if
     /// the network uses unimplemented operations.
     pub fn load(self) -> anyhow::Result<NeuralNetwork> {
-        let graph = tract_onnx::onnx().model_for_read(&mut &*self.model_data)?;
+        let model_bytes = self.model_source.load()?;
+
+        let graph = tract_onnx::onnx().model_for_read(&mut &*model_bytes)?;
 
         // tract optimization can change the name of the input/output nodes, so grab them first
         // NB: input *outlets* don't seem to have names assigned to them, only the corresponding *node*
@@ -305,7 +328,7 @@ impl<'a> Loader<'a> {
 
         let session = match (self.enable_gpu, backend::get()) {
             (true, _) => Session::Wonnx(pollster::block_on(wonnx::Session::from_bytes(
-                &self.model_data,
+                &*model_bytes,
             ))?),
             (false, backend::OnnxBackend::Tract) => Session::Tract(plan),
             (false, backend::OnnxBackend::OnnxRuntime) => {
@@ -314,7 +337,7 @@ impl<'a> Loader<'a> {
                     .with_log_level(ort::LoggingLevel::Info)
                     .build()?;
 
-                let model_data = self.model_data.to_vec().into_boxed_slice();
+                let model_data = model_bytes.to_vec().into_boxed_slice();
                 let sess = ort::SessionBuilder::new(&env.into_arc())?
                     // Make sure to turn *off* multi-threading. In the models I care about,
                     // multi-threading increases CPU load by 12x while not actually making inference
@@ -376,23 +399,17 @@ impl NeuralNetwork {
     /// Loads a pre-trained model from an ONNX file path.
     ///
     /// The path must have a `.onnx` extension. In the future, other model formats may be supported.
-    pub fn from_path<'a, P: AsRef<Path>>(path: P) -> anyhow::Result<Loader<'a>> {
+    pub fn from_path<'a, P: AsRef<Path>>(path: P) -> Loader<'a> {
         Self::from_path_impl(path.as_ref())
     }
 
-    fn from_path_impl<'a>(path: &Path) -> anyhow::Result<Loader<'a>> {
-        match path.extension() {
-            Some(ext) if ext == "onnx" => {}
-            _ => anyhow::bail!("neural network file must have `.onnx` extension"),
-        }
-
-        let model_data = std::fs::read(path)?;
-        Ok(Loader::new(model_data.into()))
+    fn from_path_impl<'a>(path: &Path) -> Loader<'a> {
+        Loader::new(ModelSource::Path(path.to_owned()))
     }
 
     /// Loads a pre-trained model from an in-memory ONNX file.
-    pub fn from_onnx(raw: &[u8]) -> anyhow::Result<Loader<'_>> {
-        Ok(Loader::new(raw.into()))
+    pub fn from_onnx(raw: &[u8]) -> Loader<'_> {
+        Loader::new(ModelSource::Memory(raw.into()))
     }
 
     /// Returns the number of tensors the network expects as inputs.

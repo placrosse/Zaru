@@ -21,10 +21,7 @@ use crate::{
 static MODEL: Lazy<Cnn> = Lazy::new(|| {
     let model_data = include_blob!("../../3rdparty/onnx/iris_landmark.onnx");
     Cnn::new(
-        NeuralNetwork::from_onnx(model_data)
-            .unwrap()
-            .load()
-            .unwrap(),
+        NeuralNetwork::from_onnx(model_data).load().unwrap(),
         CnnInputShape::NCHW,
         ColorMapper::linear(-1.0..=1.0),
     )
