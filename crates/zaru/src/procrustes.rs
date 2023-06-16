@@ -463,7 +463,7 @@ mod tests {
         let (expected_roll, expected_pitch, expected_yaw) = (3.0, -1.0, 2.0);
         let rot = UnitQuaternion::from_euler_angles(expected_roll, expected_pitch, expected_yaw);
         let offset = Vector3::new(50.0, 200.0, -20.0);
-        let rng = fastrand::Rng::with_seed(0x3024b6663d843ca2);
+        let mut rng = fastrand::Rng::with_seed(0x3024b6663d843ca2);
         let res = ANALYZER
             .clone()
             .analyze(REFERENCE_POINTS.iter().map(|&(x, y, z)| {

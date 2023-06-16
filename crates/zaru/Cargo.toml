@@ -20,7 +20,7 @@ include-blob = "0.1.0"
 
 # image processing
 image = { version = "0.24.0", default-features = false, features = ["jpeg", "png", "gif"] }
-embedded-graphics = "0.7.1"
+embedded-graphics = "0.8.0"
 mozjpeg = "0.9.4"
 zune-jpeg = "0.3.15"
 linuxvideo = "0.3.0"
@@ -54,4 +54,4 @@ include-blob = "0.1.3"
 [dev-dependencies]
 rayon = "1.5.1"
 approx = "0.5.1"
-fastrand = "1.8.0"
+fastrand = "2.0.0"

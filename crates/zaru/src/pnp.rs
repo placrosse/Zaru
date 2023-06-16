@@ -205,9 +205,9 @@ mod tests {
         let mut hasher = DefaultHasher::new();
         thread::current().name().unwrap().hash(&mut hasher);
         let seed = hasher.finish();
-        let rng = fastrand::Rng::with_seed(seed);
+        let mut rng = fastrand::Rng::with_seed(seed);
 
-        let gen = || rng.f32() - 0.5;
+        let mut gen = || rng.f32() - 0.5;
         let points = std::iter::from_fn(|| Some([gen(), gen(), gen()]))
             .take(n)
             .collect::<Vec<_>>();
