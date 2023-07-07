@@ -2,7 +2,7 @@
 name = "zaru"
 version = "0.1.0"
 edition = "2021"
-license-file = "LICENSE"
+license = "0BSD"
 repository = "https://github.com/SludgePhD/Zaru"
 description = "Neural Network powered machine perception and computer vision library"
 
