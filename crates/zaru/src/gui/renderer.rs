@@ -2,7 +2,7 @@
 //! its own library at this point but I'm not sure how a good API would look so I guess I'll keep
 //! copying it around.
 
-use std::{iter, rc::Rc};
+use std::rc::Rc;
 
 use anyhow::anyhow;
 use wgpu::{
@@ -390,7 +390,7 @@ impl Renderer {
             rpass.draw(0..3, 0..1);
         }
 
-        self.gpu.queue.submit(iter::once(encoder.finish()));
+        self.gpu.queue.submit([encoder.finish()]);
         frame.present();
     }
 
