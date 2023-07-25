@@ -41,10 +41,11 @@ raw-window-handle = "0.5.0"
 
 # neural nets
 tract-onnx = "0.20.5"
-#tract-onnx = { git = "https://github.com/sonos/tract.git" }
 tinyvec = { version = "1.6.0", features = ["alloc"] }
 wonnx = "0.5.0"
-ort = { version = "1.14.8", default-features = false, features = ["half", "load-dynamic", "download-binaries", "copy-dylibs"] }
+# `ort` makes completely arbitrary breaking changes on minor and patch releases, so we need to pin
+# to a precise version
+ort = { version = "=1.14.8", default-features = false, features = ["half", "load-dynamic", "download-binaries", "copy-dylibs"] }
 ndarray = "0.15.6"
 half = "2.2.1"
 
