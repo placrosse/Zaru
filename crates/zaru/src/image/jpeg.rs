@@ -7,12 +7,12 @@ use std::{
 };
 
 use anyhow::bail;
-use image::ImageBuffer;
-use once_cell::sync::Lazy;
-use v_ayylmao::{
+use fev::{
     display::Display,
     jpeg::{JpegDecodeSession, JpegInfo},
 };
+use image::ImageBuffer;
+use once_cell::sync::Lazy;
 
 use crate::gui;
 use crate::image::Resolution;
@@ -223,7 +223,8 @@ fn decode_jpeg_vaapi(jpeg: &[u8]) -> anyhow::Result<Image> {
             }
         };
 
-        let mapping = sess.decode(jpeg)?;
+        let surface = sess.decode_and_convert(jpeg)?;
+        let mapping = surface.map_sync()?;
         Ok(Image::from_rgba8(
             Resolution::new(info.width().into(), info.height().into()),
             &mapping[..info.width() as usize * info.height() as usize * 4],
