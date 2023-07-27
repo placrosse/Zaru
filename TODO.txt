@@ -19,3 +19,6 @@
   - what to replace the `draw::text` impl with?
     - epaint?
 - figure out a way to make the `ImageView` to `Tensor` conversion always built with optimizations
+
+somehow mozjpeg shits the bed when I DIM THE GOD DAM LIGHTS
+[2023-07-26T21:45:33Z ERROR zaru::video::webcam] webcam decode error: libjpeg fatal error: Unsupported JPEG process: SOF type 0xc3

@@ -22,6 +22,7 @@ include-blob = "0.1.0"
 image = { version = "0.24.0", default-features = false, features = ["jpeg", "png", "gif"] }
 embedded-graphics = "0.8.0"
 mozjpeg = "0.9.4"
+turbojpeg = "0.5.3"
 zune-jpeg = "0.3.15"
 linuxvideo = "0.3.0"
 fev = "0.1.0"
@@ -35,7 +36,7 @@ nalgebra = "0.32.1"
 
 # GUI
 winit = "0.28.1"
-wgpu = "0.17.0"
+wgpu = "0.16.3"
 pollster = "0.3.0"
 raw-window-handle = "0.5.0"
 

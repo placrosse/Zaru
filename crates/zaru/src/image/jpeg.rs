@@ -34,6 +34,8 @@ enum JpegBackend {
     /// Uses the `mozjpeg` crate, a wrapper around Mozilla's libjpeg fork. Robust and fast-ish, but
     /// C.
     MozJpeg,
+    /// Uses the `turbojpeg` crate, a wrapper around *libjpeg-turbo*.
+    LibjpegTurbo,
     /// Uses the `zune-jpeg` crate, a pure-Rust JPEG decoder somewhat faster than `jpeg-decoder`.
     /// Tends to be much slower than `mozjpeg` still.
     ZuneJpeg,
@@ -71,6 +73,7 @@ static JPEG_BACKEND: Lazy<JpegBackend> = Lazy::new(|| {
     let backend = match env::var("ZARU_JPEG_BACKEND") {
         Ok(v) if v == "fast-but-wrong" => JpegBackend::FastButWrong,
         Ok(v) if v == "mozjpeg" => JpegBackend::MozJpeg,
+        Ok(v) if v == "libjpeg-turbo" => JpegBackend::LibjpegTurbo,
         Ok(v) if v == "zune-jpeg" => JpegBackend::ZuneJpeg,
         Ok(v) if v == "jpeg-decoder" => JpegBackend::JpegDecoder,
         Ok(v) => {
@@ -123,6 +126,22 @@ pub(super) fn decode_jpeg(data: &[u8]) -> anyhow::Result<Image> {
             })??;
 
             ImageBuffer::from_raw(width.try_into().unwrap(), height.try_into().unwrap(), buf)
+                .expect("failed to create ImageBuffer")
+        }
+        JpegBackend::LibjpegTurbo => {
+            let mut decomp = turbojpeg::Decompressor::new()?;
+            let header = decomp.read_header(data)?;
+
+            let mut image = turbojpeg::Image {
+                pixels: vec![0; header.width * header.height * 4],
+                width: header.width,
+                pitch: header.width * 4,
+                height: header.height,
+                format: turbojpeg::PixelFormat::RGBA,
+            };
+            decomp.decompress(data, image.as_deref_mut())?;
+
+            ImageBuffer::from_raw(header.width as u32, header.height as u32, image.pixels)
                 .expect("failed to create ImageBuffer")
         }
         JpegBackend::ZuneJpeg => {

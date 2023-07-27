@@ -31,10 +31,7 @@ pub struct ShortRangeNetwork;
 static SHORT_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
     let model_data = include_blob!("../../3rdparty/onnx/face_detection_short_range.onnx");
     Cnn::new(
-        NeuralNetwork::from_onnx(model_data)
-            .with_gpu_support()
-            .load()
-            .unwrap(),
+        NeuralNetwork::from_onnx(model_data).load().unwrap(),
         CnnInputShape::NCHW,
         ColorMapper::linear(-1.0..=1.0),
     )
