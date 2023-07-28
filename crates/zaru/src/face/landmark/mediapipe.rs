@@ -354,21 +354,26 @@ impl LandmarkResultV2 {
     ///
     /// The first landmark is the center of the iris, the 4 other surround the iris on the left,
     /// right, top and bottom.
-    pub fn left_iris(&self) -> impl Iterator<Item = Landmark> + '_ {
-        self.landmarks
-            .iter()
-            .skip(LandmarkResult::NUM_LANDMARKS)
-            .take(5)
+    pub fn left_iris(&self) -> [Landmark; 5] {
+        let mut lms = [Landmark::default(); 5];
+        let start = LandmarkResult::NUM_LANDMARKS;
+        for (i, lm) in lms.iter_mut().enumerate() {
+            *lm = self.landmarks.get(start + i);
+        }
+        lms
     }
 
     /// Returns the 5 landmarks surrounding the right iris (from the perspective of the camera).
     ///
     /// The first landmark is the center of the iris, the 4 other surround the iris on the left,
     /// right, top and bottom.
-    pub fn right_iris(&self) -> impl Iterator<Item = Landmark> + '_ {
-        self.landmarks
-            .iter()
-            .skip(LandmarkResult::NUM_LANDMARKS + 5)
+    pub fn right_iris(&self) -> [Landmark; 5] {
+        let mut lms = [Landmark::default(); 5];
+        let start = LandmarkResult::NUM_LANDMARKS + 5;
+        for (i, lm) in lms.iter_mut().enumerate() {
+            *lm = self.landmarks.get(start + i);
+        }
+        lms
     }
 
     pub fn left_eye_contour(&self) -> [Landmark; 16] {
@@ -421,13 +426,13 @@ impl LandmarkResultV2 {
         for lm in self.mesh_landmarks() {
             draw::marker(image, lm.x(), lm.y()).size(3);
         }
-        for (i, lm) in self.left_iris().enumerate() {
+        for (i, lm) in self.left_iris().into_iter().enumerate() {
             let size = if i == 0 { 3 } else { 1 };
             draw::marker(image, lm.x(), lm.y())
                 .size(size)
                 .color(Color::GREEN);
         }
-        for (i, lm) in self.right_iris().enumerate() {
+        for (i, lm) in self.right_iris().into_iter().enumerate() {
             let size = if i == 0 { 3 } else { 1 };
             draw::marker(image, lm.x(), lm.y())
                 .size(size)

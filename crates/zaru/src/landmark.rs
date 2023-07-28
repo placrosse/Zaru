@@ -89,7 +89,7 @@ impl Landmarks {
 }
 
 /// A landmark in 3D space.
-#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+#[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
 pub struct Landmark {
     pos: [f32; 3],
     visibility: Option<f32>,
