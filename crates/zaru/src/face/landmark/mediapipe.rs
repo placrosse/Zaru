@@ -376,20 +376,28 @@ impl LandmarkResultV2 {
         lms
     }
 
+    /// Returns the landmarks forming the contour of the left eyeball (from the perspective of the
+    /// camera).
+    ///
+    /// The returned [`Landmark`]s are ordered clockwise, starting with the left corner of the eye.
     pub fn left_eye_contour(&self) -> [Landmark; 16] {
         #[rustfmt::skip]
         let indices = [
-            /* top */ 33, 246, 161, 160, 159, 158, 157, 173, 133,
-            /* bottom */ 7, 163, 144, 145, 153, 154, 155,
+            /* top (LTR) */ 33, 246, 161, 160, 159, 158, 157, 173, 133,
+            /* bottom (RTL) */ 155, 154, 153, 145, 144, 163, 7,
         ];
         indices.map(|i| self.landmarks.get(i))
     }
 
+    /// Returns the landmarks forming the contour of the right eyeball (from the perspective of the
+    /// camera).
+    ///
+    /// The returned [`Landmark`]s are ordered clockwise, starting with the left corner of the eye.
     pub fn right_eye_contour(&self) -> [Landmark; 16] {
         #[rustfmt::skip]
         let indices = [
-            /* top */ 362, 398, 384, 385, 386, 387, 388, 466, 263,
-            /* bottom */ 382, 381, 380, 374, 373, 390, 249,
+            /* top (LTR) */ 362, 398, 384, 385, 386, 387, 388, 466, 263,
+            /* bottom (RTL) */ 249, 390, 373, 374, 380, 381, 382,
         ];
         indices.map(|i| self.landmarks.get(i))
     }
