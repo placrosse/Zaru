@@ -3,6 +3,7 @@
 //! Currently, only V4L2 `VIDEO_CAPTURE` devices yielding JFIF JPEG or Motion JPEG frames are
 //! supported.
 
+use std::time::Instant;
 use std::{cmp::Reverse, env};
 
 use crate::image::{Image, Resolution};
@@ -310,6 +311,32 @@ impl Webcam {
                 Ok(image)
             })
             .map_err(Into::into)
+    }
+
+    /// Checks whether the next call to [`Webcam::read`] will block.
+    ///
+    /// If this returns `false`, the next frame is available immediately and the next call to
+    /// [`Webcam::read`] will not have to block (but will still take a potentially large amount of
+    /// time to decode the frame). If it returns `true`, the next call to [`Webcam::read`] might
+    /// have to block on I/O.
+    pub fn will_block(&self) -> anyhow::Result<bool> {
+        Ok(self.stream.will_block()?)
+    }
+
+    /// Retrieves and discards all frames from the [`Webcam`] that are available immediately without
+    /// blocking.
+    ///
+    /// [`Webcam`] operates asynchronously: frames are buffered internally and will generally reside
+    /// in their buffers until retrieved via [`Webcam::read`]. This means that pausing image
+    /// retrieval and later resuming it will serve some potentially *very* old frames first.
+    /// [`Webcam::flush`] can be used to clear out any old frames before image retrieval is resumed.
+    pub fn flush(&mut self) -> anyhow::Result<()> {
+        let start = Instant::now();
+        while !self.will_block()? {
+            self.stream.dequeue(|_| Ok(()))?;
+        }
+        log::debug!("Webcam::flush took {:?}", start.elapsed());
+        Ok(())
     }
 
     /// Returns a borrowing iterator over the frames produced by this webcam.

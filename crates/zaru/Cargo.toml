@@ -24,7 +24,7 @@ embedded-graphics = "0.8.0"
 mozjpeg = "0.9.4"
 turbojpeg = "0.5.3"
 zune-jpeg = "0.3.15"
-linuxvideo = "0.3.0"
+linuxvideo = "0.3.1"
 fev = "0.1.0"
 fast-but-wrong = { git = "https://github.com/SludgePhD/zune-jpeg.git", rev = "e76c28cb3b39e9a02ae4732a1f4a3fcf4ea99aed", package = "zune-jpeg" }
 # This zune-jpeg commit contains a bunch of fixes not on crates.io.
