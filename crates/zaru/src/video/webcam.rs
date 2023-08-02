@@ -298,7 +298,9 @@ impl Webcam {
                         // ignore for the sake of my own sanity).
                         log::error!("webcam decode error: {}", e);
 
-                        std::fs::write("error.jpg", &*buf).ok();
+                        if let Some(path) = env::var_os("ZARU_WEBCAM_ERROR_DUMP") {
+                            std::fs::write(path, &*buf).ok();
+                        }
 
                         // Hand back a blank image. The alternative would be to skip the image, which
                         // causes 2x latency spikes (OTOH, a blank image isn't going to result in any
