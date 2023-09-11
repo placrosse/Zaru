@@ -31,13 +31,13 @@ enum VaApi {
 enum JpegBackend {
     /// Uses the `jpeg-decoder` crate, a robust but slow pure-Rust JPEG decoder.
     JpegDecoder,
-    /// Uses the `mozjpeg` crate, a wrapper around Mozilla's libjpeg fork. Robust and fast-ish, but
-    /// C.
+    /// Uses the `mozjpeg` crate, a wrapper around Mozilla's libjpeg fork. Somewhat buggy, fails to
+    /// decode images from my webcam frequently.
     MozJpeg,
     /// Uses the `turbojpeg` crate, a wrapper around *libjpeg-turbo*.
     LibjpegTurbo,
     /// Uses the `zune-jpeg` crate, a pure-Rust JPEG decoder somewhat faster than `jpeg-decoder`.
-    /// Tends to be much slower than `mozjpeg` still.
+    /// Tends to be slower than `mozjpeg` on some images.
     ZuneJpeg,
     /// Uses a specific patched commit of the `zune-jpeg` crate, which can perform better than
     /// mozjpeg, but errors on some valid images and incorrectly decodes some images. Only useful in
@@ -49,7 +49,7 @@ enum JpegBackend {
 /// performance is too unpredictable (10-50ms for a 4K image) to be even remotely usable.
 const DEFAULT_VAAPI: VaApi = VaApi::Off;
 
-const DEFAULT_BACKEND: JpegBackend = JpegBackend::MozJpeg;
+const DEFAULT_BACKEND: JpegBackend = JpegBackend::ZuneJpeg;
 
 static USE_VAAPI: Lazy<VaApi> = Lazy::new(|| match env::var("ZARU_JPEG_VAAPI") {
     Ok(v) if v == "1" || v == "true" || v == "on" => VaApi::On,
