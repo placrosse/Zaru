@@ -60,7 +60,7 @@ static MODEL_V2: Lazy<Cnn> = Lazy::new(|| {
 pub struct FaceMeshV1;
 
 impl landmark::Network for FaceMeshV1 {
-    type Output = LandmarkResult;
+    type Output = LandmarkResultV1;
 
     fn cnn(&self) -> &Cnn {
         &MODEL_V1
@@ -117,12 +117,12 @@ impl landmark::Network for FaceMeshV2 {
 
 /// Landmark results estimated by [`FaceMeshV1`].
 #[derive(Clone)]
-pub struct LandmarkResult {
+pub struct LandmarkResultV1 {
     landmarks: Landmarks,
     face_flag: f32,
 }
 
-impl Default for LandmarkResult {
+impl Default for LandmarkResultV1 {
     fn default() -> Self {
         Self {
             landmarks: Landmarks::new(Self::NUM_LANDMARKS),
@@ -131,7 +131,7 @@ impl Default for LandmarkResult {
     }
 }
 
-impl LandmarkResult {
+impl LandmarkResultV1 {
     pub const NUM_LANDMARKS: usize = 468;
 
     #[inline]
@@ -257,7 +257,7 @@ impl LandmarkResult {
     }
 }
 
-impl landmark::Estimate for LandmarkResult {
+impl landmark::Estimate for LandmarkResultV1 {
     #[inline]
     fn landmarks_mut(&mut self) -> &mut Landmarks {
         &mut self.landmarks
@@ -269,13 +269,17 @@ impl landmark::Estimate for LandmarkResult {
     }
 }
 
-impl landmark::Confidence for LandmarkResult {
+impl landmark::Confidence for LandmarkResultV1 {
     #[inline]
     fn confidence(&self) -> f32 {
         self.face_flag
     }
 }
 
+/// The output of the [`FaceMeshV2`] model.
+///
+/// In addition to the face mesh landmarks of [`FaceMeshV1`], [`FaceMeshV2`] also computes 5 iris
+/// landmarks for each eye, as well as a "tongue out" blend shape.
 #[derive(Clone)]
 pub struct LandmarkResultV2 {
     landmarks: Landmarks,
@@ -309,7 +313,7 @@ impl LandmarkResultV2 {
     /// Returns an iterator over the landmarks corresponding to the reference mesh (ie. without the
     /// iris landmarks, which are not part of the reference mesh).
     pub fn mesh_landmarks(&self) -> impl Iterator<Item = Landmark> + '_ {
-        self.landmarks.iter().take(LandmarkResult::NUM_LANDMARKS)
+        self.landmarks.iter().take(LandmarkResultV1::NUM_LANDMARKS)
     }
 
     /// Returns a [`RotatedRect`] containing the left eye.
@@ -356,7 +360,7 @@ impl LandmarkResultV2 {
     /// right, top and bottom.
     pub fn left_iris(&self) -> [Landmark; 5] {
         let mut lms = [Landmark::default(); 5];
-        let start = LandmarkResult::NUM_LANDMARKS;
+        let start = LandmarkResultV1::NUM_LANDMARKS;
         for (i, lm) in lms.iter_mut().enumerate() {
             *lm = self.landmarks.get(start + i);
         }
@@ -369,7 +373,7 @@ impl LandmarkResultV2 {
     /// right, top and bottom.
     pub fn right_iris(&self) -> [Landmark; 5] {
         let mut lms = [Landmark::default(); 5];
-        let start = LandmarkResult::NUM_LANDMARKS + 5;
+        let start = LandmarkResultV1::NUM_LANDMARKS + 5;
         for (i, lm) in lms.iter_mut().enumerate() {
             *lm = self.landmarks.get(start + i);
         }
@@ -520,10 +524,10 @@ include!(concat!(
 /// Returns an iterator over the vertices of the reference face mesh.
 ///
 /// Each point yielded by the returned iterator corresponds to the same point in the sequence
-/// of landmarks in the [`LandmarkResult`], but the scale and coordinate system does not: The points
-/// returned by this function have Y pointing up, and X and Y are in a smaller range around `(0,0)`,
-/// while [`LandmarkResult`] contains points that have Y point down, and X and Y are in term of the
-/// input image's coordinates.
+/// of landmarks in the [`LandmarkResultV1`], but the scale and coordinate system does not: The
+/// points returned by this function have Y pointing up, and X and Y are in a smaller range around
+/// `(0,0)`, while [`LandmarkResultV1`] contains points that have Y point down, and X and Y are in
+/// term of the input image's coordinates.
 pub fn reference_positions() -> impl Iterator<Item = (f32, f32, f32)> {
     REFERENCE_POSITIONS.iter().copied()
 }
@@ -532,7 +536,7 @@ pub fn reference_positions() -> impl Iterator<Item = (f32, f32, f32)> {
 ///
 /// "Left" and "Right" are relative to the input image, not from the PoV of the depicted person.
 ///
-/// This enum is valid for the landmarks in both [`LandmarkResult`] and [`LandmarkResultV2`].
+/// This enum is valid for the landmarks in both [`LandmarkResultV1`] and [`LandmarkResultV2`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LandmarkIdx {
     MouthLeft = 78,
@@ -550,7 +554,6 @@ pub enum LandmarkIdx {
     RightEyebrowInnerCorner = 295,
     LeftEyebrowInnerCorner = 65,
 }
-// FIXME: these are swapped or otherwise messed up
 
 impl From<LandmarkIdx> for usize {
     #[inline]
