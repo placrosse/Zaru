@@ -2,7 +2,7 @@
 name = "zaru-macros"
 version = "0.1.0"
 edition = "2021"
-license = "0BSD"
+license-file = "../../LICENSE"
 description = "Procedural macros used by `zaru`; don't use this crate directly"
 
 [lib]

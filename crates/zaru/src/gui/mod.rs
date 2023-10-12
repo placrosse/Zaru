@@ -97,6 +97,12 @@ pub struct Display {
 }
 
 impl Display {
+    /// Returns a reference to the global [`Display`].
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the library has not been initialized via
+    /// [`zaru::run`][crate::run] or the [`#[zaru::main]`][crate::main] macro.
     pub fn get() -> &'static Display {
         DISPLAY.get().expect("display not initialized")
     }
