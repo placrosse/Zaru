@@ -117,7 +117,7 @@ fn rotated_views() {
         Rect::from_top_left(-1.0, 1.0, 2.0, 2.0),
         0.0,
     ));
-    assert_eq!(bot_right.get(0, 0), C::NULL);
+    assert_eq!(bot_right.get(0, 0), C::NONE);
     assert_eq!(bot_right.get(1, 0), C::YELLOW);
 }
 
@@ -134,6 +134,6 @@ fn view() {
     assert_eq!(view.rect().width(), 99.0);
     assert_eq!(view.rect().height(), 100.0);
     assert_eq!(view.get(0, 0), C::GREEN);
-    assert_eq!(view.get(0, 1), C::NULL);
-    assert_eq!(view.get(1, 0), C::NULL);
+    assert_eq!(view.get(0, 1), C::NONE);
+    assert_eq!(view.get(1, 0), C::NONE);
 }

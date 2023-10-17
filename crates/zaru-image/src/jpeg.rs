@@ -13,8 +13,6 @@ use fev::{
 };
 use once_cell::sync::Lazy;
 
-use crate::gui;
-
 #[derive(PartialEq, Eq)]
 enum VaApi {
     On,
@@ -212,18 +210,22 @@ pub(super) fn decode_jpeg(data: &[u8]) -> anyhow::Result<DecodedImage> {
     Ok(buf)
 }
 
+#[allow(unreachable_code, unused_variables)]
 fn decode_jpeg_vaapi(jpeg: &[u8]) -> anyhow::Result<DecodedImage> {
     let display = match *USE_VAAPI {
         VaApi::Off => bail!("VA-API use disabled by env var"),
         VaApi::Force | VaApi::On => {
             static DISPLAY: Lazy<Option<Display>> = Lazy::new(|| {
-                let display = match unsafe { Display::new_unmanaged(gui::Display::get()) } {
+                /*let display = match unsafe { Display::new_unmanaged(gui::Display::get()) } {
                     Ok(display) => display,
                     Err(e) => {
                         log::warn!("failed to open VA-API display: {e}");
                         return None;
                     }
-                };
+                };*/
+
+                // TODO: VA-API decoding needs display connection
+                let display: Display = todo!("VA-API");
 
                 match display.query_vendor_string() {
                     Ok(vendor) => {

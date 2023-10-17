@@ -8,6 +8,7 @@ description = "Neural Network powered machine perception and computer vision lib
 
 [dependencies]
 zaru-macros = { path = "../zaru-macros", version = "0.1.0" }
+zaru-image = { path = "../zaru-image", version = "0.1.0" }
 
 # generic deps
 anyhow = "1.0.53"
@@ -21,6 +22,7 @@ include-blob = "0.1.0"
 # image processing
 image = { version = "0.24.0", default-features = false, features = ["jpeg", "png", "gif"] }
 embedded-graphics = "0.8.0"
+jpeg-decoder = "0.3.0"
 mozjpeg = "0.9.4"
 turbojpeg = "0.5.3"
 zune-jpeg = "0.3.15"
@@ -36,14 +38,14 @@ nalgebra = "0.32.1"
 
 # GUI
 winit = "0.28.1"
-wgpu = "0.16.3"
+wgpu = "0.17.1"
 pollster = "0.3.0"
 raw-window-handle = "0.5.0"
 
 # neural nets
 tract-onnx = "0.20.5"
 tinyvec = { version = "1.6.0", features = ["alloc"] }
-wonnx = "0.5.0"
+wonnx = { path = "../../../wonnx/wonnx" }
 # `ort` makes completely arbitrary breaking changes on minor and patch releases, so we need to pin
 # to a precise version
 ort = { version = "=1.14.8", default-features = false, features = ["half", "load-dynamic", "download-binaries", "copy-dylibs"] }

@@ -6,7 +6,6 @@ use std::{
     collections::HashMap,
     panic::{catch_unwind, AssertUnwindSafe},
     process,
-    rc::Rc,
     sync::Mutex,
 };
 
@@ -17,24 +16,25 @@ use winit::{
     event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopClosed, EventLoopProxy},
     window::WindowId,
 };
+use zaru_image::Gpu;
 
 use crate::{
     image::{Image, Resolution},
     termination::Termination,
 };
 
-use self::renderer::{Gpu, Renderer, Window};
+use self::renderer::{Renderer, Window};
 
 struct Gui {
-    gpu: Rc<Gpu>,
+    gpu: &'static Gpu,
     windows: HashMap<String, Renderer>,
     win_id_to_key: HashMap<WindowId, String>,
 }
 
 impl Gui {
-    fn new() -> Self {
+    fn new(gpu: &'static Gpu) -> Self {
         Self {
-            gpu: Rc::new(pollster::block_on(Gpu::open()).unwrap()),
+            gpu,
             windows: HashMap::new(),
             win_id_to_key: HashMap::new(),
         }
@@ -56,7 +56,7 @@ impl Gui {
 
                             let win = Window::open(target, &key, res).unwrap();
                             let win_id = win.win.id();
-                            let renderer = Renderer::new(win, self.gpu.clone()).unwrap();
+                            let renderer = Renderer::new(win, self.gpu).unwrap();
 
                             self.win_id_to_key.insert(win_id, key.clone());
 
@@ -132,6 +132,7 @@ where
     F: FnOnce() -> R + Send + 'static,
     R: Termination + Send,
 {
+    // Initialize the global display connection.
     let event_loop = EventLoopBuilder::with_user_event().build();
     let proxy = event_loop.create_proxy();
     let display = Display {
@@ -163,7 +164,8 @@ where
         }
     });
 
-    let gui = Gui::new();
+    // Run the GUI event loop on the main thread.
+    let gui = Gui::new(Gpu::get());
     gui.run(event_loop);
 }
 

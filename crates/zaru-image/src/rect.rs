@@ -5,8 +5,8 @@
 
 use std::{cmp, fmt, ops::RangeInclusive};
 
-use crate::image::AspectRatio;
 use crate::num::TotalF32;
+use crate::AspectRatio;
 use nalgebra::{Point2, Rotation2};
 
 /// An axis-aligned rectangle.

@@ -11,7 +11,7 @@ use embedded_graphics::{
     draw_target::DrawTarget,
     mono_font::{ascii, MonoTextStyle},
     prelude::*,
-    primitives::{self, Line, PrimitiveStyle, Rectangle},
+    primitives::{Line, PrimitiveStyle, Rectangle},
     text::{Alignment, Baseline, Text, TextStyleBuilder},
 };
 use itertools::Itertools;
@@ -219,43 +219,6 @@ impl<'a> Drop for DrawText<'a> {
     }
 }
 
-/// Guard returned by [`circle`]; draws the circle when dropped and allows customization.
-pub struct DrawCircle<'a> {
-    image: ImageViewMut<'a>,
-    x: f32,
-    y: f32,
-    diameter: f32,
-    color: Color,
-}
-
-impl<'a> DrawCircle<'a> {
-    /// Sets the circle's color.
-    pub fn color(&mut self, color: Color) -> &mut Self {
-        self.color = color;
-        self
-    }
-}
-
-impl<'a> Drop for DrawCircle<'a> {
-    fn drop(&mut self) {
-        let top_left = Point {
-            x: (self.x - (self.diameter / 2.0)).round() as i32,
-            y: (self.y - (self.diameter / 2.0)).round() as i32,
-        };
-        let circle = primitives::Circle {
-            top_left,
-            diameter: self.diameter as _,
-        };
-        match circle
-            .into_styled(PrimitiveStyle::with_stroke(self.color, 1))
-            .draw(&mut Target(self.image.reborrow()))
-        {
-            Ok(_) => {}
-            Err(infallible) => match infallible {},
-        }
-    }
-}
-
 /// Guard returned by [`quaternion`]; draws the rotated coordinate system when dropped.
 pub struct DrawQuaternion<'a> {
     image: ImageViewMut<'a>,
@@ -358,22 +321,6 @@ pub fn text<'a, I: AsImageViewMut>(
         color: Color::RED,
         alignment: Alignment::Center,
         baseline: Baseline::Middle,
-    }
-}
-
-/// Draws a circle onto an image.
-pub fn circle<'a, I: AsImageViewMut>(
-    image: &'a mut I,
-    x: f32,
-    y: f32,
-    diameter: f32,
-) -> DrawCircle<'a> {
-    DrawCircle {
-        image: image.as_view_mut(),
-        x,
-        y,
-        diameter,
-        color: Color::GREEN,
     }
 }
 

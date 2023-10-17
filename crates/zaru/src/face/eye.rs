@@ -30,8 +30,8 @@ static MODEL: Lazy<Cnn> = Lazy::new(|| {
 
 /// A [`Network`] that computes eye landmarks on a cropped image of a left eye.
 ///
-/// Landmarks of a right eye can be computed by flipping both the image and the returned
-/// landmarks (via [`ImageViewMut::flip_horizontal_in_place`] and
+/// Landmarks of a right eye can be computed by flipping both the input image and the returned
+/// landmarks (via [`ImageView::flip_horizontal`] and
 /// [`EyeLandmarks::flip_horizontal_in_place`], respectively).
 #[derive(Clone, Copy)]
 pub struct EyeNetwork;
@@ -137,7 +137,6 @@ impl EyeLandmarks {
     fn draw_impl(&self, mut image: ImageViewMut<'_>) {
         let [x, y, _] = self.iris_center();
         draw::marker(&mut image, x, y).size(3).color(Color::CYAN);
-        draw::circle(&mut image, x, y, self.iris_diameter()).color(Color::CYAN);
 
         for [x, y, _] in self.eye_contour().take(16) {
             draw::marker(&mut image, x, y).size(1).color(Color::MAGENTA);

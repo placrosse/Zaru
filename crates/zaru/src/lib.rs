@@ -42,7 +42,6 @@ pub mod nn;
 pub mod num;
 pub mod pnp;
 pub mod procrustes;
-pub mod rect;
 pub mod slice;
 pub mod timer;
 pub mod video;
@@ -50,6 +49,8 @@ pub mod video;
 pub mod termination;
 #[cfg(test)]
 mod test;
+
+pub use zaru_image::rect;
 
 use log::LevelFilter;
 

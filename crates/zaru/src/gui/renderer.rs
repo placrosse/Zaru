@@ -4,15 +4,9 @@
 
 use std::rc::Rc;
 
-use anyhow::anyhow;
-use wgpu::{
-    Adapter, Backends, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-    BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, Color, ColorWrites, Device,
-    Extent3d, Features, ImageDataLayout, Origin3d, Queue, RenderPipeline, SamplerBindingType,
-    SamplerDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, Surface,
-    TextureDescriptor, TextureFormat, TextureUsages,
-};
+use wgpu::*;
 use winit::{dpi::PhysicalSize, event_loop::EventLoopWindowTarget, window::WindowBuilder};
+use zaru_image::Gpu;
 
 use crate::image::Resolution;
 
@@ -42,65 +36,6 @@ impl Window {
     }
 }
 
-/// A handle to a GPU device and command queue.
-pub struct Gpu {
-    instance: wgpu::Instance,
-    adapter: Adapter,
-    device: Device,
-    queue: Queue,
-}
-
-impl Gpu {
-    pub async fn open() -> anyhow::Result<Self> {
-        let backends = Backends::PRIMARY;
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends,
-            ..Default::default()
-        });
-
-        log::info!("available graphics adapters:");
-        for adapter in instance.enumerate_adapters(backends) {
-            let info = adapter.get_info();
-            log::info!("- {:?} {:?} {}", info.backend, info.device_type, info.name);
-        }
-
-        let adapter = instance
-            .request_adapter(&Default::default())
-            .await
-            .ok_or_else(|| anyhow!("no graphics adapter found"))?;
-        let info = adapter.get_info();
-        log::info!(
-            "using {:?} {:?} {}",
-            info.backend,
-            info.device_type,
-            info.name
-        );
-
-        log::debug!("adapter features: {:?}", adapter.features());
-        let unsupported = Features::all() - adapter.features();
-        log::debug!("unsupported features: {:?}", unsupported);
-
-        let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    features: wgpu::Features::empty(),
-                    // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
-                    limits: wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits()),
-                },
-                None,
-            )
-            .await?;
-
-        Ok(Self {
-            instance,
-            adapter,
-            device,
-            queue,
-        })
-    }
-}
-
 struct Texture {
     inner: wgpu::Texture,
     size: Extent3d,
@@ -113,7 +48,7 @@ impl Texture {
         let format = TextureFormat::Rgba8UnormSrgb;
         Self {
             label: label.to_string(),
-            inner: gpu.device.create_texture(&TextureDescriptor {
+            inner: gpu.device().create_texture(&TextureDescriptor {
                 label: Some(label),
                 size: Extent3d::default(),
                 mip_level_count: 1,
@@ -144,7 +79,7 @@ impl Texture {
                 size.height
             );
             reallocated = true;
-            self.inner = gpu.device.create_texture(&TextureDescriptor {
+            self.inner = gpu.device().create_texture(&TextureDescriptor {
                 label: Some(&self.label),
                 size,
                 mip_level_count: 1,
@@ -157,7 +92,7 @@ impl Texture {
             self.size = size;
         }
 
-        gpu.queue.write_texture(
+        gpu.queue().write_texture(
             wgpu::ImageCopyTexture {
                 texture: &self.inner,
                 mip_level: 0,
@@ -255,7 +190,7 @@ impl BindGroups {
 }
 
 pub struct Renderer {
-    gpu: Rc<Gpu>,
+    gpu: &'static Gpu,
     surface: Option<Surface>,
     render_pipelines: RenderPipelines,
 
@@ -269,24 +204,29 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(window: Window, gpu: Rc<Gpu>) -> anyhow::Result<Self> {
-        let surface = unsafe { gpu.instance.create_surface(&*window.win)? };
-        let shader = gpu.device.create_shader_module(ShaderModuleDescriptor {
+    pub fn new(window: Window, gpu: &'static Gpu) -> anyhow::Result<Self> {
+        let surface = unsafe { gpu.instance().create_surface(&*window.win)? };
+        let shader = gpu.device().create_shader_module(ShaderModuleDescriptor {
             label: Some("fullscreen texture shader"),
             source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
         });
         Ok(Self::with_surface(window, gpu, shader, surface))
     }
 
-    fn with_surface(window: Window, gpu: Rc<Gpu>, shader: ShaderModule, surface: Surface) -> Self {
+    fn with_surface(
+        window: Window,
+        gpu: &'static Gpu,
+        shader: ShaderModule,
+        surface: Surface,
+    ) -> Self {
         let surface_format = *surface
-            .get_capabilities(&gpu.adapter)
+            .get_capabilities(gpu.adapter())
             .formats
             .get(0)
             .expect("adapter cannot render to window surface");
 
         let shared_bind_group_layout =
-            gpu.device
+            gpu.device()
                 .create_bind_group_layout(&BindGroupLayoutDescriptor {
                     label: None,
                     entries: &[
@@ -311,13 +251,13 @@ impl Renderer {
 
         let render_pipelines = RenderPipelines::create(
             surface_format,
-            &gpu.device,
+            gpu.device(),
             &shader,
             &shared_bind_group_layout,
         );
 
         let texture = Texture::empty(&gpu, "texture");
-        let bind_groups = BindGroups::create(&gpu.device, &shared_bind_group_layout, &texture);
+        let bind_groups = BindGroups::create(gpu.device(), &shared_bind_group_layout, &texture);
 
         let mut this = Self {
             gpu,
@@ -367,7 +307,7 @@ impl Renderer {
             .create_view(&wgpu::TextureViewDescriptor::default());
         let mut encoder = self
             .gpu
-            .device
+            .device()
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
         {
             let ops = wgpu::Operations {
@@ -390,7 +330,7 @@ impl Renderer {
             rpass.draw(0..3, 0..1);
         }
 
-        self.gpu.queue.submit([encoder.finish()]);
+        self.gpu.queue().submit([encoder.finish()]);
         frame.present();
     }
 
@@ -404,7 +344,7 @@ impl Renderer {
             // When the texture is reallocated, the bind group containing it has to be recreated to
             // reflect that.
             self.bind_groups = BindGroups::create(
-                &self.gpu.device,
+                self.gpu.device(),
                 &self.shared_bind_group_layout,
                 &self.texture,
             );
@@ -418,7 +358,7 @@ impl Renderer {
     fn recreate_swapchain(&mut self) {
         let surface_format = *self
             .surface()
-            .get_capabilities(&self.gpu.adapter)
+            .get_capabilities(self.gpu.adapter())
             .formats
             .get(0)
             .expect("adapter cannot render to window surface");
@@ -451,6 +391,6 @@ impl Renderer {
             view_formats: Vec::new(),
         };
 
-        self.surface().configure(&self.gpu.device, &config);
+        self.surface().configure(self.gpu.device(), &config);
     }
 }

@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::image::Rect;
+use crate::rect::Rect;
 
 /// Resolution (`width x height`) of an image, window, camera, or display.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -113,6 +113,12 @@ impl fmt::Display for Resolution {
 impl fmt::Debug for Resolution {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)
+    }
+}
+
+impl From<(u32, u32)> for Resolution {
+    fn from((width, height): (u32, u32)) -> Self {
+        Resolution { width, height }
     }
 }
 

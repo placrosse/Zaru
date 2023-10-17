@@ -9,16 +9,14 @@
 - replace the fast-but-wrong JPEG decoder with something less awful
   - amazingly, there really does not seem to be any decoder that can sustain 30 4k images per second
   - https://github.com/SludgePhD/Compeg can do it on my desktop card, but not on the Intel iGPU in my laptop
+  - try using `IsochronousProcessor` for this
 - `Detection` having an angle is weird, maybe the wrapper approach of landmark networks could be used instead?
 - generalize `HandTracker` to allow tracking any type of object with a detector and landmarker network
 - new MediaPipe models use f16 weights, but ONNX conversion discards this, which blows up file sizes
   - wonnx and tract don't seem to support f16 weights well right now
 - GPU-backed `Image`
-  - how to handle the 256 Byte row alignment requirement on buffer<->texture copies
-    - compute shader, probably
-  - what to replace the `draw::text` impl with?
-    - epaint?
+  - "Two resource variables may have overlapping memory locations, but it is a dynamic error if either of those variables is mutable"
+  - image->tensor via compute shader
+    - since this will be located outside of zaru-image, this requires a public API for compute shader stuff
+  - to allow more than 1 texture format, and different blend modes, introduce some kind of specializable and cached `Pipeline` abstraction
 - figure out a way to make the `ImageView` to `Tensor` conversion always built with optimizations
-
-somehow mozjpeg shits the bed when I DIM THE GOD DAM LIGHTS
-[2023-07-26T21:45:33Z ERROR zaru::video::webcam] webcam decode error: libjpeg fatal error: Unsupported JPEG process: SOF type 0xc3

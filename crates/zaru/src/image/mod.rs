@@ -9,7 +9,6 @@
 
 pub mod draw;
 mod jpeg;
-mod resolution;
 
 #[cfg(test)]
 mod tests;
@@ -19,9 +18,11 @@ use std::{fmt, ops::Index, path::Path};
 use embedded_graphics::{pixelcolor::raw::RawU32, prelude::PixelColor};
 use image::{GenericImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
 
-pub use resolution::*;
+pub use zaru_image::{AspectRatio, Resolution};
 
 use crate::rect::{Rect, RotatedRect};
+
+use self::jpeg::DecodedImage;
 
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
@@ -76,7 +77,15 @@ impl Image {
 
     /// Decodes a JFIF JPEG or Motion JPEG from a byte slice.
     pub fn decode_jpeg(data: &[u8]) -> anyhow::Result<Self> {
-        jpeg::decode_jpeg(data)
+        let DecodedImage {
+            width,
+            height,
+            data,
+        } = jpeg::decode_jpeg(data)?;
+
+        Ok(Self {
+            buf: RgbaImage::from_vec(width, height, data).unwrap(),
+        })
     }
 
     /// Creates an [`Image`] from raw, preexisting RGBA pixel data.
@@ -139,7 +148,7 @@ impl Image {
     /// Creates an immutable view into an area of this image, specified by `rect`.
     ///
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
-    /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
+    /// the value [`Color::NONE`] and ignore writes. The returned view always has the size of
     /// `rect`.
     pub fn view(&self, rect: impl Into<RotatedRect>) -> ImageView<'_> {
         ImageView {
@@ -151,33 +160,13 @@ impl Image {
     /// Creates a mutable view into an area of this image, specified by `rect`.
     ///
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
-    /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
+    /// the value [`Color::NONE`] and ignore writes. The returned view always has the size of
     /// `rect`.
     pub fn view_mut(&mut self, rect: impl Into<RotatedRect>) -> ImageViewMut<'_> {
         ImageViewMut {
             data: ViewData::full(self).view(rect),
             image: self,
         }
-    }
-
-    pub fn flip_horizontal(&self) -> Image {
-        Image {
-            buf: image::imageops::flip_horizontal(&self.buf),
-        }
-    }
-
-    pub fn flip_vertical(&self) -> Image {
-        Image {
-            buf: image::imageops::flip_vertical(&self.buf),
-        }
-    }
-
-    pub fn flip_horizontal_in_place(&mut self) {
-        image::imageops::flip_horizontal_in_place(&mut self.buf);
-    }
-
-    pub fn flip_vertical_in_place(&mut self) {
-        image::imageops::flip_vertical_in_place(&mut self.buf);
     }
 
     /// Clears the image, setting every pixel value to `color`.
@@ -257,7 +246,7 @@ impl ViewData {
     fn get(&self, x: u32, y: u32, image: &Image) -> Color {
         match self.image_coord(x, y, image) {
             Some((x, y)) => Color(image.buf[(x, y)].0),
-            _ => Color::NULL,
+            _ => Color::NONE,
         }
     }
 }
@@ -319,25 +308,13 @@ impl<'a> ImageView<'a> {
     ///
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will
     /// access the underlying [`Image`] outside of this [`ImageView`]. If part of `rect` are outside
-    /// of the underlying [`Image`], they will be read as [`Color::NULL`].
+    /// of the underlying [`Image`], they will be read as [`Color::NONE`].
     ///
     /// The returned view always has the size of `rect`.
     pub fn view(&self, rect: impl Into<RotatedRect>) -> ImageView<'_> {
         ImageView {
             image: self.image,
             data: self.data.view(rect),
-        }
-    }
-
-    pub fn flip_horizontal(&self) -> Image {
-        Image {
-            buf: image::imageops::flip_horizontal(&self.as_generic_image_view()),
-        }
-    }
-
-    pub fn flip_vertical(&self) -> Image {
-        Image {
-            buf: image::imageops::flip_vertical(&self.as_generic_image_view()),
         }
     }
 
@@ -454,7 +431,7 @@ impl<'a> ImageViewMut<'a> {
     /// Creates an immutable subview into an area of this view, specified by `rect`.
     ///
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
-    /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
+    /// the value [`Color::NONE`] and ignore writes. The returned view always has the size of
     /// `rect`.
     pub fn view(&self, rect: impl Into<RotatedRect>) -> ImageView<'_> {
         ImageView {
@@ -466,29 +443,13 @@ impl<'a> ImageViewMut<'a> {
     /// Creates a mutable view into an area of this view, specified by `rect`.
     ///
     /// If `rect` lies partially outside of `self`, the pixels that are outside of `self` will have
-    /// the value [`Color::NULL`] and ignore writes. The returned view always has the size of
+    /// the value [`Color::NONE`] and ignore writes. The returned view always has the size of
     /// `rect`.
     pub fn view_mut(&mut self, rect: impl Into<RotatedRect>) -> ImageViewMut<'_> {
         ImageViewMut {
             image: self.image,
             data: self.data.view(rect),
         }
-    }
-
-    pub fn flip_horizontal(&self) -> Image {
-        self.as_view().flip_horizontal()
-    }
-
-    pub fn flip_vertical(&self) -> Image {
-        self.as_view().flip_vertical()
-    }
-
-    pub fn flip_horizontal_in_place(&mut self) {
-        image::imageops::flip_horizontal_in_place(&mut self.as_generic_image());
-    }
-
-    pub fn flip_vertical_in_place(&mut self) {
-        image::imageops::flip_vertical_in_place(&mut self.as_generic_image());
     }
 
     /// Copies the contents of this view into a new [`Image`].
@@ -514,7 +475,7 @@ pub struct Color(pub(crate) [u8; 4]);
 
 impl Color {
     /// Fully transparent black (all components are 0).
-    pub const NULL: Self = Self([0, 0, 0, 0]);
+    pub const NONE: Self = Self([0, 0, 0, 0]);
     pub const BLACK: Self = Self([0, 0, 0, 255]);
     pub const WHITE: Self = Self([255, 255, 255, 255]);
     pub const RED: Self = Self([255, 0, 0, 255]);
