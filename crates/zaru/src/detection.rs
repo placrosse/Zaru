@@ -244,7 +244,7 @@ impl<C: Classes> Detector<C> {
         let scale = rect.width() / input_res.width() as f32;
         for (_, det) in self.detections.all_detections_mut() {
             // Map all coordinates from the network's input coordinate system to `rect`'s system.
-            let [xc, yc] = det.rect.center();
+            let [xc, yc] = det.rect.center().into();
             let [w, h] = [det.rect.width(), det.rect.height()];
             det.rect = Rect::from_center(xc * scale, yc * scale, w * scale, h * scale);
             for kp in &mut det.keypoints {
@@ -364,7 +364,7 @@ impl Detection {
             0.4..=0.8 => Color::YELLOW,
             _ => Color::RED,
         };
-        let [xc, yc] = self.bounding_rect().center();
+        let [xc, yc] = self.bounding_rect().center().into();
         draw::text(
             image,
             xc,

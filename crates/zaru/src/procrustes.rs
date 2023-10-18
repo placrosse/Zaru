@@ -3,6 +3,7 @@
 //! [Procrustes analysis]: https://en.wikipedia.org/wiki/Procrustes_analysis
 
 use nalgebra::{Const, Dyn, Matrix, Matrix3, Matrix4, OMatrix, Rotation3, UnitQuaternion, Vector3};
+use zaru_linalg::Vec3f;
 
 use crate::iter::zip_exact;
 
@@ -29,9 +30,9 @@ impl ProcrustesAnalyzer {
     /// # Panics
     ///
     /// This panics if the `reference` iterator yields fewer than 2 points.
-    pub fn new(reference: impl Iterator<Item = (f32, f32, f32)>) -> Self {
+    pub fn new(reference: impl Iterator<Item = Vec3f>) -> Self {
         let reference = reference
-            .map(|(x, y, z)| Vector3::new(x, y, z))
+            .map(|v| Vector3::new(v.x, v.y, v.z))
             .collect::<Vec<_>>();
 
         Self::new_impl(reference)
@@ -84,10 +85,9 @@ impl ProcrustesAnalyzer {
     ///
     /// This function will panic if `points` yields a different number of points than contained in
     /// the reference data passed to [`new`][Self::new].
-    pub fn analyze(&mut self, points: impl Iterator<Item = (f32, f32, f32)>) -> AnalysisResult {
+    pub fn analyze(&mut self, points: impl Iterator<Item = Vec3f>) -> AnalysisResult {
         self.buf.clear();
-        self.buf
-            .extend(points.map(|(x, y, z)| Vector3::new(x, y, z)));
+        self.buf.extend(points.map(|v| Vector3::new(v.x, v.y, v.z)));
 
         self.analyze_impl()
     }
@@ -257,18 +257,19 @@ mod tests {
     use approx::assert_relative_eq;
     use nalgebra::{Point3, Rotation3};
     use once_cell::sync::Lazy;
+    use zaru_linalg::vec3;
 
     use super::*;
 
-    const REFERENCE_POINTS: &[(f32, f32, f32)] = &[
-        (-1.0, 1.0, 0.0),
-        (1.0, 1.0, 0.0),
-        (1.0, 1.5, 0.0),
-        (1.75, 0.0, 0.0),
-        (1.0, -1.5, 0.0),
-        (1.0, -1.0, 0.0),
-        (-1.0, -1.0, 0.0),
-        (1.0, 1.0, 5.0),
+    const REFERENCE_POINTS: &[Vec3f] = &[
+        vec3(-1.0, 1.0, 0.0),
+        vec3(1.0, 1.0, 0.0),
+        vec3(1.0, 1.5, 0.0),
+        vec3(1.75, 0.0, 0.0),
+        vec3(1.0, -1.5, 0.0),
+        vec3(1.0, -1.0, 0.0),
+        vec3(-1.0, -1.0, 0.0),
+        vec3(1.0, 1.0, 5.0),
     ];
     static ANALYZER: Lazy<ProcrustesAnalyzer> =
         Lazy::new(|| ProcrustesAnalyzer::new(REFERENCE_POINTS.iter().copied()));
@@ -285,12 +286,10 @@ mod tests {
                 .ok();
         }
 
-        ANALYZER
-            .clone()
-            .analyze(REFERENCE_POINTS.iter().map(|&(x, y, z)| {
-                let pt = transform.transform_point(&Point3::new(x, y, z));
-                (pt.x, pt.y, pt.z)
-            }))
+        ANALYZER.clone().analyze(REFERENCE_POINTS.iter().map(|&v| {
+            let pt = transform.transform_point(&Point3::new(v.x, v.y, v.z));
+            vec3(pt.x, pt.y, pt.z)
+        }))
     }
 
     /// Applies `transform` to `orig`, then applies procrustes analysis and checks if we get
@@ -464,16 +463,14 @@ mod tests {
         let rot = UnitQuaternion::from_euler_angles(expected_roll, expected_pitch, expected_yaw);
         let offset = Vector3::new(50.0, 200.0, -20.0);
         let mut rng = fastrand::Rng::with_seed(0x3024b6663d843ca2);
-        let res = ANALYZER
-            .clone()
-            .analyze(REFERENCE_POINTS.iter().map(|&(x, y, z)| {
-                let rotated = rot * Vector3::new(x, y, z);
-                (
-                    rotated.x * 100.0 + offset.x + rng.f32() - 0.5,
-                    rotated.y * 100.0 + offset.y + rng.f32() - 0.5,
-                    rotated.z * 100.0 + offset.z + rng.f32() - 0.5,
-                )
-            }));
+        let res = ANALYZER.clone().analyze(REFERENCE_POINTS.iter().map(|&v| {
+            let rotated = rot * Vector3::new(v.x, v.y, v.z);
+            vec3(
+                rotated.x * 100.0 + offset.x + rng.f32() - 0.5,
+                rotated.y * 100.0 + offset.y + rng.f32() - 0.5,
+                rotated.z * 100.0 + offset.z + rng.f32() - 0.5,
+            )
+        }));
         assert_relative_eq!(res.scale(), 100.0, epsilon = 0.1);
         assert_relative_eq!(res.translation(), offset, epsilon = 0.5);
         let (roll, pitch, yaw) = res.rotation().euler_angles();

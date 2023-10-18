@@ -13,6 +13,7 @@ use include_blob::include_blob;
 use itertools::Itertools;
 use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
+use zaru_linalg::Vec3f;
 
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
 use crate::landmark::{Confidence, Landmark};
@@ -528,8 +529,8 @@ include!(concat!(
 /// points returned by this function have Y pointing up, and X and Y are in a smaller range around
 /// `(0,0)`, while [`LandmarkResultV1`] contains points that have Y point down, and X and Y are in
 /// term of the input image's coordinates.
-pub fn reference_positions() -> impl Iterator<Item = (f32, f32, f32)> {
-    REFERENCE_POSITIONS.iter().copied()
+pub fn reference_positions() -> impl Iterator<Item = Vec3f> {
+    REFERENCE_POSITIONS.iter().map(|&pt| pt.into())
 }
 
 /// Assigns a name to certain important landmark indices.
@@ -564,6 +565,8 @@ impl From<LandmarkIdx> for usize {
 
 #[cfg(test)]
 mod tests {
+    use zaru_linalg::vec3;
+
     use super::*;
     use crate::image::{AsImageView, ImageView};
     use crate::landmark::Confidence;
@@ -601,7 +604,7 @@ mod tests {
             // Flip Y to bring us to canonical 3D coordinates (where Y points up).
             // Only rotation matters, so we don't have to correct for the added
             // translation.
-            (x, -y, z)
+            vec3(x, -y, z)
         }));
         let (roll, pitch, yaw) = res.rotation().euler_angles();
         check_angle(0.0, roll);

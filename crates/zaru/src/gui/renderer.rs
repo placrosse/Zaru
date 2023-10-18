@@ -272,13 +272,6 @@ impl Renderer {
             window,
         };
         this.recreate_swapchain();
-
-        // Reloading shaders recreates the render pipelines, don't make that cause any panics.
-        #[cfg(not(debug_assertions))]
-        this.gpu.device.on_uncaptured_error(Box::new(|err| {
-            log::error!("wgpu error: {}\n", err);
-        }));
-
         this
     }
 

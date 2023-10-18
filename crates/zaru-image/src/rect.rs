@@ -8,6 +8,7 @@ use std::{cmp, fmt, ops::RangeInclusive};
 use crate::num::TotalF32;
 use crate::AspectRatio;
 use nalgebra::{Point2, Rotation2};
+use zaru_linalg::{vec2, Vec2f};
 
 /// An axis-aligned rectangle.
 ///
@@ -51,20 +52,19 @@ impl Rect {
     /// Computes the (axis-aligned) bounding rectangle that encompasses `points`.
     ///
     /// Returns [`None`] if `points` is an empty iterator.
-    pub fn bounding<I: IntoIterator<Item = [f32; 2]>>(points: I) -> Option<Self> {
+    pub fn bounding<I: IntoIterator<Item = T>, T: Into<Vec2f>>(points: I) -> Option<Self> {
         let mut iter = points.into_iter();
 
-        let [x, y] = iter.next()?;
-        let [mut x_min, mut x_max, mut y_min, mut y_max] = [x, x, y, y];
+        let first: Vec2f = iter.next()?.into();
+        let (mut min, mut max) = (first, first);
 
-        for [x, y] in iter {
-            x_min = f32::min(x_min, x);
-            x_max = f32::max(x_max, x);
-            y_min = f32::min(y_min, y);
-            y_max = f32::max(y_max, y);
+        for pt in iter {
+            let pt = pt.into();
+            min = min.min(pt);
+            max = max.max(pt);
         }
 
-        Some(Self::span_inner(x_min, y_min, x_max, y_max))
+        Some(Self::span_inner(min.x, min.y, max.x, max.y))
     }
 
     fn span_inner(x_min: f32, y_min: f32, x_max: f32, y_max: f32) -> Self {
@@ -150,6 +150,11 @@ impl Rect {
         self.yc
     }
 
+    #[inline]
+    pub fn top_left(&self) -> Vec2f {
+        vec2(self.xc - self.w * 0.5, self.yc - self.h * 0.5)
+    }
+
     /// Returns the X coordinate of the left side of the rectangle.
     #[inline]
     pub fn x(&self) -> f32 {
@@ -177,8 +182,12 @@ impl Rect {
         self.w * self.h
     }
 
-    pub fn center(&self) -> [f32; 2] {
-        [self.xc, self.yc]
+    pub fn center(&self) -> Vec2f {
+        vec2(self.xc, self.yc)
+    }
+
+    pub fn size(&self) -> Vec2f {
+        vec2(self.w, self.h)
     }
 
     #[must_use]
@@ -199,14 +208,13 @@ impl Rect {
     ///
     /// Returns [`None`] when the intersection is empty (ie. the rectangles do not overlap).
     pub fn intersection(&self, other: &Rect) -> Option<Rect> {
-        let x_min = self.x().max(other.x());
-        let y_min = self.y().max(other.y());
-        let x_max = (self.x() + self.width()).min(other.x() + other.width());
-        let y_max = (self.y() + self.height()).min(other.y() + other.height());
-        if x_min > x_max || y_min > y_max {
+        let min = self.top_left().max(other.top_left());
+        let max = (self.top_left() + self.size()).min(other.top_left() + other.size());
+        if min.x > max.x || min.y > max.y {
             return None;
         }
-        Some(Rect::bounding([[x_min, y_min], [x_max, y_max]]).unwrap())
+
+        Some(Rect::bounding([min, max]).unwrap())
     }
 
     fn intersection_area(&self, other: &Self) -> f32 {
@@ -356,7 +364,7 @@ impl RotatedRect {
     }
 
     pub fn center(&self) -> [f32; 2] {
-        self.rect.center()
+        self.rect.center().into()
     }
 
     /// Grows this rectangle by adding a margin relative to width and height.
@@ -387,7 +395,7 @@ impl RotatedRect {
         let corners = self.rect.corners();
 
         let rotation = Rotation2::new(self.radians);
-        let center = Point2::from(self.rect.center());
+        let center = Point2::from(self.rect.center().into_array());
         corners.map(|[x, y]| {
             let point = Point2::new(x, y);
             let rel = point - center;

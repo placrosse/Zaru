@@ -6,6 +6,8 @@ license-file = "../../LICENSE"
 repository = "https://github.com/SludgePhD/Zaru"
 
 [dependencies]
+zaru-linalg = { path = "../zaru-linalg", version = "0.1.0" }
+
 anyhow = "1.0.53"
 log = "0.4.14"
 

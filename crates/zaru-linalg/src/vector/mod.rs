@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     traits::{Number, Sqrt},
-    Mat2, One, Trig, Zero,
+    Mat2, MinMax, One, Trig, Zero,
 };
 
 mod ops;
@@ -264,6 +264,42 @@ impl<T, const N: usize> Vector<T, N> {
         T: Number + Sqrt,
     {
         self / self.length()
+    }
+
+    /// Element-wise minimum between `self` and `other`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use zaru_linalg::{Vec3f, vec3};
+    /// let a = vec3(-1.0, 2.0, f32::NAN);
+    /// let b = vec3(3.0, f32::NEG_INFINITY, 0.0);
+    /// assert_eq!(a.min(b), b.min(a));
+    /// assert_eq!(a.min(b), vec3(-1.0, f32::NEG_INFINITY, 0.0));
+    /// ```
+    pub fn min(self, other: Self) -> Self
+    where
+        T: MinMax + Copy,
+    {
+        Self::from_fn(|i| self[i].min(other[i]))
+    }
+
+    /// Element-wise maximum between `self` and `other`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use zaru_linalg::{Vec3f, vec3};
+    /// let a = vec3(-1.0, 2.0, f32::NAN);
+    /// let b = vec3(3.0, f32::NEG_INFINITY, 0.0);
+    /// assert_eq!(a.max(b), b.max(a));
+    /// assert_eq!(a.max(b), vec3(3.0, 2.0, 0.0));
+    /// ```
+    pub fn max(self, other: Self) -> Self
+    where
+        T: MinMax + Copy,
+    {
+        Self::from_fn(|i| self[i].max(other[i]))
     }
 }
 

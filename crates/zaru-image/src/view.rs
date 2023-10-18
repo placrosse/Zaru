@@ -55,7 +55,7 @@ impl ViewData {
         let rect: RotatedRect = rect.into();
         let radians = self.rect.rotation_radians() + rect.rotation_radians();
 
-        let [cx, cy] = rect.rect().center();
+        let [cx, cy] = rect.rect().center().into();
         let [cx, cy] = self.rect.transform_out(cx, cy);
         let [x, y] = [
             cx - rect.rect().width() / 2.0,

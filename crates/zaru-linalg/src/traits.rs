@@ -2,18 +2,6 @@
 
 use std::ops;
 
-/// Types that have a "zero" value (an additive identity).
-pub trait Zero {
-    /// The *0* value of this type.
-    const ZERO: Self;
-}
-
-/// Types that have a "one" value (a multiplicative identity).
-pub trait One {
-    /// The *1* value of this type.
-    const ONE: Self;
-}
-
 /// Trait for types that support the basic trigonometric functions (`sin`, `cos` and `tan`).
 pub trait Trig {
     fn sin(self) -> Self;
@@ -24,6 +12,65 @@ pub trait Trig {
 /// Types that support computing their square root.
 pub trait Sqrt {
     fn sqrt(self) -> Self;
+}
+
+/// Types that support a `min` and `max` operation.
+///
+/// [`f32`] and [`f64`] implement this trait in terms of the [`f32::min`] and [`f32::max`] functions
+/// ([`f64::min`] and [`f64::max`] respectively). Built-in integer types implement it in terms of
+/// [`Ord::min`] and [`Ord::max`].
+pub trait MinMax: Sized {
+    fn min(self, other: Self) -> Self;
+    fn max(self, other: Self) -> Self;
+    fn clamp(self, min: Self, max: Self) -> Self {
+        self.max(min).min(max)
+    }
+}
+macro_rules! ord_min_max {
+    ($($types:ty),+) => {
+        $(
+            impl MinMax for $types {
+                fn min(self, other: Self) -> Self {
+                    Ord::min(self, other)
+                }
+
+                fn max(self, other: Self) -> Self {
+                    Ord::max(self, other)
+                }
+            }
+        )+
+    };
+}
+ord_min_max!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128);
+impl MinMax for f32 {
+    fn min(self, other: Self) -> Self {
+        self.min(other)
+    }
+
+    fn max(self, other: Self) -> Self {
+        self.max(other)
+    }
+}
+impl MinMax for f64 {
+    fn min(self, other: Self) -> Self {
+        self.min(other)
+    }
+
+    fn max(self, other: Self) -> Self {
+        self.max(other)
+    }
+}
+
+/// Types that have a "zero" value (an additive identity).
+pub trait Zero {
+    /// The *0* value of this type.
+    const ZERO: Self;
+}
+
+/// Types that have a "one" value (a multiplicative identity).
+pub trait One {
+    /// The *1* value of this type.
+    const ONE: Self;
 }
 
 /// A trait for numeric types that support basic arithmetic operations.

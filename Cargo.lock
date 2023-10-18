@@ -3736,6 +3736,7 @@ dependencies = [
  "winit",
  "wonnx",
  "zaru-image",
+ "zaru-linalg",
  "zaru-macros",
  "zune-jpeg 0.2.0",
  "zune-jpeg 0.3.17",
@@ -3761,6 +3762,7 @@ dependencies = [
  "turbojpeg",
  "wgpu",
  "winit",
+ "zaru-linalg",
  "zune-jpeg 0.2.0",
  "zune-jpeg 0.3.17",
 ]

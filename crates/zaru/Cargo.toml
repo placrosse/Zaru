@@ -9,6 +9,7 @@ description = "Neural Network powered machine perception and computer vision lib
 [dependencies]
 zaru-macros = { path = "../zaru-macros", version = "0.1.0" }
 zaru-image = { path = "../zaru-image", version = "0.1.0" }
+zaru-linalg = { path = "../zaru-linalg", version = "0.1.0" }
 
 # generic deps
 anyhow = "1.0.53"
