@@ -3766,6 +3766,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "zaru-linalg"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "zaru-macros"
 version = "0.1.0"
 dependencies = [

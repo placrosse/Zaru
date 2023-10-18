@@ -1,0 +1,9 @@
+[package]
+name = "zaru-linalg"
+version = "0.1.0"
+edition = "2021"
+license-file = "../../LICENSE"
+description = "Linear Algebra types used by Zaru"
+
+[dependencies]
+bytemuck = "1.14.0"

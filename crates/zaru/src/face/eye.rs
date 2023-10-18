@@ -4,6 +4,8 @@
 //!
 //! [Iris]: https://google.github.io/mediapipe/solutions/iris
 
+// TODO: this is rather useless with the FaceMeshV2 model, remove it
+
 use include_blob::include_blob;
 use nalgebra::Point2;
 use once_cell::sync::Lazy;
@@ -31,8 +33,7 @@ static MODEL: Lazy<Cnn> = Lazy::new(|| {
 /// A [`Network`] that computes eye landmarks on a cropped image of a left eye.
 ///
 /// Landmarks of a right eye can be computed by flipping both the input image and the returned
-/// landmarks (via [`ImageView::flip_horizontal`] and
-/// [`EyeLandmarks::flip_horizontal_in_place`], respectively).
+/// landmarks with [`EyeLandmarks::flip_horizontal_in_place`].
 #[derive(Clone, Copy)]
 pub struct EyeNetwork;
 
