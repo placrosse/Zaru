@@ -1,7 +1,4 @@
-use std::{
-    array, fmt, mem,
-    ops::{Deref, DerefMut},
-};
+use std::{array, fmt};
 
 use crate::{
     traits::{Number, Sqrt},
@@ -9,6 +6,7 @@ use crate::{
 };
 
 mod ops;
+mod view;
 
 /// A 1-dimensional vector.
 pub type Vec1<T> = Vector<T, 1>;
@@ -78,6 +76,7 @@ impl<T, const N: usize> Vector<T, N> {
     /// let v = Vector::splat(2);
     /// assert_eq!(v, vec3(2, 2, 2));
     /// ```
+    #[inline]
     pub fn splat(elem: T) -> Self
     where
         T: Copy,
@@ -203,6 +202,7 @@ impl<T, const N: usize> Vector<T, N> {
     /// # use zaru_linalg::*;
     /// assert_eq!(vec3(1, 2, 3).as_ref(), vec3(&1, &2, &3));
     /// ```
+    #[inline]
     pub fn as_ref(&self) -> Vector<&T, N> {
         Vector::from_fn(|i| &self[i])
     }
@@ -383,6 +383,7 @@ impl<T, const N: usize> Default for Vector<T, N>
 where
     T: Default,
 {
+    #[inline]
     fn default() -> Self {
         Self::from_fn(|_| T::default())
     }
@@ -464,112 +465,27 @@ impl<T, const N: usize> AsMut<[T; N]> for Vector<T, N> {
 }
 
 /// Constructs a [`Vec1`] from its single element.
+#[inline]
 pub const fn vec1<T>(x: T) -> Vec1<T> {
     Vector([x])
 }
 
 /// Constructs a [`Vec2`] from its two elements.
+#[inline]
 pub const fn vec2<T>(x: T, y: T) -> Vec2<T> {
     Vector([x, y])
 }
 
 /// Constructs a [`Vec3`] from its three elements.
+#[inline]
 pub const fn vec3<T>(x: T, y: T, z: T) -> Vec3<T> {
     Vector([x, y, z])
 }
 
 /// Constructs a [`Vec4`] from its four elements.
+#[inline]
 pub const fn vec4<T>(x: T, y: T, z: T, w: T) -> Vec4<T> {
     Vector([x, y, z, w])
-}
-
-mod view {
-    #[repr(C)]
-    pub struct X<T> {
-        pub x: T,
-        _priv: (), // prevent external construction
-    }
-
-    #[repr(C)]
-    pub struct XY<T> {
-        pub x: T,
-        pub y: T,
-        _priv: (), // prevent external construction
-    }
-
-    #[repr(C)]
-    pub struct XYZ<T> {
-        pub x: T,
-        pub y: T,
-        pub z: T,
-        _priv: (), // prevent external construction
-    }
-
-    #[repr(C)]
-    pub struct XYZW<T> {
-        pub x: T,
-        pub y: T,
-        pub z: T,
-        pub w: T,
-        _priv: (), // prevent external construction
-    }
-}
-use view::*;
-
-impl<T> Deref for Vector<T, 1> {
-    type Target = X<T>;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { mem::transmute(self) }
-    }
-}
-
-impl<T> DerefMut for Vector<T, 1> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { mem::transmute(self) }
-    }
-}
-
-impl<T> Deref for Vector<T, 2> {
-    type Target = XY<T>;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { mem::transmute(self) }
-    }
-}
-
-impl<T> DerefMut for Vector<T, 2> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { mem::transmute(self) }
-    }
-}
-
-impl<T> Deref for Vector<T, 3> {
-    type Target = XYZ<T>;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { mem::transmute(self) }
-    }
-}
-
-impl<T> DerefMut for Vector<T, 3> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { mem::transmute(self) }
-    }
-}
-
-impl<T> Deref for Vector<T, 4> {
-    type Target = XYZW<T>;
-
-    fn deref(&self) -> &Self::Target {
-        unsafe { mem::transmute(self) }
-    }
-}
-
-impl<T> DerefMut for Vector<T, 4> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { mem::transmute(self) }
-    }
 }
 
 #[cfg(test)]
@@ -585,10 +501,42 @@ mod tests {
         assert_eq!(Vec3f::X.x, 1.0);
         assert_eq!(Vec3f::X[0], 1.0);
         assert_eq!(Vec3f::X[1], 0.0);
+        assert_eq!(Vec3f::X[2], 0.0);
         assert_eq!(Vec3f::X.y, 0.0);
         assert_eq!(Vec3f::Y.y, 1.0);
         assert_eq!(Vec3f::Y.z, 0.0);
         assert_eq!(Vec4f::W.w, 1.0);
+
+        let mut v = vec2(0, 1);
+        assert_eq!(v.x, 0);
+        assert_eq!(v.y, 1);
+        assert_eq!(v.r, 0);
+        assert_eq!(v.g, 1);
+        assert_eq!(v.w, 0);
+        assert_eq!(v.h, 1);
+        assert_eq!(v[0], 0);
+        assert_eq!(v[1], 1);
+
+        v.r = 777;
+        assert_eq!(v.x, 777);
+        assert_eq!(v.y, 1);
+        assert_eq!(v.r, 777);
+        assert_eq!(v.g, 1);
+        assert_eq!(v.w, 777);
+        assert_eq!(v.h, 1);
+        assert_eq!(v[0], 777);
+        assert_eq!(v[1], 1);
+        v.h = 9;
+        assert_eq!(v.x, 777);
+        assert_eq!(v.y, 9);
+        assert_eq!(v.r, 777);
+        assert_eq!(v.g, 9);
+        assert_eq!(v.w, 777);
+        assert_eq!(v.h, 9);
+        assert_eq!(v[0], 777);
+        assert_eq!(v[1], 9);
+
+        // :3
     }
 
     #[test]
