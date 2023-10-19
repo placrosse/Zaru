@@ -45,8 +45,9 @@ pub type Vec4f = Vec4<f32>;
 ///
 /// Vector elements can be accessed and inspected in a few different ways:
 ///
-/// - For vectors with up to 4 dimensions, elements can be accessed as fields (eg. `myvec.x` or
-///   `myvec.w`).
+/// - For vectors with up to 4 dimensions, elements can be accessed as fields `x`, `y`, `z`, or `w`.
+///   - Aliases `r`, `g`, `b`, and `a` are also provided, as well as aliases `w` and `h` for
+///     2-dimensional vectors.
 /// - The [`Index`] and [`IndexMut`] impls can be used just like on arrays.
 /// - The [`AsRef`] and [`AsMut`] impls can be used to access the underlying elements as a slice or
 ///   array.

@@ -8,6 +8,8 @@ pub mod ssd;
 
 use std::{fmt::Debug, marker::PhantomData};
 
+use zaru_linalg::{vec2, Vec2f};
+
 use crate::image::{draw, AsImageView, AsImageViewMut, Color, ImageView, ImageViewMut, Resolution};
 use crate::nn::{Cnn, Outputs};
 use crate::rect::{Rect, RotatedRect};
@@ -244,20 +246,23 @@ impl<C: Classes> Detector<C> {
         let scale = rect.width() / input_res.width() as f32;
         for (_, det) in self.detections.all_detections_mut() {
             // Map all coordinates from the network's input coordinate system to `rect`'s system.
-            let [xc, yc] = det.rect.center().into();
-            let [w, h] = [det.rect.width(), det.rect.height()];
-            det.rect = Rect::from_center(xc * scale, yc * scale, w * scale, h * scale);
+            let center = det.rect.center();
+            let size = det.rect.size();
+            det.rect = Rect::from_center(
+                center.x * scale,
+                center.y * scale,
+                size.w * scale,
+                size.h * scale,
+            );
             for kp in &mut det.keypoints {
-                kp.x *= scale;
-                kp.y *= scale;
+                kp.p *= scale;
             }
 
             // Now remove the offset added by the oversized rectangle (this compensates for
             // "black bars" added to adjust the aspect ratio).
-            det.rect = det.rect.move_by(rect.x(), rect.y());
+            det.rect = det.rect.move_by(rect.top_left());
             for kp in &mut det.keypoints {
-                kp.x += rect.x();
-                kp.y += rect.y();
+                kp.p += rect.top_left();
             }
         }
 
@@ -388,20 +393,30 @@ impl Detection {
 /// scores.
 #[derive(Debug, Clone, Copy)]
 pub struct Keypoint {
-    x: f32,
-    y: f32,
+    p: Vec2f,
 }
 
 impl Keypoint {
-    pub fn new(x: f32, y: f32) -> Self {
-        Self { x, y }
+    pub fn new(point: impl Into<Vec2f>) -> Self {
+        Self { p: point.into() }
     }
 
     pub fn x(&self) -> f32 {
-        self.x
+        self.p.x
     }
 
     pub fn y(&self) -> f32 {
-        self.y
+        self.p.y
+    }
+}
+
+impl From<Vec2f> for Keypoint {
+    fn from(value: Vec2f) -> Self {
+        Self { p: value }
+    }
+}
+impl From<Keypoint> for Vec2f {
+    fn from(value: Keypoint) -> Self {
+        vec2(value.x(), value.y())
     }
 }

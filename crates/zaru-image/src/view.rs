@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use zaru_linalg::{vec2, Vec2f};
+use zaru_linalg::{vec2, Vec2, Vec2f};
 
 use crate::{
     blend,
@@ -58,14 +58,10 @@ impl ViewData {
         let radians = self.rect.rotation_radians() + rect.rotation_radians();
 
         let [cx, cy] = rect.rect().center().into();
-        let [cx, cy] = self.rect.transform_out(cx, cy);
-        let [x, y] = [
-            cx - rect.rect().width() / 2.0,
-            cy - rect.rect().height() / 2.0,
-        ];
+        let pt = self.rect.transform_out(cx, cy) - rect.rect().size() * 0.5;
 
         Self {
-            rect: RotatedRect::new(rect.rect().move_to(x, y), radians),
+            rect: RotatedRect::new(rect.rect().move_to(pt.x, pt.y), radians),
         }
     }
 
@@ -109,18 +105,18 @@ impl ViewData {
     }
 
     fn uv(&self, x: f32, y: f32, image: &Image) -> Vec2f {
-        let [x, y] = self.rect.transform_out(x, y);
-        vec2(x / image.width() as f32, y / image.height() as f32)
+        let size = vec2(image.width() as f32, image.height() as f32);
+        let pt = self.rect.transform_out(x, y);
+        pt / size
     }
 
     /// Computes the clip-space position in the underlying [`Image`] that corresponds to the given
     /// coordinates in this view.
     pub(crate) fn position(&self, x: f32, y: f32, image: &Image) -> Vec2f {
-        let [x, y] = self.rect.transform_out(x, y);
-        vec2(
-            (x / image.width() as f32 - 0.5) * 2.0,
-            -(y / image.height() as f32 - 0.5) * 2.0,
-        )
+        let size = vec2(image.width() as f32, image.height() as f32);
+        let pt = self.rect.transform_out(x, y) / size - Vec2::splat(0.5);
+
+        pt * vec2(2.0, -2.0)
     }
 }
 

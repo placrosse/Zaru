@@ -8,6 +8,7 @@ use crate::{image::Resolution, rect::Rect};
 use include_blob::include_blob;
 use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
+use zaru_linalg::vec2;
 
 use crate::{
     detection::{
@@ -149,23 +150,15 @@ fn extract_detection(
 ) -> Detection {
     assert_eq!(box_params.len(), 18);
 
-    let input_w = input_res.width() as f32;
-    let input_h = input_res.height() as f32;
+    let input_size = vec2(input_res.width() as f32, input_res.height() as f32);
+    let center = vec2(box_params[0], box_params[1]) + anchor.center() * input_size;
 
-    let xc = box_params[0] + anchor.x_center() * input_w;
-    let yc = box_params[1] + anchor.y_center() * input_h;
-    let w = box_params[2];
-    let h = box_params[3];
-    let lm = |x, y| {
-        crate::detection::Keypoint::new(
-            x + anchor.x_center() * input_w,
-            y + anchor.y_center() * input_h,
-        )
-    };
+    let lm = |x, y| crate::detection::Keypoint::new(vec2(x, y) + center * input_size);
 
+    let size = vec2(box_params[2], box_params[3]);
     let mut det = Detection::with_keypoints(
         confidence,
-        Rect::from_center(xc, yc, w, h),
+        Rect::from_center(center.x, center.y, size.w, size.h),
         vec![
             lm(box_params[4], box_params[5]),
             lm(box_params[6], box_params[7]),

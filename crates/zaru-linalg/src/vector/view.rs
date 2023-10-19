@@ -75,7 +75,7 @@ pub struct RGBA<T> {
 pub struct WH<T> {
     pub w: T,
     pub h: T,
-    _priv: (),
+    _priv: (), // prevent external construction
 }
 
 impl<T> Deref for Vector<T, 1> {

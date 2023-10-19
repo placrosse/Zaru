@@ -100,7 +100,7 @@ impl NonMaxSuppression {
                     for det in &self.avg_buf {
                         if acc.keypoints().is_empty() && !det.keypoints().is_empty() {
                             acc.keypoints_mut()
-                                .resize(det.keypoints().len(), Keypoint::new(0.0, 0.0));
+                                .resize(det.keypoints().len(), Keypoint::new([0.0, 0.0]));
                         }
 
                         assert_eq!(
@@ -112,20 +112,18 @@ impl NonMaxSuppression {
                         let factor = det.confidence;
                         divisor += factor;
                         for (acc, lm) in zip_exact(&mut acc.keypoints.iter_mut(), &det.keypoints) {
-                            acc.x += lm.x * factor;
-                            acc.y += lm.y * factor;
+                            acc.p += lm.p * factor;
                         }
                         let rect = det.bounding_rect();
-                        acc_rect_x += rect.x_center() * factor;
-                        acc_rect_y += rect.y_center() * factor;
+                        acc_rect_x += rect.center().x * factor;
+                        acc_rect_y += rect.center().y * factor;
                         acc_rect_w += rect.width() * factor;
                         acc_rect_h += rect.height() * factor;
                         acc_angle += det.angle * factor;
                     }
 
                     for lm in &mut acc.keypoints {
-                        lm.x /= divisor;
-                        lm.y /= divisor;
+                        lm.p /= divisor;
                     }
                     acc_rect_x /= divisor;
                     acc_rect_y /= divisor;

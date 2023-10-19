@@ -166,50 +166,88 @@ where
     }
 }
 
-/// Vector-Scalar multiplication (scaling).
-impl<T, U, const N: usize> Mul<U> for Vector<T, N>
+/// Element-wise multiplication.
+impl<T, const N: usize> Mul<Vector<T, N>> for Vector<T, N>
 where
-    T: Mul<U>,
-    U: Copy,
+    T: Mul + Copy,
 {
     type Output = Vector<T::Output, N>;
 
-    fn mul(self, rhs: U) -> Self::Output {
+    fn mul(self, rhs: Vector<T, N>) -> Self::Output {
+        Vector::zip(self, rhs).map(|(a, b)| a * b)
+    }
+}
+
+/// Element-wise multiplication.
+impl<T, const N: usize> MulAssign<Vector<T, N>> for Vector<T, N>
+where
+    T: MulAssign + Copy,
+{
+    fn mul_assign(&mut self, rhs: Vector<T, N>) {
+        self.as_mut_slice()
+            .iter_mut()
+            .zip(rhs.into_array())
+            .for_each(|(lhs, rhs)| *lhs *= rhs);
+    }
+}
+
+// NB: above, we choose to support both vector-scalar multiplication as well as element-wise vector-vector multiplication
+// This rules out a more generic implementation `Mul<U> for Vector<T, N> where T: Mul<U>`.
+// Zaru uses both impls a bunch, but isn't affected much by the lack of genericity, so it seems like
+// this tadeoff is worth it?
+
+/// Vector-Scalar multiplication (scaling).
+impl<T, const N: usize> Mul<T> for Vector<T, N>
+where
+    T: Mul + Copy,
+{
+    type Output = Vector<T::Output, N>;
+
+    fn mul(self, rhs: T) -> Self::Output {
         self.map(|elem| elem * rhs)
     }
 }
 
 /// Vector-Scalar multiplication (scaling).
-impl<T, U, const N: usize> MulAssign<U> for Vector<T, N>
+impl<T, const N: usize> MulAssign<T> for Vector<T, N>
 where
-    T: MulAssign<U>,
-    U: Copy,
+    T: MulAssign + Copy,
 {
-    fn mul_assign(&mut self, rhs: U) {
+    fn mul_assign(&mut self, rhs: T) {
         self.as_mut_slice().iter_mut().for_each(|lhs| *lhs *= rhs);
     }
 }
 
-/// Vector-Scalar division (scaling).
-impl<T, U, const N: usize> Div<U> for Vector<T, N>
+/// Element-wise division.
+impl<T, const N: usize> Div<Vector<T, N>> for Vector<T, N>
 where
-    T: Div<U>,
-    U: Copy,
+    T: Div + Copy,
 {
     type Output = Vector<T::Output, N>;
 
-    fn div(self, rhs: U) -> Self::Output {
+    fn div(self, rhs: Vector<T, N>) -> Self::Output {
+        Vector::zip(self, rhs).map(|(a, b)| a / b)
+    }
+}
+
+/// Vector-Scalar division (scaling).
+impl<T, const N: usize> Div<T> for Vector<T, N>
+where
+    T: Div + Copy,
+{
+    type Output = Vector<T::Output, N>;
+
+    fn div(self, rhs: T) -> Self::Output {
         self.map(|elem| elem / rhs)
     }
 }
 
 /// Vector-Scalar division (scaling).
-impl<T, U, const N: usize> DivAssign<U> for Vector<T, N>
+impl<T, const N: usize> DivAssign<T> for Vector<T, N>
 where
-    T: DivAssign<U>,
-    U: Copy,
+    T: DivAssign + Copy,
 {
-    fn div_assign(&mut self, rhs: U) {
+    fn div_assign(&mut self, rhs: T) {
         self.as_mut_slice().iter_mut().for_each(|lhs| *lhs /= rhs);
     }
 }

@@ -595,7 +595,7 @@ mod tests {
         check_angle(expected_radians, landmarks.right_eye().rotation_radians());
 
         if degrees.abs() <= 45.0f32 {
-            assert!(landmarks.left_eye().x_center() < landmarks.right_eye().x_center());
+            assert!(landmarks.left_eye().center().x < landmarks.right_eye().center().x);
         }
 
         let mut pa = ProcrustesAnalyzer::new(reference_positions());

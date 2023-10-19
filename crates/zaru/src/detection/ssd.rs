@@ -7,6 +7,8 @@
 
 use std::ops::Index;
 
+use zaru_linalg::Vec2f;
+
 use crate::image::Resolution;
 
 /// An anchor of an SSD network.
@@ -14,20 +16,26 @@ use crate::image::Resolution;
 /// The anchor position coordinates are in range 0 to 1 and have to be adjusted to match the
 /// network's input resolution.
 pub struct Anchor {
-    // values range from 0 to 1
-    x_center: f32,
-    y_center: f32,
+    // coordinates range from 0 to 1
+    center: Vec2f,
 }
 
 impl Anchor {
     /// Returns the X coordinate of the anchor's center.
+    #[inline]
     pub fn x_center(&self) -> f32 {
-        self.x_center
+        self.center.x
     }
 
     /// Returns the Y coordinate of the anchor's center.
+    #[inline]
     pub fn y_center(&self) -> f32 {
-        self.y_center
+        self.center.y
+    }
+
+    #[inline]
+    pub fn center(&self) -> Vec2f {
+        self.center
     }
 }
 
@@ -96,10 +104,12 @@ impl Anchors {
                 for x in 0..width {
                     // FIXME `boxes_per_cell` is ignored, what should it do?
                     for _ in 0..layer.boxes_per_cell {
-                        let x_center = (x as f32 + 0.5) / width as f32;
-                        let y_center = (y as f32 + 0.5) / height as f32;
+                        let x = (x as f32 + 0.5) / width as f32;
+                        let y = (y as f32 + 0.5) / height as f32;
 
-                        anchors.push(Anchor { x_center, y_center });
+                        anchors.push(Anchor {
+                            center: [x, y].into(),
+                        });
                     }
                 }
             }
