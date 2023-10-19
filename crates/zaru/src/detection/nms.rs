@@ -180,8 +180,7 @@ mod tests {
         let d = &detections[0];
         let rect = d.bounding_rect();
         assert_eq!(d.confidence(), 0.6);
-        assert_eq!(rect.x_center(), 0.0);
-        assert_eq!(rect.y_center(), 0.0);
+        assert_eq!(rect.center(), [0.0, 0.0]);
         assert_eq!(rect.width(), 1.0);
         assert_eq!(rect.height(), 1.0);
     }
@@ -213,8 +212,7 @@ mod tests {
         let d = &detections[0];
         let rect = d.bounding_rect();
         assert_eq!(d.confidence(), 1.0);
-        assert_eq!(rect.x_center(), -1.0);
-        assert_eq!(rect.y_center(), 3.0);
+        assert_eq!(rect.center(), [-1.0, 3.0]);
         assert_eq!(rect.width(), 2.0);
         assert_eq!(rect.height(), 2.0);
     }

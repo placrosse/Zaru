@@ -3,7 +3,7 @@
 //! [Procrustes analysis]: https://en.wikipedia.org/wiki/Procrustes_analysis
 
 use nalgebra::{Const, Dyn, Matrix, Matrix3, Matrix4, OMatrix, Rotation3, UnitQuaternion, Vector3};
-use zaru_linalg::Vec3f;
+use zaru_linalg::{vec3, Vec3f};
 
 use crate::iter::zip_exact;
 
@@ -210,8 +210,8 @@ impl AnalysisResult {
     ///
     /// Scaling and rotation happens around this point.
     #[inline]
-    pub fn centroid(&self) -> Vector3<f32> {
-        self.centroid
+    pub fn centroid(&self) -> Vec3f {
+        vec3(self.centroid.x, self.centroid.y, self.centroid.z)
     }
 
     /// Returns the translation that was applied to the analyzed data, relative to the reference
@@ -222,8 +222,8 @@ impl AnalysisResult {
     /// centroid of the reference data, that offset *will* be reflected in the centroid, but *not*
     /// in the translation returned by this method. Only true translation is returned.
     #[inline]
-    pub fn translation(&self) -> Vector3<f32> {
-        self.translation
+    pub fn translation(&self) -> Vec3f {
+        vec3(self.translation.x, self.translation.y, self.translation.z)
     }
 
     /// Returns the computed rotation as a unit quaternion.
@@ -257,7 +257,7 @@ mod tests {
     use approx::assert_relative_eq;
     use nalgebra::{Point3, Rotation3};
     use once_cell::sync::Lazy;
-    use zaru_linalg::vec3;
+    use zaru_linalg::{assert_approx_eq, vec3, Vec3};
 
     use super::*;
 
@@ -327,16 +327,13 @@ mod tests {
                         * Matrix4::from(Rotation3::new(Vector3::new(0.0, 0.0, 1.0) * angle)),
                 );
 
-                assert_relative_eq!(result.scale(), scaling, epsilon = MAX_DELTA);
-                assert_relative_eq!(
-                    result.translation(),
-                    translation,
-                    epsilon = MAX_TRANSLATION_DELTA
-                );
+                let translation = vec3(translation.x, translation.y, translation.z);
+                assert_approx_eq!(result.scale(), scaling).rel(MAX_DELTA);
+                assert_approx_eq!(result.translation(), translation).abs(MAX_TRANSLATION_DELTA);
 
                 let (roll, pitch, yaw) = result.rotation().euler_angles();
-                assert_relative_eq!(roll, 0.0, epsilon = MAX_DELTA);
-                assert_relative_eq!(pitch, 0.0, epsilon = MAX_DELTA);
+                assert_approx_eq!(roll, 0.0).abs(MAX_DELTA);
+                assert_approx_eq!(pitch, 0.0).abs(MAX_DELTA);
                 clamp_degrees(yaw.to_degrees().round() as i32)
             })
             .collect::<Vec<_>>();
@@ -390,7 +387,7 @@ mod tests {
             UnitQuaternion::identity(),
             epsilon = MAX_DELTA
         );
-        assert_relative_eq!(res.translation(), Vector3::zeros(), epsilon = MAX_DELTA);
+        assert_approx_eq!(res.translation(), Vec3::ZERO).abs(MAX_DELTA);
 
         let res = analyze(Matrix4::identity().append_scaling(0.5));
         assert_eq!(res.scale(), 0.5);
@@ -399,7 +396,7 @@ mod tests {
             UnitQuaternion::identity(),
             epsilon = MAX_DELTA
         );
-        assert_relative_eq!(res.translation(), Vector3::zeros(), epsilon = MAX_DELTA);
+        assert_approx_eq!(res.translation(), Vec3::ZERO).abs(MAX_DELTA);
     }
 
     #[test]
@@ -461,7 +458,7 @@ mod tests {
     fn jitter() {
         let (expected_roll, expected_pitch, expected_yaw) = (3.0, -1.0, 2.0);
         let rot = UnitQuaternion::from_euler_angles(expected_roll, expected_pitch, expected_yaw);
-        let offset = Vector3::new(50.0, 200.0, -20.0);
+        let offset = vec3(50.0, 200.0, -20.0);
         let mut rng = fastrand::Rng::with_seed(0x3024b6663d843ca2);
         let res = ANALYZER.clone().analyze(REFERENCE_POINTS.iter().map(|&v| {
             let rotated = rot * Vector3::new(v.x, v.y, v.z);
@@ -471,15 +468,11 @@ mod tests {
                 rotated.z * 100.0 + offset.z + rng.f32() - 0.5,
             )
         }));
-        assert_relative_eq!(res.scale(), 100.0, epsilon = 0.1);
-        assert_relative_eq!(res.translation(), offset, epsilon = 0.5);
+        assert_approx_eq!(res.scale(), 100.0).abs(0.1);
+        assert_approx_eq!(res.translation(), offset).abs(0.5);
         let (roll, pitch, yaw) = res.rotation().euler_angles();
-        assert_relative_eq!(roll.to_degrees(), expected_roll.to_degrees(), epsilon = 0.2);
-        assert_relative_eq!(
-            pitch.to_degrees(),
-            expected_pitch.to_degrees(),
-            epsilon = 0.2
-        );
-        assert_relative_eq!(yaw.to_degrees(), expected_yaw.to_degrees(), epsilon = 0.2);
+        assert_approx_eq!(roll.to_degrees(), expected_roll.to_degrees()).abs(0.2);
+        assert_approx_eq!(pitch.to_degrees(), expected_pitch.to_degrees(),).abs(0.2);
+        assert_approx_eq!(yaw.to_degrees(), expected_yaw.to_degrees()).abs(0.2);
     }
 }

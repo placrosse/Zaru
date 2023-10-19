@@ -163,7 +163,7 @@ impl<'a> Drop for DrawText<'a> {
 
         // `epaint` operates in pixel coordinates of the destination `Image`, not in clip space.
         // FIXME: perhaps all primitives should work like that? they all have access to the dest `Image` already.
-        let pos = self.image.data.rect.transform_out(self.pos.x, self.pos.y);
+        let pos = self.image.data.rect.transform_out(self.pos);
 
         let font_id = FontId {
             size: self.size,

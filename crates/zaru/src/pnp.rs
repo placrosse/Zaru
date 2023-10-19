@@ -3,6 +3,7 @@
 //! (experimental, might not work)
 
 use nalgebra::{Const, Dyn, Matrix, Matrix3x4, OMatrix, Rotation3, Vector3};
+use zaru_linalg::{vec3, Vec3f};
 
 use crate::iter::zip_exact;
 
@@ -164,8 +165,8 @@ impl DltOutput {
 
     /// Returns the recovered translation of the camera.
     #[inline]
-    pub fn translation(&self) -> Vector3<f32> {
-        self.translation
+    pub fn translation(&self) -> Vec3f {
+        vec3(self.translation.x, self.translation.y, self.translation.z)
     }
 }
 
@@ -178,8 +179,8 @@ mod tests {
         thread,
     };
 
-    use approx::assert_relative_eq;
     use nalgebra::{Matrix4, Vector4};
+    use zaru_linalg::{assert_approx_eq, Vec3};
 
     use super::*;
 
@@ -194,14 +195,7 @@ mod tests {
     }
 
     #[track_caller]
-    fn check(
-        n: usize,
-        tf: Matrix4<f32>,
-        translation: Vector3<f32>,
-        roll: f32,
-        pitch: f32,
-        yaw: f32,
-    ) {
+    fn check(n: usize, tf: Matrix4<f32>, translation: Vec3f, roll: f32, pitch: f32, yaw: f32) {
         let mut hasher = DefaultHasher::new();
         thread::current().name().unwrap().hash(&mut hasher);
         let seed = hasher.finish();
@@ -217,18 +211,18 @@ mod tests {
             let p = tf * Vector4::new(x, y, z, 1.0);
             project(&intrinsic, (p / p.w).xyz())
         }));
-        assert_relative_eq!(out.translation(), translation, epsilon = POS_EPSILON);
+        assert_approx_eq!(out.translation(), translation).abs(POS_EPSILON);
         let (r, p, y) = out.rotation().euler_angles();
-        assert_relative_eq!(roll, r, epsilon = ANGLE_EPSILON);
-        assert_relative_eq!(pitch, p, epsilon = ANGLE_EPSILON);
-        assert_relative_eq!(yaw, y, epsilon = ANGLE_EPSILON);
+        assert_approx_eq!(roll, r, "roll").abs(ANGLE_EPSILON);
+        assert_approx_eq!(pitch, p, "pitch").abs(ANGLE_EPSILON);
+        assert_approx_eq!(yaw, y, "yaw").abs(ANGLE_EPSILON);
     }
 
     #[test]
     fn test_identity() {
-        check(6, Matrix4::identity(), Vector3::zeros(), 0.0, 0.0, 0.0);
-        check(7, Matrix4::identity(), Vector3::zeros(), 0.0, 0.0, 0.0);
-        check(60, Matrix4::identity(), Vector3::zeros(), 0.0, 0.0, 0.0);
+        check(6, Matrix4::identity(), Vec3::ZERO, 0.0, 0.0, 0.0);
+        check(7, Matrix4::identity(), Vec3::ZERO, 0.0, 0.0, 0.0);
+        check(60, Matrix4::identity(), Vec3::ZERO, 0.0, 0.0, 0.0);
     }
 
     #[test]
@@ -237,7 +231,7 @@ mod tests {
         check(
             6,
             Matrix4::new_translation(&Vector3::new(1.0, 5.0, 0.0)),
-            Vector3::new(1.0, 5.0, 0.0),
+            vec3(1.0, 5.0, 0.0),
             0.0,
             0.0,
             0.0,
@@ -246,14 +240,7 @@ mod tests {
 
     #[test]
     fn test_uniform_scale() {
-        check(
-            6,
-            Matrix4::new_scaling(3.0),
-            Vector3::new(0.0, 0.0, 0.0),
-            0.0,
-            0.0,
-            0.0,
-        );
+        check(6, Matrix4::new_scaling(3.0), Vec3::ZERO, 0.0, 0.0, 0.0);
     }
 
     #[test]
@@ -261,7 +248,7 @@ mod tests {
         check(
             6,
             Rotation3::from_euler_angles(45.0f32.to_radians(), 0.0, 0.0).into(),
-            Vector3::zeros(),
+            Vec3::ZERO,
             45.0f32.to_radians(),
             0.0,
             0.0,
@@ -269,7 +256,7 @@ mod tests {
         check(
             60,
             Rotation3::from_euler_angles(45.0f32.to_radians(), 0.0, 0.0).into(),
-            Vector3::zeros(),
+            Vec3::ZERO,
             45.0f32.to_radians(),
             0.0,
             0.0,
@@ -278,7 +265,7 @@ mod tests {
         check(
             6,
             Rotation3::from_euler_angles(90.0f32.to_radians(), 0.0, 0.0).into(),
-            Vector3::zeros(),
+            Vec3::ZERO,
             90.0f32.to_radians(),
             0.0,
             0.0,
@@ -286,7 +273,7 @@ mod tests {
         check(
             6,
             Rotation3::from_euler_angles(90.0f32.to_radians(), 45.0f32.to_radians(), 0.0).into(),
-            Vector3::zeros(),
+            Vec3::ZERO,
             90.0f32.to_radians(),
             45.0f32.to_radians(),
             0.0,
@@ -294,7 +281,7 @@ mod tests {
         check(
             6,
             Rotation3::from_euler_angles(0.0, 0.0, PI).into(),
-            Vector3::zeros(),
+            Vec3::ZERO,
             0.0,
             0.0,
             PI,
@@ -302,7 +289,7 @@ mod tests {
         check(
             6,
             Rotation3::from_euler_angles(HALF_TURN, 0.0, HALF_TURN).into(),
-            Vector3::zeros(),
+            Vec3::ZERO,
             HALF_TURN,
             0.0,
             HALF_TURN,
@@ -315,7 +302,7 @@ mod tests {
             6,
             Matrix4::from(Rotation3::from_euler_angles(HALF_TURN, 0.0, HALF_TURN))
                 .append_translation(&[5.0, 10.0, 0.0].into()),
-            Vector3::new(5.0, 10.0, 0.0),
+            vec3(5.0, 10.0, 0.0),
             HALF_TURN,
             0.0,
             HALF_TURN,

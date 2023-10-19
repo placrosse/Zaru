@@ -481,7 +481,7 @@ impl<E: Estimate + Confidence> LandmarkTracker<E> {
 
         // Map all landmarks to the image coordinate system.
         for [x, y, _] in estimate.landmarks_mut().positions_mut() {
-            [*x, *y] = view_rect.transform_out(*x, *y).into();
+            [*x, *y] = view_rect.transform_out([*x, *y]).into();
         }
 
         let updated_roi = RotatedRect::bounding(

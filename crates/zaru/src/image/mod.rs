@@ -204,15 +204,10 @@ impl ViewData {
         let rect: RotatedRect = rect.into();
         let radians = self.rect.rotation_radians() + rect.rotation_radians();
 
-        let [cx, cy] = rect.rect().center().into();
-        let [cx, cy] = self.rect.transform_out(cx, cy).into();
-        let [x, y] = [
-            cx - rect.rect().width() / 2.0,
-            cy - rect.rect().height() / 2.0,
-        ];
+        let pos = self.rect.transform_out(rect.rect().center()) - rect.rect().size() * 0.5;
 
         Self {
-            rect: RotatedRect::new(rect.rect().move_to(x, y), radians),
+            rect: RotatedRect::new(rect.rect().move_to(pos.x, pos.y), radians),
         }
     }
 
@@ -231,7 +226,7 @@ impl ViewData {
     fn image_coord(&self, x: u32, y: u32, image: &Image) -> Option<(u32, u32)> {
         let [x, y] = self
             .rect
-            .transform_out(x as f32 + 0.5, y as f32 + 0.5)
+            .transform_out([x as f32 + 0.5, y as f32 + 0.5])
             .into();
         let [x, y] = [(x - 0.5).round(), (y - 0.5).round()];
 

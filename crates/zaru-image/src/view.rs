@@ -57,8 +57,7 @@ impl ViewData {
         let rect: RotatedRect = rect.into();
         let radians = self.rect.rotation_radians() + rect.rotation_radians();
 
-        let [cx, cy] = rect.rect().center().into();
-        let pt = self.rect.transform_out(cx, cy) - rect.rect().size() * 0.5;
+        let pt = self.rect.transform_out(rect.rect().center()) - rect.rect().size() * 0.5;
 
         Self {
             rect: RotatedRect::new(rect.rect().move_to(pt.x, pt.y), radians),
@@ -106,7 +105,7 @@ impl ViewData {
 
     fn uv(&self, x: f32, y: f32, image: &Image) -> Vec2f {
         let size = vec2(image.width() as f32, image.height() as f32);
-        let pt = self.rect.transform_out(x, y);
+        let pt = self.rect.transform_out([x, y]);
         pt / size
     }
 
@@ -114,7 +113,7 @@ impl ViewData {
     /// coordinates in this view.
     pub(crate) fn position(&self, x: f32, y: f32, image: &Image) -> Vec2f {
         let size = vec2(image.width() as f32, image.height() as f32);
-        let pt = self.rect.transform_out(x, y) / size - Vec2::splat(0.5);
+        let pt = self.rect.transform_out([x, y]) / size - Vec2::splat(0.5);
 
         pt * vec2(2.0, -2.0)
     }

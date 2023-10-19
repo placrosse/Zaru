@@ -6,18 +6,15 @@
 use std::{fmt, ops::RangeInclusive};
 
 use crate::AspectRatio;
-use nalgebra::{Point2, Rotation2};
-use zaru_linalg::{vec2, Mat2f, Vec2f};
+use zaru_linalg::{approx::ApproxEq, vec2, Mat2, Mat2f, Vec2f};
 
 /// An axis-aligned rectangle.
 ///
 /// Rectangles are allowed to have zero height and/or width. Negative dimensions are not allowed.
 #[derive(Clone, Copy, PartialEq)]
 pub struct Rect {
-    xc: f32,
-    yc: f32,
-    w: f32,
-    h: f32,
+    center: Vec2f,
+    size: Vec2f,
 }
 
 impl Rect {
@@ -25,10 +22,8 @@ impl Rect {
     #[inline]
     pub fn from_center(x_center: f32, y_center: f32, width: f32, height: f32) -> Self {
         Self {
-            xc: x_center,
-            yc: y_center,
-            w: width,
-            h: height,
+            center: vec2(x_center, y_center),
+            size: vec2(width, height),
         }
     }
 
@@ -77,10 +72,8 @@ impl Rect {
     /// The center position of the [`Rect`] remains the same.
     pub fn scale(&self, scale: f32) -> Self {
         Self {
-            xc: self.xc,
-            yc: self.yc,
-            w: self.w * scale,
-            h: self.h * scale,
+            center: self.center,
+            size: self.size * scale,
         }
     }
 
@@ -94,8 +87,7 @@ impl Rect {
         let top = self.height() * amount;
         let bottom = self.height() * amount;
         Rect {
-            w: self.w + left + right,
-            h: self.h + top + bottom,
+            size: vec2(self.size.w + left + right, self.size.h + top + bottom),
             ..*self
         }
     }
@@ -114,11 +106,11 @@ impl Rect {
         let target_width = self.height() * target_aspect.as_f32();
         if target_width >= self.width() {
             let inc_w = target_width - self.width();
-            res.w += inc_w;
+            res.size.w += inc_w;
         } else {
             let target_height = self.width() / target_aspect.as_f32();
             let inc_h = target_height - self.height();
-            res.h += inc_h;
+            res.size.h += inc_h;
         }
 
         res
@@ -140,64 +132,52 @@ impl Rect {
     }
 
     #[inline]
-    pub fn x_center(&self) -> f32 {
-        self.xc
-    }
-
-    #[inline]
-    pub fn y_center(&self) -> f32 {
-        self.yc
-    }
-
-    #[inline]
     pub fn top_left(&self) -> Vec2f {
-        vec2(self.xc - self.w * 0.5, self.yc - self.h * 0.5)
+        self.center - self.size * 0.5
     }
 
     /// Returns the X coordinate of the left side of the rectangle.
     #[inline]
     pub fn x(&self) -> f32 {
-        self.xc - self.w * 0.5
+        self.top_left().x
     }
 
     /// Returns the Y coordinate of the top side of the rectangle.
     #[inline]
     pub fn y(&self) -> f32 {
-        self.yc - self.h * 0.5
+        self.top_left().y
     }
 
     #[inline]
     pub fn width(&self) -> f32 {
-        self.w
+        self.size.w
     }
 
     #[inline]
     pub fn height(&self) -> f32 {
-        self.h
+        self.size.h
     }
 
     /// Returns the number of pixels contained in `self`.
     #[inline]
     pub fn area(&self) -> f32 {
-        self.w * self.h
+        self.size.w * self.size.h
     }
 
     #[inline]
     pub fn center(&self) -> Vec2f {
-        vec2(self.xc, self.yc)
+        self.center
     }
 
     #[inline]
     pub fn size(&self) -> Vec2f {
-        vec2(self.w, self.h)
+        self.size
     }
 
     #[must_use]
     pub fn move_by(&self, offset: impl Into<Vec2f>) -> Rect {
-        let offset = offset.into();
         Rect {
-            xc: self.xc + offset.x,
-            yc: self.yc + offset.y,
+            center: self.center + offset.into(),
             ..*self
         }
     }
@@ -255,8 +235,33 @@ impl Rect {
 
 impl fmt::Debug for Rect {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Rect { xc, yc, h, w } = self;
-        write!(f, "Rect @ ({xc},{yc})/{w}x{h}")
+        write!(
+            f,
+            "Rect @ ({},{})/{}x{}",
+            self.center().x,
+            self.center().y,
+            self.size().w,
+            self.size().h
+        )
+    }
+}
+
+impl ApproxEq for Rect {
+    type Tolerance = f32;
+
+    fn abs_diff_eq(&self, other: &Self, abs_tolerance: Self::Tolerance) -> bool {
+        self.center.abs_diff_eq(&other.center, abs_tolerance)
+            && self.size.abs_diff_eq(&other.size, abs_tolerance)
+    }
+
+    fn rel_diff_eq(&self, other: &Self, rel_tolerance: Self::Tolerance) -> bool {
+        self.center.rel_diff_eq(&other.center, rel_tolerance)
+            && self.size.rel_diff_eq(&other.size, rel_tolerance)
+    }
+
+    fn ulps_diff_eq(&self, other: &Self, ulps_tolerance: u32) -> bool {
+        self.center.ulps_diff_eq(&other.center, ulps_tolerance)
+            && self.size.ulps_diff_eq(&other.size, ulps_tolerance)
     }
 }
 
@@ -265,10 +270,6 @@ impl fmt::Debug for Rect {
 pub struct RotatedRect {
     rect: Rect,
     radians: f32,
-    sin: f32,
-    cos: f32,
-    inv_sin: f32,
-    inv_cos: f32,
 }
 
 impl RotatedRect {
@@ -277,19 +278,12 @@ impl RotatedRect {
     /// `radians` is the clockwise rotation to apply to the [`Rect`].
     #[inline]
     pub fn new(rect: Rect, radians: f32) -> Self {
-        Self {
-            rect,
-            radians,
-            sin: radians.sin(),
-            cos: radians.cos(),
-            inv_sin: (-radians).sin(),
-            inv_cos: (-radians).cos(),
-        }
+        Self { rect, radians }
     }
 
     /// Approximates the rotated bounding rectangle that encompasses `points`.
     ///
-    /// Returns `None` if `points` is an empty iterator.
+    /// Returns [`None`] if `points` is an empty iterator.
     pub fn bounding<T: Into<Vec2f>, I: IntoIterator<Item = T>>(
         radians: f32,
         points: I,
@@ -382,7 +376,7 @@ impl RotatedRect {
         self.map(|rect| rect.grow_to_fit_aspect(target_aspect))
     }
 
-    /// Returns the rotated rectangle's corners.
+    /// Returns the rotated rectangle's corners in the parent's coordinate system.
     ///
     /// The order is: top-left, top-right, bottom-right, bottom-left, as seen from the non-rotated
     /// rect: after the rotation is applied, the corners can be rotated anywhere else, but the order
@@ -390,42 +384,61 @@ impl RotatedRect {
     pub fn rotated_corners(&self) -> [Vec2f; 4] {
         let corners = self.rect.corners();
 
-        let rotation = Rotation2::new(self.radians);
-        let center = Point2::from(self.rect.center().into_array());
+        let rot = Mat2::rotation_counterclockwise(self.radians);
         corners.map(|p| {
-            let point = Point2::new(p.x, p.y);
-            let rel = point - center;
-            let rot = rotation * rel;
-            let abs = center + rot;
-            [abs.x, abs.y].into()
+            let rel = p - self.rect.center();
+            let rot = rot * rel;
+            self.rect().center() + rot
         })
     }
 
     pub fn contains_point(&self, point: impl Into<Vec2f>) -> bool {
-        let point = point.into();
-        let pt = self.transform_in(point.x, point.y);
+        let pt = self.transform_in(point.into());
 
         // The rect offset was already compensated for by the transform.
         self.rect.move_to(0.0, 0.0).contains_point(pt)
     }
 
     /// Transforms a point from the parent coordinate system into the [`RotatedRect`]'s system.
-    pub fn transform_in(&self, x: f32, y: f32) -> Vec2f {
-        let [x, y] = [x - self.rect.x(), y - self.rect.y()];
-        let [cx, cy] = [self.rect.width() / 2.0, self.rect.height() / 2.0];
-        let [x, y] = [x - cx, y - cy];
-        let [x, y] = [
-            x * self.inv_cos - y * self.inv_sin + cx,
-            y * self.inv_cos + x * self.inv_sin + cy,
-        ];
-        [x, y].into()
+    ///
+    /// The origin of the inner coordinate system is formed by the top left corner of the rectangle.
+    pub fn transform_in(&self, pt: impl Into<Vec2f>) -> Vec2f {
+        self.transform_in_impl(pt.into())
+    }
+    fn transform_in_impl(&self, pt: Vec2f) -> Vec2f {
+        let center = self.rect.size() * 0.5;
+        let pos = pt - self.rect.top_left() - center;
+        pos.rotate_clockwise(self.radians) + center
     }
 
     /// Transforms a point from the [`RotatedRect`]'s coordinate system to the parent system.
-    pub fn transform_out(&self, x: f32, y: f32) -> Vec2f {
-        let center = self.rect.size() * 0.5;
-        let pos = vec2(x, y);
-        (pos - center).rotate_counterclockwise(self.radians) + center + self.rect.top_left()
+    ///
+    /// The origin of the inner coordinate system is formed by the top left corner of the rectangle.
+    pub fn transform_out(&self, pt: impl Into<Vec2f>) -> Vec2f {
+        self.transform_out_impl(pt.into())
+    }
+    fn transform_out_impl(&self, pt: Vec2f) -> Vec2f {
+        let center: Vec2f = self.rect.size() * 0.5;
+        (pt - center).rotate_counterclockwise(self.radians) + center + self.rect.top_left()
+    }
+}
+
+impl ApproxEq for RotatedRect {
+    type Tolerance = f32;
+
+    fn abs_diff_eq(&self, other: &Self, abs_tolerance: Self::Tolerance) -> bool {
+        self.rect.abs_diff_eq(&other.rect, abs_tolerance)
+            && self.radians.abs_diff_eq(&other.radians, abs_tolerance)
+    }
+
+    fn rel_diff_eq(&self, other: &Self, rel_tolerance: Self::Tolerance) -> bool {
+        self.rect.rel_diff_eq(&other.rect, rel_tolerance)
+            && self.radians.rel_diff_eq(&other.radians, rel_tolerance)
+    }
+
+    fn ulps_diff_eq(&self, other: &Self, ulps_tolerance: u32) -> bool {
+        self.rect.ulps_diff_eq(&other.rect, ulps_tolerance)
+            && self.radians.ulps_diff_eq(&other.radians, ulps_tolerance)
     }
 }
 
@@ -439,69 +452,9 @@ impl From<Rect> for RotatedRect {
 mod tests {
     use std::f32::consts::TAU;
 
-    use approx::{assert_relative_eq, AbsDiffEq, RelativeEq};
     use zaru_linalg::assert_approx_eq;
 
     use super::*;
-
-    impl AbsDiffEq for RotatedRect {
-        type Epsilon = f32;
-
-        fn default_epsilon() -> Self::Epsilon {
-            f32::default_epsilon()
-        }
-
-        fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
-            self.rect.xc.abs_diff_eq(&other.rect.xc, epsilon)
-                && self.rect.yc.abs_diff_eq(&other.rect.yc, epsilon)
-                && self.rect.w.abs_diff_eq(&other.rect.w, epsilon)
-                && self.rect.h.abs_diff_eq(&other.rect.h, epsilon)
-                && self.radians.abs_diff_eq(&other.radians, epsilon)
-                && self.sin.abs_diff_eq(&other.sin, epsilon)
-                && self.cos.abs_diff_eq(&other.cos, epsilon)
-                && self.inv_sin.abs_diff_eq(&other.inv_sin, epsilon)
-                && self.inv_cos.abs_diff_eq(&other.inv_cos, epsilon)
-        }
-    }
-    impl RelativeEq for RotatedRect {
-        fn default_max_relative() -> Self::Epsilon {
-            f32::default_max_relative()
-        }
-
-        fn relative_eq(
-            &self,
-            other: &Self,
-            epsilon: Self::Epsilon,
-            max_relative: Self::Epsilon,
-        ) -> bool {
-            self.rect
-                .xc
-                .relative_eq(&other.rect.xc, epsilon, max_relative)
-                && self
-                    .rect
-                    .yc
-                    .relative_eq(&other.rect.yc, epsilon, max_relative)
-                && self
-                    .rect
-                    .w
-                    .relative_eq(&other.rect.w, epsilon, max_relative)
-                && self
-                    .rect
-                    .h
-                    .relative_eq(&other.rect.h, epsilon, max_relative)
-                && self
-                    .radians
-                    .relative_eq(&other.radians, epsilon, max_relative)
-                && self.sin.relative_eq(&other.sin, epsilon, max_relative)
-                && self.cos.relative_eq(&other.cos, epsilon, max_relative)
-                && self
-                    .inv_sin
-                    .relative_eq(&other.inv_sin, epsilon, max_relative)
-                && self
-                    .inv_cos
-                    .relative_eq(&other.inv_cos, epsilon, max_relative)
-        }
-    }
 
     #[test]
     fn test_contains_point() {
@@ -558,10 +511,8 @@ mod tests {
         assert_eq!(bigger.area(), 4.0);
 
         let intersection = smaller.intersection(&bigger).unwrap();
-        assert_eq!(intersection.xc, smaller.xc);
-        assert_eq!(intersection.yc, smaller.yc);
-        assert_eq!(intersection.w, smaller.w);
-        assert_eq!(intersection.h, smaller.h);
+        assert_eq!(intersection.center(), smaller.center());
+        assert_eq!(intersection.size(), smaller.size());
 
         assert_eq!(
             smaller.intersection_area(&bigger),
@@ -629,31 +580,31 @@ mod tests {
     fn test_rotated_rect_transform() {
         // Not actually rotated
         let null = RotatedRect::new(Rect::from_top_left(0.0, 0.0, 1.0, 1.0), 0.0);
-        assert_eq!(null.transform_in(0.0, 0.0), vec2(0.0, 0.0));
-        assert_eq!(null.transform_out(0.0, 0.0), vec2(0.0, 0.0));
+        assert_eq!(null.transform_in([0.0, 0.0]), vec2(0.0, 0.0));
+        assert_eq!(null.transform_out([0.0, 0.0]), vec2(0.0, 0.0));
 
-        assert_eq!(null.transform_in(1.0, -1.0), vec2(1.0, -1.0));
-        assert_eq!(null.transform_out(1.0, -1.0), vec2(1.0, -1.0));
+        assert_eq!(null.transform_in([1.0, -1.0]), vec2(1.0, -1.0));
+        assert_eq!(null.transform_out([1.0, -1.0]), vec2(1.0, -1.0));
 
         let offset = RotatedRect::new(Rect::from_top_left(10.0, 20.0, 1.0, 1.0), 0.0);
-        assert_eq!(offset.transform_in(0.0, 0.0), vec2(-10.0, -20.0));
-        assert_eq!(offset.transform_in(10.0, 20.0), vec2(0.0, 0.0));
+        assert_eq!(offset.transform_in([0.0, 0.0]), vec2(-10.0, -20.0));
+        assert_eq!(offset.transform_in([10.0, 20.0]), vec2(0.0, 0.0));
 
         // Rotated clockwise by 90°
         let right = RotatedRect::new(Rect::from_top_left(0.0, 0.0, 1.0, 1.0), TAU / 4.0);
-        assert_eq!(right.transform_in(0.5, 0.5), vec2(0.5, 0.5));
-        assert_eq!(right.transform_out(0.5, 0.5), vec2(0.5, 0.5));
-        assert_approx_eq!(right.transform_in(0.0, 0.0), vec2(0.0, 1.0));
-        assert_approx_eq!(right.transform_out(0.0, 0.0), vec2(1.0, 0.0));
+        assert_eq!(right.transform_in([0.5, 0.5]), vec2(0.5, 0.5));
+        assert_eq!(right.transform_out([0.5, 0.5]), vec2(0.5, 0.5));
+        assert_approx_eq!(right.transform_in([0.0, 0.0]), vec2(0.0, 1.0));
+        assert_approx_eq!(right.transform_out([0.0, 0.0]), vec2(1.0, 0.0));
 
-        assert_approx_eq!(right.transform_in(1.0, 0.0), vec2(0.0, 0.0));
-        assert_approx_eq!(right.transform_out(0.0, -1.0), vec2(2.0, 0.0));
+        assert_approx_eq!(right.transform_in([1.0, 0.0]), vec2(0.0, 0.0));
+        assert_approx_eq!(right.transform_out([0.0, -1.0]), vec2(2.0, 0.0));
 
         // Offset, rotated by 180°
         let rect = RotatedRect::new(Rect::from_top_left(10.0, 20.0, 1.0, 1.0), TAU / 2.0);
-        assert_approx_eq!(rect.transform_in(10.0, 20.0), vec2(1.0, 1.0));
-        assert_approx_eq!(rect.transform_in(11.0, 21.0), vec2(0.0, 0.0));
-        assert_approx_eq!(rect.transform_out(0.0, 0.0), vec2(11.0, 21.0));
+        assert_approx_eq!(rect.transform_in([10.0, 20.0]), vec2(1.0, 1.0));
+        assert_approx_eq!(rect.transform_in([11.0, 21.0]), vec2(0.0, 0.0));
+        assert_approx_eq!(rect.transform_out([0.0, 0.0]), vec2(11.0, 21.0));
     }
 
     #[test]
@@ -742,15 +693,13 @@ mod tests {
             bounding(0.0, [[0.0, 0.0], [10.0, 0.0]]),
             Rect::from_top_left(0.0, 0.0, 10.0, 0.0).into(),
         );
-        assert_relative_eq!(
+        assert_approx_eq!(
             bounding(TAU / 2.0, [[0.0, 0.0], [1.0, 1.0]]),
             RotatedRect::new(Rect::from_top_left(0.0, 0.0, 1.0, 1.0), TAU / 2.0),
-            epsilon = 1e-7,
         );
-        assert_relative_eq!(
+        assert_approx_eq!(
             bounding(TAU / 4.0, [[0.0, 0.0], [1.0, 1.0]]),
             RotatedRect::new(Rect::from_top_left(0.0, 0.0, 1.0, 1.0), TAU / 4.0),
-            epsilon = 1e-7,
         );
         assert_eq!(
             bounding(TAU / 4.0, [[0.0, 0.0], [9.0, 9.0]]),

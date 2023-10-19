@@ -19,7 +19,7 @@ pub trait ApproxEq<Rhs: ?Sized = Self> {
 
     /// Performs an *absolute comparison* of `self` and `other`.
     ///
-    /// If the absolute difference of the compared value is less than or equal to `abs`, the values
+    /// If the absolute difference of the compared values is less than or equal to `abs`, the values
     /// are considered to be equal.
     fn abs_diff_eq(&self, other: &Rhs, abs_tolerance: Self::Tolerance) -> bool;
 
@@ -30,13 +30,13 @@ pub trait ApproxEq<Rhs: ?Sized = Self> {
     fn rel_diff_eq(&self, other: &Rhs, rel_tolerance: Self::Tolerance) -> bool;
 
     /// Performs a comparison of `self` and `other` by counting the number of
-    /// [*units in the last place*] between the values.
+    /// [*units in the last place*] (ULPs) between the values.
     ///
     /// If there are at most `ulps` values between the two compared values, they are considered to
     /// be equal.
     ///
-    /// Values with different signs are never considered equal. `NaN` is never considered equal to
-    /// anything. `-0.0` and `+0.0` are always considered equal.
+    /// `NaN` is never considered equal to anything. `-0.0` and `+0.0` are always considered equal,
+    /// other values with differing signs are never considered equal.
     ///
     /// [*units in the last place*]: https://en.wikipedia.org/wiki/Unit_in_the_last_place
     fn ulps_diff_eq(&self, other: &Rhs, ulps_tolerance: u32) -> bool;
@@ -74,14 +74,13 @@ impl DefaultTolerances for f64 {
 /// comparison method and tolerances to use. It supports 3 ways of comparing values that can be
 /// enabled by calling the appropriate methods:
 ///
-/// - [`Asserter::abs`] for comparing the value's *absolute difference*.
-/// - [`Asserter::rel`] for comparing the value's *relative difference*.
+/// - [`Asserter::abs`] for comparing the value's *absolute difference* via [`ApproxEq::abs_diff_eq`].
+/// - [`Asserter::rel`] for comparing the value's *relative difference* via [`ApproxEq::rel_diff_eq`].
 /// - [`Asserter::ulps`] for comparing the values by checking how many other values can fit between
-///   them.
+///   them via [`ApproxEq::ulps_diff_eq`].
 ///
-/// If more than one of these methods is called, all requested comparisons will be performed and
-/// the values will be considered equal if *any* comparison considers them equal (ie. the results
-/// are ORed together).
+/// If more than one of these methods is called, the values will be considered equal if *any*
+/// comparison considers them equal (ie. the results are ORed together).
 ///
 /// If none of the methods are called to customize the behavior, a *default comparison* is
 /// performed: the values compare equal if an *absolute comparison* with a tolerance of
@@ -253,20 +252,70 @@ pub enum AssertionKind {
 
 /// Asserts that two expressions are approximately equal to each other (using [`ApproxEq`]).
 ///
-/// Also see [`assert_eq!`].
+/// This macro functions identically to [`assert_eq!`], except in that it uses the [`ApproxEq`]
+/// trait to perform an approximate comparison, and returns an [`Asserter`] that can be used to
+/// configure the exact type of comparison, as well as the tolerance values to use.
+///
+/// Also see [`assert_approx_ne!`].
+///
+/// # Examples
+///
+/// Default approximate comparison:
+///
+/// ```
+/// # use zaru_linalg::*;
+/// let one = (0..10).fold(0.0, |acc, _| acc + 0.1);
+/// assert_approx_eq!(one, 1.0);
+/// ```
+///
+/// Perform absolute and relative comparisons with custom tolerance values:
+///
+/// ```
+/// # use zaru_linalg::*;
+/// assert_approx_eq!(100.0, 99.0).abs(1.0);
+/// assert_approx_eq!(100.0, 99.0).rel(0.01);
+/// ```
+///
+/// Compare values via ULPs, based on the number of floats that fit between them:
+///
+/// ```
+/// # use zaru_linalg::*;
+/// assert_approx_eq!(1.0, 1.0 + f64::EPSILON).ulps(1);
+/// ```
 #[macro_export]
 macro_rules! assert_approx_eq {
     ($lhs:expr, $rhs:expr $(,)?) => {
         $crate::approx::Asserter::new(&$lhs, &$rhs, $crate::approx::AssertionKind::Eq, ::core::option::Option::None)
     };
     ($lhs:expr, $rhs:expr, $($arg:tt)+) => {
-        $crate::approx::Asserter::new(&$lhs, &$rhs, $crate::approx::AssertionKind::Eq, ::core::option::Option::Some(::core::format_args!($($args)+)))
+        $crate::approx::Asserter::new(&$lhs, &$rhs, $crate::approx::AssertionKind::Eq, ::core::option::Option::Some(::core::format_args!($($arg)+)))
     };
 }
 
-/// Asserts that two expressions are not approximately equal to each other (using [`ApproxEq`]).
+/// Asserts that two expressions are *not* approximately equal to each other (using [`ApproxEq`]).
 ///
-/// Also see [`assert_ne!`].
+/// This macro functions identically to [`assert_ne!`], except in that it uses the [`ApproxEq`]
+/// trait to perform an approximate comparison, and returns an [`Asserter`] that can be used to
+/// configure the exact type of comparison, as well as the tolerance values to use.
+///
+/// Also see [`assert_approx_eq!`].
+///
+/// # Examples
+///
+/// Perform absolute and relative comparisons with custom tolerance values:
+///
+/// ```
+/// # use zaru_linalg::*;
+/// assert_approx_ne!(100.0, 99.0).abs(0.5);
+/// assert_approx_ne!(100.0, 99.0).rel(0.005);
+/// ```
+///
+/// Compare values via ULPs, based on the number of floats that fit between them:
+///
+/// ```
+/// # use zaru_linalg::*;
+/// assert_approx_ne!(1.0, 1.0 + f64::EPSILON + f64::EPSILON).ulps(1);
+/// ```
 #[macro_export]
 macro_rules! assert_approx_ne {
     ($lhs:expr, $rhs:expr $(,)?) => {
@@ -299,6 +348,12 @@ mod tests {
     #[should_panic(expected = "assertion `left == right` failed")]
     fn fail_eq() {
         assert_approx_eq!(1.0, 2.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "my message")]
+    fn assertion_message() {
+        assert_approx_eq!(1.0, 2.0, "my message");
     }
 
     #[test]
