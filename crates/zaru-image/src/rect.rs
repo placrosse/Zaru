@@ -237,10 +237,15 @@ impl Rect {
             && self.y() + self.height() >= y
     }
 
-    pub fn corners(&self) -> [[f32; 2]; 4] {
+    pub fn corners(&self) -> [Vec2f; 4] {
         let [x, y] = [self.x(), self.y()];
         let [w, h] = [self.width(), self.height()];
-        [[x, y], [x + w, y], [x + w, y + h], [x, y + h]]
+        [
+            vec2(x, y),
+            vec2(x + w, y),
+            vec2(x + w, y + h),
+            vec2(x, y + h),
+        ]
     }
 }
 
@@ -281,7 +286,10 @@ impl RotatedRect {
     /// Approximates the rotated bounding rectangle that encompasses `points`.
     ///
     /// Returns `None` if `points` is an empty iterator.
-    pub fn bounding<I: IntoIterator<Item = [f32; 2]>>(radians: f32, points: I) -> Option<Self> {
+    pub fn bounding<T: Into<Vec2f>, I: IntoIterator<Item = T>>(
+        radians: f32,
+        points: I,
+    ) -> Option<Self> {
         let mut points = points.into_iter().peekable();
 
         // Make sure we have at least 1 point.
@@ -298,10 +306,11 @@ impl RotatedRect {
         let mut x_max = f32::MIN;
         let mut y_min = f32::MAX;
         let mut y_max = f32::MIN;
-        for [x, y] in points {
+        for point in points {
+            let p = point.into();
             let [x, y] = [
-                x * (-radians).cos() - y * (-radians).sin(),
-                x * (-radians).sin() + y * (-radians).cos(),
+                p.x * (-radians).cos() - p.y * (-radians).sin(),
+                p.x * (-radians).sin() + p.y * (-radians).cos(),
             ];
 
             x_min = cmp::min(TotalF32(x_min), TotalF32(x)).0;
@@ -363,8 +372,8 @@ impl RotatedRect {
         self.rect.y_center()
     }
 
-    pub fn center(&self) -> [f32; 2] {
-        self.rect.center().into()
+    pub fn center(&self) -> Vec2f {
+        self.rect.center()
     }
 
     /// Grows this rectangle by adding a margin relative to width and height.
@@ -391,22 +400,23 @@ impl RotatedRect {
     /// The order is: top-left, top-right, bottom-right, bottom-left, as seen from the non-rotated
     /// rect: after the rotation is applied, the corners can be rotated anywhere else, but the order
     /// is retained.
-    pub fn rotated_corners(&self) -> [[f32; 2]; 4] {
+    pub fn rotated_corners(&self) -> [Vec2f; 4] {
         let corners = self.rect.corners();
 
         let rotation = Rotation2::new(self.radians);
         let center = Point2::from(self.rect.center().into_array());
-        corners.map(|[x, y]| {
-            let point = Point2::new(x, y);
+        corners.map(|p| {
+            let point = Point2::new(p.x, p.y);
             let rel = point - center;
             let rot = rotation * rel;
             let abs = center + rot;
-            [abs.x, abs.y]
+            [abs.x, abs.y].into()
         })
     }
 
-    pub fn contains_point(&self, x: f32, y: f32) -> bool {
-        let [x, y] = self.transform_in(x, y);
+    pub fn contains_point(&self, point: impl Into<Vec2f>) -> bool {
+        let point = point.into();
+        let [x, y] = self.transform_in(point.x, point.y);
 
         // The rect offset was already compensated for by the transform.
         self.rect.move_to(0.0, 0.0).contains_point(x, y)
@@ -672,57 +682,60 @@ mod tests {
     fn test_rotated_rect_contains_point() {
         // 1x1 rect at origin
         let rect = RotatedRect::new(Rect::from_top_left(0.0, 0.0, 1.0, 1.0), 1.0);
-        assert!(rect.contains_point(0.5, 0.5));
-        assert!(!rect.contains_point(0.0, 1.5));
-        assert!(!rect.contains_point(1.0, 1.0));
-        assert!(!rect.contains_point(1.0, 0.0));
-        assert!(!rect.contains_point(0.0, -1.0));
+        assert!(rect.contains_point([0.5, 0.5]));
+        assert!(!rect.contains_point([0.0, 1.5]));
+        assert!(!rect.contains_point([1.0, 1.0]));
+        assert!(!rect.contains_point([1.0, 0.0]));
+        assert!(!rect.contains_point([0.0, -1.0]));
 
         // 1x1 rect offset
         let rect = RotatedRect::new(Rect::from_top_left(10.0, 20.0, 1.0, 1.0), 1.0);
-        assert!(rect.contains_point(10.5, 20.5));
-        assert!(!rect.contains_point(9.0, 20.0));
-        assert!(!rect.contains_point(10.0, 21.5));
+        assert!(rect.contains_point([10.5, 20.5]));
+        assert!(!rect.contains_point([9.0, 20.0]));
+        assert!(!rect.contains_point([10.0, 21.5]));
 
         // Wide rect, flipped
         let rect = RotatedRect::new(Rect::from_top_left(10.0, 20.0, 100.0, 1.0), TAU / 2.0);
-        assert!(!rect.contains_point(-20.0, 20.5));
-        assert!(!rect.contains_point(9.0, 20.5));
-        assert!(rect.contains_point(10.0, 20.5));
-        assert!(rect.contains_point(100.0, 20.00005));
-        assert!(rect.contains_point(55.0, 20.5));
-        assert!(!rect.contains_point(55.0, 21.0));
-        assert!(!rect.contains_point(55.0, 19.0));
+        assert!(!rect.contains_point([-20.0, 20.5]));
+        assert!(!rect.contains_point([9.0, 20.5]));
+        assert!(rect.contains_point([10.0, 20.5]));
+        assert!(rect.contains_point([100.0, 20.00005]));
+        assert!(rect.contains_point([55.0, 20.5]));
+        assert!(!rect.contains_point([55.0, 21.0]));
+        assert!(!rect.contains_point([55.0, 19.0]));
 
         // Wide rect, rotated 90°
         let rect = RotatedRect::new(Rect::from_center(0.0, 0.0, 51.0, 1.0), TAU / 4.0);
-        assert!(rect.contains_point(0.0, 0.0));
-        assert!(rect.contains_point(0.0, 1.0));
-        assert!(rect.contains_point(0.0, 25.0));
-        assert!(!rect.contains_point(0.0, 26.0));
-        assert!(rect.contains_point(0.0, -1.0));
-        assert!(rect.contains_point(0.0, -25.0));
-        assert!(!rect.contains_point(0.0, -26.0));
-        assert!(!rect.contains_point(1.0, 0.0));
-        assert!(!rect.contains_point(-1.0, 0.0));
+        assert!(rect.contains_point([0.0, 0.0]));
+        assert!(rect.contains_point([0.0, 1.0]));
+        assert!(rect.contains_point([0.0, 25.0]));
+        assert!(!rect.contains_point([0.0, 26.0]));
+        assert!(rect.contains_point([0.0, -1.0]));
+        assert!(rect.contains_point([0.0, -25.0]));
+        assert!(!rect.contains_point([0.0, -26.0]));
+        assert!(!rect.contains_point([1.0, 0.0]));
+        assert!(!rect.contains_point([-1.0, 0.0]));
 
         // Wide rect, offset, rotated 90°
         let rect = RotatedRect::new(Rect::from_center(10.0, 10.0, 51.0, 1.0), TAU / 4.0);
-        assert!(rect.contains_point(10.0, 0.0));
-        assert!(rect.contains_point(10.0, 1.0));
-        assert!(rect.contains_point(10.0, 35.0));
-        assert!(!rect.contains_point(10.0, 36.0));
-        assert!(rect.contains_point(10.0, -1.0));
-        assert!(rect.contains_point(10.0, -15.0));
-        assert!(!rect.contains_point(10.0, -16.0));
-        assert!(!rect.contains_point(11.0, 0.0));
-        assert!(!rect.contains_point(9.0, 0.0));
+        assert!(rect.contains_point([10.0, 0.0]));
+        assert!(rect.contains_point([10.0, 1.0]));
+        assert!(rect.contains_point([10.0, 35.0]));
+        assert!(!rect.contains_point([10.0, 36.0]));
+        assert!(rect.contains_point([10.0, -1.0]));
+        assert!(rect.contains_point([10.0, -15.0]));
+        assert!(!rect.contains_point([10.0, -16.0]));
+        assert!(!rect.contains_point([11.0, 0.0]));
+        assert!(!rect.contains_point([9.0, 0.0]));
     }
 
     #[test]
     fn test_rotated_rect_bounding() {
         #[track_caller]
-        fn bounding<I: IntoIterator<Item = [f32; 2]>>(radians: f32, points: I) -> RotatedRect
+        fn bounding<I: IntoIterator<Item = impl Into<Vec2f>>>(
+            radians: f32,
+            points: I,
+        ) -> RotatedRect
         where
             I::IntoIter: Clone,
         {
@@ -730,17 +743,18 @@ mod tests {
             let rect = RotatedRect::bounding(radians, points.clone()).unwrap();
 
             let dilated = rect.map(|rect| rect.grow_rel(0.005));
-            for [x, y] in points {
+            for point in points {
+                let point = point.into();
                 assert!(
-                    dilated.contains_point(x, y),
-                    "{dilated:?} does not contain {x},{y}"
+                    dilated.contains_point(point),
+                    "{dilated:?} does not contain {point}"
                 );
             }
 
             rect
         }
 
-        assert!(RotatedRect::bounding(0.0, []).is_none());
+        assert!(RotatedRect::bounding::<Vec2f, _>(0.0, []).is_none());
 
         assert_eq!(
             bounding(0.0, [[0.0, 0.0], [1.0, 1.0]]),
@@ -763,6 +777,15 @@ mod tests {
         assert_eq!(
             bounding(TAU / 4.0, [[0.0, 0.0], [9.0, 9.0]]),
             RotatedRect::new(Rect::from_top_left(0.0, 0.0, 9.0, 9.0), TAU / 4.0),
+        );
+    }
+
+    #[test]
+    fn corners() {
+        let rect = Rect::from_center(1.0, 1.0, 4.0, 2.0);
+        assert_eq!(
+            rect.corners(),
+            [[-1.0, 0.0], [3.0, 0.0], [3.0, 2.0], [-1.0, 2.0]]
         );
     }
 }

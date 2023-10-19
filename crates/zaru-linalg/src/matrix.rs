@@ -7,6 +7,10 @@ use crate::{Number, One, Trig, Vector, Zero};
 
 mod ops;
 
+/// A 1x1 matrix.
+pub type Mat1<T> = Matrix<T, 1, 1>;
+/// A 1x1 matrix with [`f32`] elements.
+pub type Mat1f = Mat1<f32>;
 /// A 2x2 matrix.
 pub type Mat2<T> = Matrix<T, 2, 2>;
 /// A 2x2 matrix with [`f32`] elements.
@@ -411,7 +415,7 @@ impl<T, const N: usize> Matrix<T, N, N> {
     /// # Examples
     ///
     /// ```
-    /// # use zaru_linalg::Matrix;
+    /// # use zaru_linalg::*;
     /// let mat = Matrix::from_rows([
     ///     [1, 2],
     ///     [3, 4],
@@ -422,11 +426,9 @@ impl<T, const N: usize> Matrix<T, N, N> {
     where
         T: Copy,
     {
-        array::from_fn(|i| self.0[i][i]).into()
+        array::from_fn(|i| self[(i, i)]).into()
     }
-}
 
-impl<T: Zero, const N: usize> Matrix<T, N, N> {
     /// Creates a square matrix from its diagonal.
     ///
     /// Elements outside the diagonal will be initialized with zero.
@@ -438,7 +440,7 @@ impl<T: Zero, const N: usize> Matrix<T, N, N> {
     /// # Examples
     ///
     /// ```
-    /// # use zaru_linalg::Matrix;
+    /// # use zaru_linalg::*;
     /// let diag = Matrix::from_diagonal([1, 2, 3]);
     /// assert_eq!(diag, Matrix::from_rows([
     ///     [1, 0, 0],
@@ -446,7 +448,10 @@ impl<T: Zero, const N: usize> Matrix<T, N, N> {
     ///     [0, 0, 3],
     /// ]));
     /// ```
-    pub fn from_diagonal<D: Into<Vector<T, N>>>(diag: D) -> Self {
+    pub fn from_diagonal<D: Into<Vector<T, N>>>(diag: D) -> Self
+    where
+        T: Zero,
+    {
         let mut iter = diag.into().into_array().into_iter();
         let mut this = Self::ZERO;
         for i in 0..N {
@@ -454,20 +459,122 @@ impl<T: Zero, const N: usize> Matrix<T, N, N> {
         }
         this
     }
+
+    /// Returns the *trace* of the matrix (the sum of all elements on the diagonal).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// let diag = Matrix::from_diagonal([1, 2, 3]);
+    /// assert_eq!(diag.trace(), 1 + 2 + 3);
+    ///
+    /// assert_eq!(Mat3f::IDENTITY.trace(), 3.0);
+    /// ```
+    pub fn trace(&self) -> T
+    where
+        T: Number,
+    {
+        (0..N).fold(T::ZERO, |acc, i| acc + self[(i, i)])
+    }
 }
 
-impl<T: Number + Trig> Matrix<T, 2, 2> {
+// Determinant limited to 3x3 for now; keep bounds in sync!
+impl<T: Number> Matrix<T, 1, 1> {
+    /// Returns the [determinant] of the matrix.
+    ///
+    /// [determinant]: https://en.wikipedia.org/wiki/Determinant
+    #[inline]
+    pub fn determinant(&self) -> T {
+        self[(0, 0)]
+    }
+
+    /// Inverts this 1x1 matrix.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if `self` is not invertible (ie. if its [`determinant()`] is zero).
+    ///
+    /// [`determinant()`]: Self::determinant
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// assert_eq!(Mat1::<i32>::IDENTITY.invert(), Mat1::<i32>::IDENTITY);
+    /// assert_eq!(Mat1f::IDENTITY.invert(), Mat1f::IDENTITY);
+    /// ```
+    pub fn invert(&self) -> Self {
+        let det = self.determinant();
+        if det == T::ZERO {
+            panic!("attempt to invert a non-invertible matrix");
+        }
+
+        Matrix::from_columns([[T::ONE / self[(0, 0)]]])
+    }
+}
+
+impl<T: Number> Matrix<T, 2, 2> {
+    /// Returns the [determinant] of the matrix.
+    ///
+    /// [determinant]: https://en.wikipedia.org/wiki/Determinant
+    #[inline]
+    pub fn determinant(&self) -> T {
+        self[(0, 0)] * self[(1, 1)] - self[(0, 1)] * self[(1, 0)]
+    }
+
+    /// Inverts this 2x2 matrix.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if `self` is not invertible (ie. if its [`determinant()`] is zero).
+    ///
+    /// [`determinant()`]: Self::determinant
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// assert_eq!(Mat2::<i32>::IDENTITY.invert(), Mat2::<i32>::IDENTITY);
+    /// assert_eq!(Mat2f::IDENTITY.invert(), Mat2f::IDENTITY);
+    /// ```
+    pub fn invert(&self) -> Self {
+        let det = self.determinant();
+        if det == T::ZERO {
+            panic!("attempt to invert a non-invertible matrix");
+        }
+
+        let [[a, c], [b, d]] = self.0;
+        Matrix::from_columns([[d, -c], [-b, a]]) * (T::ONE / det)
+    }
+
     /// Creates a 2x2 rotation matrix for a clockwise rotation in the XY plane.
-    pub fn rotation_clockwise(radians: T) -> Self {
+    pub fn rotation_clockwise(radians: T) -> Self
+    where
+        T: Trig,
+    {
         Self::rotation_counterclockwise(-radians)
     }
 
     /// Creates a 2x2 rotation matrix for a counterclockwise rotation in the XY plane.
-    pub fn rotation_counterclockwise(radians: T) -> Self {
+    pub fn rotation_counterclockwise(radians: T) -> Self
+    where
+        T: Trig,
+    {
         Self::from_columns([
             [radians.cos(), radians.sin()],
             [-radians.sin(), radians.cos()],
         ])
+    }
+}
+
+impl<T: Number> Matrix<T, 3, 3> {
+    /// Returns the [determinant] of the matrix.
+    ///
+    /// [determinant]: https://en.wikipedia.org/wiki/Determinant
+    pub fn determinant(&self) -> T {
+        let [[a, d, g], [b, e, h], [c, f, i]] = self.0;
+        a * e * i + b * f * g + c * d * h - c * e * g - b * d * i - a * f * h
     }
 }
 
@@ -482,7 +589,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::vec2;
+    use std::f32::consts::PI;
+
+    use crate::{assert_approx_eq, vec2};
 
     use super::*;
 
@@ -579,5 +688,38 @@ mod tests {
         let c = a * b;
         assert_eq!(c[(0, 1)], a[(0, 0)] * b[(0, 1)] + a[(0, 1)] * b[(1, 1)]);
         assert_eq!(c[(2, 2)], a[(2, 0)] * b[(0, 2)] + a[(2, 1)] * b[(1, 2)]);
+    }
+
+    #[test]
+    fn determinant() {
+        assert_eq!(Mat1f::ZERO.determinant(), 0.0);
+        assert_eq!(Mat2f::ZERO.determinant(), 0.0);
+        assert_eq!(Mat3f::ZERO.determinant(), 0.0);
+        assert_eq!(Mat1f::IDENTITY.determinant(), 1.0);
+        assert_eq!(Mat2f::IDENTITY.determinant(), 1.0);
+        assert_eq!(Mat3f::IDENTITY.determinant(), 1.0);
+
+        #[rustfmt::skip]
+        let testmat = Matrix::from_rows([
+            [-2, -1,  2],
+            [ 2,  1,  4],
+            [-3,  3, -1],
+        ]);
+        assert_eq!(testmat.determinant(), 54);
+        assert_eq!(testmat.transpose().determinant(), 54);
+    }
+
+    #[test]
+    fn rotation() {
+        let cw = Mat2f::rotation_clockwise(0.0);
+        assert_eq!(cw, cw.invert());
+
+        let ccw = Mat2f::rotation_counterclockwise(0.0);
+        assert_eq!(ccw, ccw.invert());
+
+        assert_eq!(ccw, cw);
+
+        let cw = Mat2f::rotation_clockwise(PI);
+        assert_approx_eq!(cw, cw.invert()).abs(1e-6);
     }
 }

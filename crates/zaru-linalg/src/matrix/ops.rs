@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut, Mul};
 
-use crate::{traits::Number, Matrix, Vector};
+use crate::{approx::ApproxEq, traits::Number, Matrix, Vector};
 
 impl<T, const R: usize, const C: usize> Index<(usize, usize)> for Matrix<T, R, C> {
     type Output = T;
@@ -30,6 +30,40 @@ where
 
 impl<T, const R: usize, const C: usize> Eq for Matrix<T, R, C> where T: Eq {}
 
+impl<T, const R: usize, const C: usize> ApproxEq for Matrix<T, R, C>
+where
+    T: ApproxEq,
+{
+    type Tolerance = T::Tolerance;
+
+    fn abs_diff_eq(&self, other: &Self, abs_tolerance: Self::Tolerance) -> bool {
+        for (a, b) in self.0.iter().zip(&other.0) {
+            if !a.abs_diff_eq(b, abs_tolerance.clone()) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn rel_diff_eq(&self, other: &Self, rel_tolerance: Self::Tolerance) -> bool {
+        for (a, b) in self.0.iter().zip(&other.0) {
+            if !a.rel_diff_eq(b, rel_tolerance.clone()) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn ulps_diff_eq(&self, other: &Self, ulps_tolerance: u32) -> bool {
+        for (a, b) in self.0.iter().zip(&other.0) {
+            if !a.ulps_diff_eq(b, ulps_tolerance) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 /// Matrix * Column Vector.
 impl<T, const R: usize, const C: usize> Mul<Vector<T, C>> for Matrix<T, R, C>
 where
@@ -51,5 +85,17 @@ where
 
     fn mul(self, rhs: Matrix<T, N, P>) -> Self::Output {
         Matrix::from_fn(|i, j| (0..N).fold(T::ZERO, |acc, k| acc + self[(i, k)] * rhs[(k, j)]))
+    }
+}
+
+/// Matrix * Scalar.
+impl<T, const R: usize, const C: usize> Mul<T> for Matrix<T, R, C>
+where
+    T: Number,
+{
+    type Output = Matrix<T, R, C>;
+
+    fn mul(self, rhs: T) -> Self::Output {
+        self.map(|elem| elem * rhs)
     }
 }

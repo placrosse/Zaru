@@ -10,6 +10,10 @@ use crate::{
 
 mod ops;
 
+/// A 1-dimensional vector.
+pub type Vec1<T> = Vector<T, 1>;
+/// A 1-dimensional vector with [`f32`] elements.
+pub type Vec1f = Vec1<f32>;
 /// A 2-dimensional vector.
 pub type Vec2<T> = Vector<T, 2>;
 /// A 2-dimensional vector with [`f32`] elements.
@@ -62,6 +66,7 @@ pub struct Vector<T, const N: usize>([T; N]);
 
 unsafe impl<T: bytemuck::Zeroable, const N: usize> bytemuck::Zeroable for Vector<T, N> {}
 unsafe impl<T: bytemuck::Pod, const N: usize> bytemuck::Pod for Vector<T, N> {}
+// FIXME: do we even want these? `.as_slice()` lets you do the same thing.
 
 impl<T, const N: usize> Vector<T, N> {
     /// Creates a vector with each element initialized to `elem`.
@@ -129,6 +134,7 @@ impl<T, const N: usize> Vector<T, N> {
         let mut iter = self.0.into_iter().zip(other.0);
         Vector::from_fn(|_| iter.next().unwrap())
     }
+    // TODO: replace `self` param with `left: Self`
 
     /// Returns a reference to the underlying elements as an array of length `N`.
     ///
@@ -437,6 +443,11 @@ impl<T, const N: usize> AsMut<[T; N]> for Vector<T, N> {
     fn as_mut(&mut self) -> &mut [T; N] {
         &mut self.0
     }
+}
+
+/// Constructs a [`Vec1`] from its single element.
+pub const fn vec1<T>(x: T) -> Vec1<T> {
+    Vector([x])
 }
 
 /// Constructs a [`Vec2`] from its two elements.

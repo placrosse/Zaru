@@ -5,6 +5,8 @@ use std::ops::{
     MulAssign, Neg, Not, Sub, SubAssign,
 };
 
+use crate::approx::ApproxEq;
+
 use super::Vector;
 
 impl<T, const N: usize> Index<usize> for Vector<T, N> {
@@ -68,6 +70,25 @@ where
 {
     fn eq(&self, other: &&[U]) -> bool {
         self.0.eq(other)
+    }
+}
+
+impl<T, const N: usize> ApproxEq for Vector<T, N>
+where
+    T: ApproxEq,
+{
+    type Tolerance = T::Tolerance;
+
+    fn abs_diff_eq(&self, other: &Self, abs_tolerance: Self::Tolerance) -> bool {
+        self.0.abs_diff_eq(&other.0, abs_tolerance)
+    }
+
+    fn rel_diff_eq(&self, other: &Self, rel_tolerance: Self::Tolerance) -> bool {
+        self.0.rel_diff_eq(&other.0, rel_tolerance)
+    }
+
+    fn ulps_diff_eq(&self, other: &Self, ulps_tolerance: u32) -> bool {
+        self.0.ulps_diff_eq(&other.0, ulps_tolerance)
     }
 }
 

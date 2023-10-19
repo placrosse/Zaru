@@ -33,6 +33,7 @@ use ::epaint::{
     text::{LayoutJob, LayoutSection, TextFormat},
     FontFamily, FontId, Shape, Stroke, TextShape,
 };
+use zaru_linalg::Vec2f;
 
 use crate::{draw::lines::Point, AsImageViewMut, Color, Gpu, ImageViewMut};
 
@@ -126,8 +127,7 @@ pub enum HAlign {
 
 pub struct DrawText<'a> {
     image: ImageViewMut<'a>,
-    x: f32,
-    y: f32,
+    pos: Vec2f,
     text: &'a str,
     size: f32,
     color: Color,
@@ -169,7 +169,7 @@ impl<'a> Drop for DrawText<'a> {
 
         // `epaint` operates in pixel coordinates of the destination `Image`, not in clip space.
         // FIXME: perhaps all primitives should work like that? they all have access to the dest `Image` already.
-        let pos = self.image.data.rect.transform_out(self.x, self.y);
+        let pos = self.image.data.rect.transform_out(self.pos.x, self.pos.y);
 
         let font_id = FontId {
             size: self.size,
@@ -228,14 +228,12 @@ impl<'a> Drop for DrawText<'a> {
 /// By default, the text is drawn centered horizontally and vertically around `x` and `y`.
 pub fn text<'a, I: AsImageViewMut>(
     image: &'a mut I,
-    x: f32,
-    y: f32,
+    pos: impl Into<Vec2f>,
     text: &'a str,
 ) -> DrawText<'a> {
     DrawText {
         image: image.as_view_mut(),
-        x,
-        y,
+        pos: pos.into(),
         text,
         size: 16.0,
         color: Color::WHITE,
@@ -277,7 +275,9 @@ mod tests {
     fn test_text() {
         // Hard to test without using reference images. Just draw something that fills a pixel.
         let mut image = Image::filled((1, 1), Color::NONE);
-        text(&mut image, 0.5, 0.5, "■").size(4.0).color(Color::RED);
+        text(&mut image, [0.5, 0.5], "■")
+            .size(4.0)
+            .color(Color::RED);
         image.with_data(|data| assert_eq!(data.to_vec(), &[0xFF, 0x00, 0x00, 0xFF]));
     }
 }

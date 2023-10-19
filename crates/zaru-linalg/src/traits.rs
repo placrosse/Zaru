@@ -82,6 +82,7 @@ pub trait Number:
     + ops::Sub<Output = Self>
     + ops::Mul<Output = Self>
     + ops::Div<Output = Self>
+    + PartialEq
     + Copy
 {
 }
@@ -93,6 +94,7 @@ impl<T> Number for T where
         + ops::Sub<Output = Self>
         + ops::Mul<Output = Self>
         + ops::Div<Output = Self>
+        + PartialEq
         + Copy
 {
 }

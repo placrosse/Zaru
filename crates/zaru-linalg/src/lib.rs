@@ -34,6 +34,7 @@
 //!
 //! [Rust API Guidelines]: https://rust-lang.github.io/api-guidelines/
 
+pub mod approx;
 mod matrix;
 mod traits;
 mod vector;
