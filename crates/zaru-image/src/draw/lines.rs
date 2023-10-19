@@ -1,6 +1,7 @@
 //! Instanced line rendering.
 
 use wgpu::*;
+use zaru_linalg::Vec2f;
 
 use crate::{Gpu, Image};
 
@@ -50,7 +51,7 @@ pub fn create_pipeline(device: &Device) -> RenderPipeline {
 #[derive(Clone, Copy, bytemuck::NoUninit)]
 #[repr(C)]
 pub struct Point {
-    pub position: [f32; 2],
+    pub position: Vec2f,
     pub color: [f32; 4],
 }
 

@@ -24,14 +24,26 @@ pub type Mat4<T> = Matrix<T, 4, 4>;
 /// A 4x4 matrix with [`f32`] elements.
 pub type Mat4f = Mat4<f32>;
 
+/// A matrix with 1 row and 2 columns.
+pub type Mat1x2<T> = Matrix<T, 1, 2>;
+/// A matrix with 1 row and 3 columns.
+pub type Mat1x3<T> = Matrix<T, 1, 3>;
+/// A matrix with 1 row and 4 columns.
+pub type Mat1x4<T> = Matrix<T, 1, 4>;
+/// A matrix with 2 rows and 1 column.
+pub type Mat2x1<T> = Matrix<T, 2, 1>;
 /// A matrix with 2 rows and 3 columns.
 pub type Mat2x3<T> = Matrix<T, 2, 3>;
 /// A matrix with 2 rows and 4 columns.
 pub type Mat2x4<T> = Matrix<T, 2, 4>;
+/// A matrix with 3 rows and 1 column.
+pub type Mat3x1<T> = Matrix<T, 3, 1>;
 /// A matrix with 3 rows and 2 columns.
 pub type Mat3x2<T> = Matrix<T, 3, 2>;
 /// A matrix with 3 rows and 4 columns.
 pub type Mat3x4<T> = Matrix<T, 3, 4>;
+/// A matrix with 4 rows and 1 column.
+pub type Mat4x1<T> = Matrix<T, 4, 1>;
 /// A matrix with 4 rows and 2 columns.
 pub type Mat4x2<T> = Matrix<T, 4, 2>;
 /// A matrix with 4 rows and 3 columns.
@@ -535,7 +547,6 @@ impl<T: Number> Matrix<T, 2, 2> {
     ///
     /// ```
     /// # use zaru_linalg::*;
-    /// assert_eq!(Mat2::<i32>::IDENTITY.invert(), Mat2::<i32>::IDENTITY);
     /// assert_eq!(Mat2f::IDENTITY.invert(), Mat2f::IDENTITY);
     /// ```
     pub fn invert(&self) -> Self {
@@ -707,6 +718,15 @@ mod tests {
         ]);
         assert_eq!(testmat.determinant(), 54);
         assert_eq!(testmat.transpose().determinant(), 54);
+    }
+
+    #[test]
+    fn invert_identity() {
+        assert_eq!(Mat1::<i32>::IDENTITY.invert(), Mat1::<i32>::IDENTITY);
+        assert_eq!(Mat1f::IDENTITY.invert(), Mat1f::IDENTITY);
+        assert_eq!(Mat2::<i32>::IDENTITY.invert(), Mat2::<i32>::IDENTITY);
+        assert_eq!(Mat2f::IDENTITY.invert(), Mat2f::IDENTITY);
+        assert_eq!(Mat2::<f64>::IDENTITY.invert(), Mat2::<f64>::IDENTITY);
     }
 
     #[test]

@@ -43,10 +43,8 @@ pub(crate) mod lines;
 /// Guard returned by [`line`][line()]; draws the line when dropped and allows customization.
 pub struct DrawLine<'a> {
     image: ImageViewMut<'a>,
-    start_x: f32,
-    start_y: f32,
-    end_x: f32,
-    end_y: f32,
+    start: Vec2f,
+    end: Vec2f,
     color: Color,
 }
 
@@ -64,8 +62,8 @@ impl<'a> Drop for DrawLine<'a> {
             return;
         }
 
-        let start = self.image.position(self.start_x, self.start_y);
-        let end = self.image.position(self.end_x, self.end_y);
+        let start = self.image.position(self.start.x, self.start.y);
+        let end = self.image.position(self.end.x, self.end.y);
 
         let color = self.color.to_linear();
         lines::draw(
@@ -88,17 +86,13 @@ impl<'a> Drop for DrawLine<'a> {
 /// Draws a line onto an image.
 pub fn line<I: AsImageViewMut>(
     image: &mut I,
-    start_x: f32,
-    start_y: f32,
-    end_x: f32,
-    end_y: f32,
+    start: impl Into<Vec2f>,
+    end: impl Into<Vec2f>,
 ) -> DrawLine<'_> {
     DrawLine {
         image: image.as_view_mut(),
-        start_x,
-        start_y,
-        end_x,
-        end_y,
+        start: start.into(),
+        end: end.into(),
         color: Color::RED,
     }
 }
@@ -253,16 +247,16 @@ mod tests {
         let mut image = Image::from_rgba8((2, 1), &[0; 8]);
 
         // Draw a line of the same color as the destination.
-        line(&mut image, 0.0, 0.5, 2.0, 0.5).color(Color::NONE);
+        line(&mut image, [0.0, 0.5], [2.0, 0.5]).color(Color::NONE);
         image.with_data(|data| assert_eq!(data.to_vec(), &[0; 8]));
 
         // Draw a solid white line.
         // NB: a 1-pixel-wide line may not cover the pixel's sample location if drawn at Y=0.0, so we draw at Y=0.5
-        line(&mut image, 0.0, 0.5, 2.0, 0.5).color(Color::WHITE);
+        line(&mut image, [0.0, 0.5], [2.0, 0.5]).color(Color::WHITE);
         image.with_data(|data| assert_eq!(data.to_vec(), &[0xFF; 8]));
 
         // Draw a transparent black line over the second pixel.
-        line(&mut image, 1.0, 0.5, 2.0, 0.5).color(Color::NONE);
+        line(&mut image, [1.0, 0.5], [2.0, 0.5]).color(Color::NONE);
         image.with_data(|data| {
             assert_eq!(
                 data.to_vec(),

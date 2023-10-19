@@ -231,13 +231,13 @@ impl<T, const N: usize> Vector<T, N> {
     /// # use zaru_linalg::*;
     /// assert_eq!(vec2(4, 0).length2(), 16);
     /// ```
-    pub fn length2(self) -> T
+    pub fn length2(&self) -> T
     where
         T: Number,
     {
         self.0
-            .into_iter()
-            .fold(T::ZERO, |prev, elem| prev + elem * elem)
+            .iter()
+            .fold(T::ZERO, |prev, &elem| prev + elem * elem)
     }
 
     /// Returns the length of this [`Vector`].
@@ -249,7 +249,7 @@ impl<T, const N: usize> Vector<T, N> {
     /// let z = Vec3f::Z;
     /// assert_eq!(z.length(), 1.0);
     /// ```
-    pub fn length(self) -> T
+    pub fn length(&self) -> T
     where
         T: Number + Sqrt,
     {
@@ -261,7 +261,7 @@ impl<T, const N: usize> Vector<T, N> {
     /// # Examples
     ///
     /// ```
-    /// # use zaru_linalg::{Vec3f, vec3};
+    /// # use zaru_linalg::*;
     /// let z = vec3(0.0, 0.0, 4.0).normalize();
     /// assert_eq!(z, vec3(0.0, 0.0, 1.0));
     /// ```
@@ -277,7 +277,7 @@ impl<T, const N: usize> Vector<T, N> {
     /// # Example
     ///
     /// ```
-    /// # use zaru_linalg::{Vec3f, vec3};
+    /// # use zaru_linalg::*;
     /// let a = vec3(-1.0, 2.0, f32::NAN);
     /// let b = vec3(3.0, f32::NEG_INFINITY, 0.0);
     /// assert_eq!(a.min(b), b.min(a));
@@ -295,7 +295,7 @@ impl<T, const N: usize> Vector<T, N> {
     /// # Example
     ///
     /// ```
-    /// # use zaru_linalg::{Vec3f, vec3};
+    /// # use zaru_linalg::*;
     /// let a = vec3(-1.0, 2.0, f32::NAN);
     /// let b = vec3(3.0, f32::NEG_INFINITY, 0.0);
     /// assert_eq!(a.max(b), b.max(a));
@@ -306,6 +306,24 @@ impl<T, const N: usize> Vector<T, N> {
         T: MinMax + Copy,
     {
         Self::from_fn(|i| self[i].max(other[i]))
+    }
+
+    /// Element-wise range clamp of the elements in `self` between `min` and `max`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// let a = vec3(-1.0, 2.0, f32::NAN);
+    /// let b = vec3(3.0, f32::NEG_INFINITY, 0.0);
+    /// assert_eq!(a.max(b), b.max(a));
+    /// assert_eq!(a.max(b), vec3(3.0, 2.0, 0.0));
+    /// ```
+    pub fn clamp(self, min: Self, max: Self) -> Self
+    where
+        T: MinMax + Copy,
+    {
+        Self::from_fn(|i| self[i].clamp(min[i], max[i]))
     }
 }
 
@@ -469,12 +487,14 @@ mod view {
     #[repr(C)]
     pub struct X<T> {
         pub x: T,
+        _priv: (), // prevent external construction
     }
 
     #[repr(C)]
     pub struct XY<T> {
         pub x: T,
         pub y: T,
+        _priv: (), // prevent external construction
     }
 
     #[repr(C)]
@@ -482,6 +502,7 @@ mod view {
         pub x: T,
         pub y: T,
         pub z: T,
+        _priv: (), // prevent external construction
     }
 
     #[repr(C)]
@@ -490,6 +511,7 @@ mod view {
         pub y: T,
         pub z: T,
         pub w: T,
+        _priv: (), // prevent external construction
     }
 }
 use view::*;
@@ -554,6 +576,8 @@ impl<T> DerefMut for Vector<T, 4> {
 mod tests {
     use std::f32::consts::TAU;
 
+    use crate::assert_approx_eq;
+
     use super::*;
 
     #[test]
@@ -575,9 +599,9 @@ mod tests {
 
     #[test]
     fn rotate() {
-        assert!((Vec2f::Y.rotate_clockwise(TAU / 4.0) - Vec2f::X).length() < 0.0001);
-        assert!((Vec2f::Y.rotate_clockwise(TAU / 2.0) - -Vec2f::Y).length() < 0.0001);
-        assert!((Vec2f::X.rotate_clockwise(TAU / 2.0) - -Vec2f::X).length() < 0.0001);
-        assert!((Vec2f::X.rotate_counterclockwise(TAU / 4.0) - Vec2f::Y).length() < 0.0001);
+        assert_approx_eq!(Vec2f::Y.rotate_clockwise(TAU / 4.0), Vec2f::X);
+        assert_approx_eq!(Vec2f::Y.rotate_clockwise(TAU / 2.0), -Vec2f::Y);
+        assert_approx_eq!(Vec2f::X.rotate_clockwise(TAU / 2.0), -Vec2f::X);
+        assert_approx_eq!(Vec2f::X.rotate_counterclockwise(TAU / 4.0), Vec2f::Y);
     }
 }

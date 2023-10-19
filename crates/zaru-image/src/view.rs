@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use zaru_linalg::{vec2, Vec2f};
+
 use crate::{
     blend,
     rect::{Rect, RotatedRect},
@@ -81,44 +83,44 @@ impl ViewData {
 
     /// Returns the UV coordinates of the top left and bottom right corners of this view in the
     /// original image.
-    pub(crate) fn uvs(&self, image: &Image) -> [[f32; 2]; 4] {
+    pub(crate) fn uvs(&self, image: &Image) -> [Vec2f; 4] {
         let top_left = self.uv(0.0, 0.0, image);
         let bottom_right = self.uv(self.width(), self.height(), image);
         // top left, top right, bottom left, bottom right
         [
             top_left,
-            [bottom_right[0], top_left[1]],
-            [top_left[0], bottom_right[1]],
+            vec2(bottom_right.x, top_left.y),
+            vec2(top_left.x, bottom_right.y),
             bottom_right,
         ]
     }
 
     /// Returns the positions of the top left and bottom right corners of this view, in clip space.
-    pub(crate) fn clip_corners(&self, image: &Image) -> [[f32; 2]; 4] {
+    pub(crate) fn clip_corners(&self, image: &Image) -> [Vec2f; 4] {
         let top_left = self.position(0.0, 0.0, image);
         let bottom_right = self.position(self.width(), self.height(), image);
         // top left, top right, bottom left, bottom right
         [
             top_left,
-            [bottom_right[0], top_left[1]],
-            [top_left[0], bottom_right[1]],
+            vec2(bottom_right.x, top_left.y),
+            vec2(top_left.x, bottom_right.y),
             bottom_right,
         ]
     }
 
-    fn uv(&self, x: f32, y: f32, image: &Image) -> [f32; 2] {
+    fn uv(&self, x: f32, y: f32, image: &Image) -> Vec2f {
         let [x, y] = self.rect.transform_out(x, y);
-        [x / image.width() as f32, y / image.height() as f32]
+        vec2(x / image.width() as f32, y / image.height() as f32)
     }
 
     /// Computes the clip-space position in the underlying [`Image`] that corresponds to the given
     /// coordinates in this view.
-    pub(crate) fn position(&self, x: f32, y: f32, image: &Image) -> [f32; 2] {
+    pub(crate) fn position(&self, x: f32, y: f32, image: &Image) -> Vec2f {
         let [x, y] = self.rect.transform_out(x, y);
-        [
+        vec2(
             (x / image.width() as f32 - 0.5) * 2.0,
             -(y / image.height() as f32 - 0.5) * 2.0,
-        ]
+        )
     }
 }
 
@@ -182,7 +184,7 @@ pub struct ImageViewMut<'a> {
 impl<'a> ImageViewMut<'a> {
     /// Computes the clip-space position in the underlying [`Image`] that corresponds to the given
     /// coordinates in this view.
-    pub(crate) fn position(&self, x: f32, y: f32) -> [f32; 2] {
+    pub(crate) fn position(&self, x: f32, y: f32) -> Vec2f {
         self.data.position(x, y, self.image)
     }
 

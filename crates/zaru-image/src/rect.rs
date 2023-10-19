@@ -307,7 +307,7 @@ impl RotatedRect {
         let mut y_min = f32::MAX;
         let mut y_max = f32::MIN;
         for point in points {
-            let p = point.into();
+            let p: Vec2f = point.into();
             let [x, y] = [
                 p.x * (-radians).cos() - p.y * (-radians).sin(),
                 p.x * (-radians).sin() + p.y * (-radians).cos(),

@@ -85,11 +85,11 @@ impl DefaultTolerances for f64 {
 ///
 /// If none of the methods are called to customize the behavior, a *default comparison* is
 /// performed: the values compare equal if an *absolute comparison* with a tolerance of
-/// [`T::DEFAULT_ABS_TOLERANCE`] considers them equal, *or* if a *relative comparison* with a
-/// tolerance of [`T::DEFAULT_REL_TOLERANCE`] considers them equal.
+/// [`DEFAULT_ABS_TOLERANCE`] considers them equal, *or* if a *relative comparison* with a
+/// tolerance of [`DEFAULT_REL_TOLERANCE`] considers them equal.
 ///
-/// [`T::DEFAULT_ABS_TOLERANCE`]: ApproxEq::DEFAULT_ABS_TOLERANCE
-/// [`T::DEFAULT_REL_TOLERANCE`]: ApproxEq::DEFAULT_REL_TOLERANCE
+/// [`DEFAULT_ABS_TOLERANCE`]: DefaultTolerances::DEFAULT_ABS_TOLERANCE
+/// [`DEFAULT_REL_TOLERANCE`]: DefaultTolerances::DEFAULT_REL_TOLERANCE
 pub struct Asserter<'a, T>
 where
     T: ApproxEq + fmt::Debug,

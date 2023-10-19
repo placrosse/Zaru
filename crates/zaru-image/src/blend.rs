@@ -6,6 +6,7 @@ use wgpu::{
     ShaderModuleDescriptor, ShaderSource, TextureFormat, VertexAttribute, VertexBufferLayout,
     VertexFormat, VertexState, VertexStepMode,
 };
+use zaru_linalg::Vec2f;
 
 use crate::{AsImageView, AsImageViewMut, Gpu, ImageView, ImageViewMut};
 
@@ -143,8 +144,8 @@ pub(crate) fn create_pipeline(device: &Device) -> RenderPipeline {
 #[derive(Clone, Copy, bytemuck::NoUninit)]
 #[repr(C)]
 pub(crate) struct Vertex {
-    pub(crate) position: [f32; 2],
-    pub(crate) uv: [f32; 2],
+    pub(crate) position: Vec2f,
+    pub(crate) uv: Vec2f,
 }
 
 #[cfg(test)]
