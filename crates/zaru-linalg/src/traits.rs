@@ -2,11 +2,18 @@
 
 use std::ops;
 
-/// Trait for types that support the basic trigonometric functions (`sin`, `cos` and `tan`).
+/// Types that support the trigonometric functions.
 pub trait Trig {
+    /// Computes the sine of the angle `self` (in radians).
     fn sin(self) -> Self;
+    /// Computes the cosine of the angle `self` (in radians).
     fn cos(self) -> Self;
+    /// Computes the tangent of the angle `self` (in radians).
     fn tan(self) -> Self;
+    fn asin(self) -> Self;
+    fn acos(self) -> Self;
+    fn atan(self) -> Self;
+    fn atan2(self, other: Self) -> Self;
 }
 
 /// Types that support computing their square root.
@@ -185,6 +192,22 @@ impl Trig for f32 {
     fn tan(self) -> Self {
         self.tan()
     }
+
+    fn asin(self) -> Self {
+        self.asin()
+    }
+
+    fn acos(self) -> Self {
+        self.acos()
+    }
+
+    fn atan(self) -> Self {
+        self.atan()
+    }
+
+    fn atan2(self, other: Self) -> Self {
+        self.atan2(other)
+    }
 }
 
 impl Trig for f64 {
@@ -198,6 +221,22 @@ impl Trig for f64 {
 
     fn tan(self) -> Self {
         self.tan()
+    }
+
+    fn asin(self) -> Self {
+        self.asin()
+    }
+
+    fn acos(self) -> Self {
+        self.acos()
+    }
+
+    fn atan(self) -> Self {
+        self.atan()
+    }
+
+    fn atan2(self, other: Self) -> Self {
+        self.atan2(other)
     }
 }
 

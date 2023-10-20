@@ -65,7 +65,45 @@ pub struct Vector<T, const N: usize>([T; N]);
 
 unsafe impl<T: bytemuck::Zeroable, const N: usize> bytemuck::Zeroable for Vector<T, N> {}
 unsafe impl<T: bytemuck::Pod, const N: usize> bytemuck::Pod for Vector<T, N> {}
-// FIXME: do we even want these? `.as_slice()` lets you do the same thing.
+
+impl<T: Zero, const N: usize> Vector<T, N> {
+    /// A vector with each element initialized to 0.
+    ///
+    /// This uses [`T::ZERO`][Zero::ZERO] as the value for all elements.
+    pub const ZERO: Self = Self([T::ZERO; N]);
+}
+
+impl<T: Zero + One> Vector<T, 1> {
+    /// A unit vector pointing in the X direction.
+    pub const X: Self = Self([T::ONE]);
+}
+
+impl<T: Zero + One> Vector<T, 2> {
+    /// A unit vector pointing in the X direction.
+    pub const X: Self = Self([T::ONE, T::ZERO]);
+    /// A unit vector pointing in the Y direction.
+    pub const Y: Self = Self([T::ZERO, T::ONE]);
+}
+
+impl<T: Zero + One> Vector<T, 3> {
+    /// A unit vector pointing in the X direction.
+    pub const X: Self = Self([T::ONE, T::ZERO, T::ZERO]);
+    /// A unit vector pointing in the Y direction.
+    pub const Y: Self = Self([T::ZERO, T::ONE, T::ZERO]);
+    /// A unit vector pointing in the Z direction.
+    pub const Z: Self = Self([T::ZERO, T::ZERO, T::ONE]);
+}
+
+impl<T: Zero + One> Vector<T, 4> {
+    /// A unit vector pointing in the X direction.
+    pub const X: Self = Self([T::ONE, T::ZERO, T::ZERO, T::ZERO]);
+    /// A unit vector pointing in the Y direction.
+    pub const Y: Self = Self([T::ZERO, T::ONE, T::ZERO, T::ZERO]);
+    /// A unit vector pointing in the Z direction.
+    pub const Z: Self = Self([T::ZERO, T::ZERO, T::ONE, T::ZERO]);
+    /// A unit vector pointing in the W direction.
+    pub const W: Self = Self([T::ZERO, T::ZERO, T::ZERO, T::ONE]);
+}
 
 impl<T, const N: usize> Vector<T, N> {
     /// Creates a vector with each element initialized to `elem`.
@@ -236,9 +274,7 @@ impl<T, const N: usize> Vector<T, N> {
     where
         T: Number,
     {
-        self.0
-            .iter()
-            .fold(T::ZERO, |prev, &elem| prev + elem * elem)
+        self.dot(*self)
     }
 
     /// Returns the length of this [`Vector`].
@@ -273,9 +309,73 @@ impl<T, const N: usize> Vector<T, N> {
         self / self.length()
     }
 
+    /// Computes the dot product between `self` and `other`.
+    ///
+    /// Geometrically, the dot product provides information about the relative
+    /// angle of the two vectors:
+    /// - If the dot product is greater than zero, the angle between the vectors
+    ///   is less than 90°.
+    /// - If the dot product is equal to zero, their angle is exactly 90°.
+    /// - If the dot product is negative, the angle is greater than 90°.
+    ///
+    /// Also see [`Vector::abs_angle_to`] for computing the exact angle between them.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// let a = vec3(1, 3, -5);
+    /// let b = vec3(4, -2, -1);
+    /// assert_eq!(a.dot(b), 3);
+    /// ```
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// assert_approx_eq!(Vec2f::Y.dot(Vec2f::X), 0.0);
+    /// assert_approx_eq!(Vec2f::Y.dot(Vec2f::Y), 1.0);
+    /// assert_approx_eq!(Vec2f::Y.dot(-Vec2f::Y), -1.0);
+    /// ```
+    pub fn dot(self, other: Self) -> T
+    where
+        T: Number,
+    {
+        self.into_array()
+            .into_iter()
+            .zip(other.into_array())
+            .fold(T::ZERO, |acc, (a, b)| acc + a * b)
+    }
+
+    /// Computes the smallest positive angle between `self` and `other`, in radians.
+    ///
+    /// Both `self` and `other` must have non-zero length for the result to be meaningful.
+    ///
+    /// Also see [`Vector::signed_angle_to`] for getting a signed result depending on the relative
+    /// orientation of the vectors.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// use std::f32::consts::TAU;
+    ///
+    /// let a = Vec3f::Y;
+    /// let b = Vec3f::X;
+    /// assert_approx_eq!(a.abs_angle_to(b), TAU / 4.0);  // quarter turn
+    /// assert_approx_eq!(b.abs_angle_to(a), TAU / 4.0);  // quarter turn
+    /// assert_approx_eq!(a.abs_angle_to(-a), TAU / 2.0); // half a turn
+    /// ```
+    pub fn abs_angle_to(self, other: Self) -> T
+    where
+        T: Number + Trig + Sqrt,
+    {
+        let dot = self.dot(other);
+        let angle = (dot / (self.length() * other.length())).acos();
+        angle
+    }
+
     /// Element-wise minimum between `self` and `other`.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// # use zaru_linalg::*;
@@ -293,7 +393,7 @@ impl<T, const N: usize> Vector<T, N> {
 
     /// Element-wise maximum between `self` and `other`.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// # use zaru_linalg::*;
@@ -311,7 +411,7 @@ impl<T, const N: usize> Vector<T, N> {
 
     /// Element-wise range clamp of the elements in `self` between `min` and `max`.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```
     /// # use zaru_linalg::*;
@@ -328,45 +428,29 @@ impl<T, const N: usize> Vector<T, N> {
     }
 }
 
-impl<T: Zero, const N: usize> Vector<T, N> {
-    /// A vector with each element initialized to 0.
-    ///
-    /// This uses [`T::ZERO`][Zero::ZERO] as the value for all elements.
-    pub const ZERO: Self = Self([T::ZERO; N]);
-}
-
-impl<T: Zero + One> Vector<T, 2> {
-    /// A unit vector pointing in the X direction.
-    pub const X: Self = Self([T::ONE, T::ZERO]);
-    /// A unit vector pointing in the Y direction.
-    pub const Y: Self = Self([T::ZERO, T::ONE]);
-}
-
-impl<T: Zero + One> Vector<T, 3> {
-    /// A unit vector pointing in the X direction.
-    pub const X: Self = Self([T::ONE, T::ZERO, T::ZERO]);
-    /// A unit vector pointing in the Y direction.
-    pub const Y: Self = Self([T::ZERO, T::ONE, T::ZERO]);
-    /// A unit vector pointing in the Z direction.
-    pub const Z: Self = Self([T::ZERO, T::ZERO, T::ONE]);
-}
-
-impl<T: Zero + One> Vector<T, 4> {
-    /// A unit vector pointing in the X direction.
-    pub const X: Self = Self([T::ONE, T::ZERO, T::ZERO, T::ZERO]);
-    /// A unit vector pointing in the Y direction.
-    pub const Y: Self = Self([T::ZERO, T::ONE, T::ZERO, T::ZERO]);
-    /// A unit vector pointing in the Z direction.
-    pub const Z: Self = Self([T::ZERO, T::ZERO, T::ONE, T::ZERO]);
-    /// A unit vector pointing in the W direction.
-    pub const W: Self = Self([T::ZERO, T::ZERO, T::ZERO, T::ONE]);
-}
-
 impl<T> Vector<T, 1> {
+    /// Removes the last element of this vector, yielding a vector with zero elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// let v = vec1(-1.0).truncate();
+    /// assert_eq!(v, []);
+    /// ```
     pub fn truncate(self) -> Vector<T, 0> {
         [].into()
     }
 
+    /// Appends another value to the vector, yielding a vector with 2 dimensions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// let v = vec1(-1.0).extend(5.0);
+    /// assert_eq!(v, vec2(-1.0, 5.0));
+    /// ```
     pub fn extend(self, value: T) -> Vector<T, 2> {
         let [x] = self.into_array();
         [x, value].into()
@@ -374,17 +458,47 @@ impl<T> Vector<T, 1> {
 }
 
 impl<T> Vector<T, 2> {
+    /// Removes the last element of this vector, yielding a vector with a single element.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// let v = vec2(-1.0, 2.0).truncate();
+    /// assert_eq!(v, vec1(-1.0));
+    /// ```
     pub fn truncate(self) -> Vector<T, 1> {
         let [x, ..] = self.into_array();
         [x].into()
     }
 
+    /// Appends another value to the vector, yielding a vector with 3 dimensions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// let v = vec2(-1.0, 2.0).extend(5.0);
+    /// assert_eq!(v, vec3(-1.0, 2.0, 5.0));
+    /// ```
     pub fn extend(self, value: T) -> Vector<T, 3> {
         let [x, y] = self.into_array();
         [x, y, value].into()
     }
 
     /// Rotates `self` clockwise in the 2D plane.
+    ///
+    /// This operation assumes that the Y axis points up, and the X axis points to the right.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// use std::f32::consts::TAU;
+    ///
+    /// assert_approx_eq!(Vec2f::Y.rotate_clockwise(TAU / 4.0), Vec2f::X);
+    /// assert_approx_eq!(Vec2f::Y.rotate_clockwise(TAU / 2.0), -Vec2f::Y);
+    /// ```
     pub fn rotate_clockwise(self, radians: T) -> Self
     where
         T: Number + Trig,
@@ -393,23 +507,142 @@ impl<T> Vector<T, 2> {
     }
 
     /// Rotates `self` counterclockwise in the 2D plane.
+    ///
+    /// This operation assumes that the Y axis points up, and the X axis points to the right.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// use std::f32::consts::TAU;
+    ///
+    /// assert_approx_eq!(Vec2f::Y.rotate_counterclockwise(TAU / 4.0), -Vec2f::X);
+    /// assert_approx_eq!(Vec2f::X.rotate_counterclockwise(TAU / 4.0), Vec2f::Y);
+    /// assert_approx_eq!(Vec2f::Y.rotate_counterclockwise(TAU / 2.0), -Vec2f::Y);
+    /// ```
     pub fn rotate_counterclockwise(self, radians: T) -> Self
     where
         T: Number + Trig,
     {
         Mat2::rotation_counterclockwise(radians) * self
     }
+
+    /// Computes the (signed) clockwise rotation in radians needed to align `self` with `other`.
+    ///
+    /// This operation assumes that the Y axis points up, and the X axis points to the right.
+    ///
+    /// Also see [`Vector::abs_angle_to`] for a more general way of getting the unsigned angle
+    /// between vectors.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// use std::f32::consts::TAU;
+    ///
+    /// // The Y axis can be aligned with the X axis by rotating it clockwise by a quarter turn.
+    /// assert_approx_eq!(Vec2f::Y.signed_angle_to(Vec2f::X), TAU / 4.0);
+    ///
+    /// // The X axis can be aligned with the Y axis by rotating it counterclockwise by a quarter turn.
+    /// assert_approx_eq!(Vec2f::X.signed_angle_to(Vec2f::Y), -TAU / 4.0);
+    ///
+    /// // The angle of a vector to itself is, of course, 0.
+    /// assert_approx_eq!(Vec2f::Y.signed_angle_to(Vec2f::Y), 0.0);
+    ///
+    /// // The result for opposing vectors is ambiguous: it could be either `TAU / 2` or `-TAU / 2`.
+    /// assert_approx_eq!(Vec2f::Y.signed_angle_to(-Vec2f::Y), -TAU / 2.0);
+    /// ```
+    pub fn signed_angle_to(self, other: Self) -> T
+    where
+        T: Number + Trig,
+    {
+        -self.perp_dot(other).atan2(self.dot(other))
+    }
+
+    /// Computes the [perpendicular dot product] of `self` and `other`.
+    ///
+    /// This is equivalent to the Z coordinate of the cross product of `self` and `other`
+    /// (extended with Z=0 in the third dimension). Since the Z coordinates of both inputs are 0,
+    /// the Z coordinate is the only non-zero coordinate of the cross product.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// let x = Vec2f::X;
+    /// let y = Vec2f::Y;
+    /// assert_eq!(x.perp_dot(y), 1.0);
+    /// assert_eq!(y.perp_dot(x), -1.0);
+    /// ```
+    ///
+    /// [perpendicular dot product]: https://mathworld.wolfram.com/PerpDotProduct.html
+    pub fn perp_dot(self, other: Self) -> T
+    where
+        T: Number,
+    {
+        self.extend(T::ZERO).cross(other.extend(T::ZERO)).z
+    }
 }
 
 impl<T> Vector<T, 3> {
+    /// Removes the last element of this vector, yielding a vector with 2 elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// let v = vec3(-1.0, 2.0, 3.5).truncate();
+    /// assert_eq!(v, vec2(-1.0, 2.0));
+    /// ```
     pub fn truncate(self) -> Vector<T, 2> {
         let [x, y, ..] = self.into_array();
         [x, y].into()
     }
 
+    /// Appends another value to the vector, yielding a vector with 4 dimensions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// let v = vec3(-1.0, 2.0, 3.5).extend(99.0);
+    /// assert_eq!(v, vec4(-1.0, 2.0, 3.5, 99.0));
+    /// ```
     pub fn extend(self, value: T) -> Vector<T, 4> {
         let [x, y, z] = self.into_array();
         [x, y, z, value].into()
+    }
+
+    /// Computes the cross product of `self` and `other`.
+    ///
+    /// The result is a vector that is perpendicular to both `self` and `other`. Its direction
+    /// depends on the order of the arguments: swapping them will invert the direction of the
+    /// resulting vector.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use zaru_linalg::*;
+    /// let x = Vec3f::X;
+    /// let y = Vec3f::Y;
+    /// let z = Vec3f::Z;
+    /// assert_eq!(x.cross(y), z);
+    /// assert_eq!(y.cross(x), -z);
+    /// ```
+    pub fn cross(self, other: Self) -> Self
+    where
+        T: Number,
+    {
+        let [a1, a2, a3] = self.into_array();
+        let [b1, b2, b3] = other.into_array();
+
+        #[rustfmt::skip]
+        let cross = vec3(
+            a2 * b3 - a3 * b2,
+            a3 * b1 - a1 * b3,
+            a1 * b2 - a2 * b1,
+        );
+        cross
     }
 }
 
@@ -585,5 +818,50 @@ mod tests {
         assert_approx_eq!(Vec2f::Y.rotate_clockwise(TAU / 2.0), -Vec2f::Y);
         assert_approx_eq!(Vec2f::X.rotate_clockwise(TAU / 2.0), -Vec2f::X);
         assert_approx_eq!(Vec2f::X.rotate_counterclockwise(TAU / 4.0), Vec2f::Y);
+    }
+
+    #[test]
+    fn dot() {
+        assert_eq!(vec3(1, 3, -5).dot(vec3(4, -2, -1)), 3);
+        assert_eq!(vec3(1, 3, -5).dot(vec3(1, 3, -5)), 35);
+
+        assert_eq!(Vec2f::X.dot(Vec2f::X), 1.0);
+        assert_eq!(Vec2f::Y.dot(Vec2f::Y), 1.0);
+        assert_eq!(Vec2f::X.dot(Vec2f::Y), 0.0);
+        assert_eq!(Vec2f::Y.dot(Vec2f::X), 0.0);
+    }
+
+    #[test]
+    fn abs_angle() {
+        assert_approx_eq!(Vec3f::Y.abs_angle_to(Vec3f::X), TAU / 4.0);
+        assert_approx_eq!(Vec3f::X.abs_angle_to(Vec3f::Y), TAU / 4.0);
+
+        assert_approx_eq!(Vec3f::Y.abs_angle_to(Vec3f::Y), 0.0);
+        assert_approx_eq!(Vec3f::Y.abs_angle_to(-Vec3f::Y), TAU / 2.0);
+        assert_approx_eq!(Vec3f::Y.abs_angle_to(-Vec3f::X), TAU / 4.0);
+
+        assert_approx_eq!(Vec2f::Y.abs_angle_to(Vec2f::X), TAU / 4.0);
+        assert_approx_eq!(Vec2f::Y.abs_angle_to(-Vec2f::Y), TAU / 2.0);
+
+        assert_approx_eq!(vec2(0.0, 2.0).abs_angle_to(Vec2f::X), TAU / 4.0);
+        assert_approx_eq!(vec2(0.0, 2.0).abs_angle_to(vec2(-3.0, 0.0)), TAU / 4.0);
+
+        assert_approx_eq!(vec2(1.0, 1.0).abs_angle_to(vec2(1.0, -1.0)), TAU / 4.0);
+    }
+
+    #[test]
+    fn signed_angle() {
+        assert_approx_eq!(Vec2f::Y.signed_angle_to(Vec2f::X), TAU / 4.0);
+        assert_approx_eq!(Vec2f::X.signed_angle_to(Vec2f::Y), -TAU / 4.0);
+        assert_approx_eq!(Vec2f::Y.signed_angle_to(Vec2f::Y), 0.0);
+
+        assert_approx_eq!(
+            Vec2f::Y
+                .rotate_counterclockwise(100.0f32.to_radians())
+                .signed_angle_to(Vec2f::Y),
+            100.0f32.to_radians()
+        );
+
+        assert_approx_eq!(Vec2f::Y.signed_angle_to(-Vec2f::Y), -TAU / 2.0);
     }
 }
