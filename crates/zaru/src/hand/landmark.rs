@@ -4,9 +4,8 @@ use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
 use crate::iter::zip_exact;
 use crate::nn::ColorMapper;
 use include_blob::include_blob;
-use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
-use zaru_linalg::{vec2, Vec3, Vec3f};
+use zaru_linalg::{vec2, Vec2, Vec3, Vec3f};
 
 use crate::{
     landmark::{Confidence, Estimate, Landmarks, Network},
@@ -66,13 +65,15 @@ impl LandmarkResult {
     ///
     /// A rotation of 0° means that fingers are pointed upwards.
     pub fn rotation_radians(&self) -> f32 {
-        let p = self.landmark_position(LandmarkIdx::MiddleFingerMcp as usize);
-        let finger = Point2::new(p.x, p.y);
-        let p = self.landmark_position(LandmarkIdx::Wrist as usize);
-        let wrist = Point2::new(p.x, p.y);
+        let finger = self
+            .landmark_position(LandmarkIdx::MiddleFingerMcp as usize)
+            .truncate();
+        let wrist = self
+            .landmark_position(LandmarkIdx::Wrist as usize)
+            .truncate();
 
         let rel = wrist - finger;
-        Rotation2::rotation_between(&Vector2::y(), &rel).angle()
+        rel.signed_angle_to(Vec2::Y) // swap arguments since Y points *up* here
     }
 
     /// Returns the estimated handedness of the hand in the image.

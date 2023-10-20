@@ -11,9 +11,8 @@
 
 use include_blob::include_blob;
 use itertools::Itertools;
-use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
-use zaru_linalg::{vec2, Vec3f};
+use zaru_linalg::{vec2, Vec2, Vec3f};
 
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
 use crate::landmark::{Confidence, Landmark};
@@ -149,14 +148,16 @@ impl LandmarkResultV1 {
         let left_eye = self
             .landmarks()
             .get(LandmarkIdx::LeftEyeOuterCorner as _)
-            .position();
+            .position()
+            .truncate();
         let right_eye = self
             .landmarks()
             .get(LandmarkIdx::RightEyeOuterCorner as _)
-            .position();
-        let left_to_right_eye =
-            Vector2::new(right_eye[0] - left_eye[0], right_eye[1] - left_eye[1]);
-        Rotation2::rotation_between(&Vector2::x(), &left_to_right_eye).angle()
+            .position()
+            .truncate();
+
+        let ltr = right_eye - left_eye;
+        ltr.signed_angle_to(Vec2::X) // swapped because Y points down here
     }
 
     /// Returns a [`RotatedRect`] containing the left eye.
@@ -408,14 +409,16 @@ impl LandmarkResultV2 {
         let left_eye = self
             .landmarks()
             .get(LandmarkIdx::LeftEyeOuterCorner as _)
-            .position();
+            .position()
+            .truncate();
         let right_eye = self
             .landmarks()
             .get(LandmarkIdx::RightEyeOuterCorner as _)
-            .position();
-        let left_to_right_eye =
-            Vector2::new(right_eye[0] - left_eye[0], right_eye[1] - left_eye[1]);
-        Rotation2::rotation_between(&Vector2::x(), &left_to_right_eye).angle()
+            .position()
+            .truncate();
+
+        let ltr = right_eye - left_eye;
+        ltr.signed_angle_to(Vec2::X) // swapped because Y points down here
     }
 
     /// Draws the landmark result onto an image.
