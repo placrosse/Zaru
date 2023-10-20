@@ -6,10 +6,9 @@ use std::{
     collections::HashMap,
     panic::{catch_unwind, AssertUnwindSafe},
     process,
-    sync::Mutex,
+    sync::{Mutex, OnceLock},
 };
 
-use once_cell::sync::OnceCell;
 use raw_window_handle::{HasRawDisplayHandle, RawDisplayHandle};
 use winit::{
     event::Event,
@@ -114,7 +113,7 @@ unsafe impl HasRawDisplayHandle for Display {
     }
 }
 
-static DISPLAY: OnceCell<Display> = OnceCell::new();
+static DISPLAY: OnceLock<Display> = OnceLock::new();
 
 fn send(msg: Msg) {
     // TODO: backpressure

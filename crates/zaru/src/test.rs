@@ -1,25 +1,25 @@
-use once_cell::sync::Lazy;
+use std::sync::OnceLock;
 
 use crate::image::Image;
 
 pub fn sad_linus_full() -> &'static Image {
-    static IMG: Lazy<Image> = Lazy::new(|| {
+    static IMG: OnceLock<Image> = OnceLock::new();
+    IMG.get_or_init(|| {
         Image::load(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../3rdparty/img/sad_linus.jpg"
         ))
         .unwrap()
-    });
-    &IMG
+    })
 }
 
 pub fn sad_linus_cropped() -> &'static Image {
-    static IMG: Lazy<Image> = Lazy::new(|| {
+    static IMG: OnceLock<Image> = OnceLock::new();
+    IMG.get_or_init(|| {
         Image::load(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../3rdparty/img/sad_linus_cropped.jpg"
         ))
         .unwrap()
-    });
-    &IMG
+    })
 }

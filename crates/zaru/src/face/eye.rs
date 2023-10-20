@@ -6,9 +6,10 @@
 
 // TODO: this is rather useless with the FaceMeshV2 model, remove it
 
+use std::sync::OnceLock;
+
 use include_blob::include_blob;
 use nalgebra::Point2;
-use once_cell::sync::Lazy;
 use zaru_linalg::Vec3f;
 
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut, Resolution};
@@ -21,16 +22,6 @@ use crate::{
     slice::SliceExt,
 };
 
-static MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob!("../../3rdparty/onnx/iris_landmark.onnx");
-    Cnn::new(
-        NeuralNetwork::from_onnx(model_data).load().unwrap(),
-        CnnInputShape::NCHW,
-        ColorMapper::linear(-1.0..=1.0),
-    )
-    .unwrap()
-});
-
 /// A [`Network`] that computes eye landmarks on a cropped image of a left eye.
 ///
 /// Landmarks of a right eye can be computed by flipping both the input image and the returned
@@ -42,7 +33,16 @@ impl Network for EyeNetwork {
     type Output = EyeLandmarks;
 
     fn cnn(&self) -> &Cnn {
-        &MODEL
+        static MODEL: OnceLock<Cnn> = OnceLock::new();
+        MODEL.get_or_init(|| {
+            let model_data = include_blob!("../../3rdparty/onnx/iris_landmark.onnx");
+            Cnn::new(
+                NeuralNetwork::from_onnx(model_data).load().unwrap(),
+                CnnInputShape::NCHW,
+                ColorMapper::linear(-1.0..=1.0),
+            )
+            .unwrap()
+        })
     }
 
     fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {

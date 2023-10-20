@@ -34,9 +34,11 @@ mod color;
 mod decode;
 mod gpu;
 mod image;
-mod jpeg;
 mod resolution;
 mod view;
+
+// TODO: make private after everything is migrated to zaru-image
+pub mod jpeg;
 
 pub use blend::*;
 pub use color::Color;

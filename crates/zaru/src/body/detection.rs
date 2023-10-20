@@ -2,14 +2,15 @@
 
 // TODO(GPU/wonnx): support mode=linear for `Resize` node
 
-use crate::nn::{ColorMapper, Outputs};
-use crate::num::sigmoid;
-use crate::rect::Rect;
+use std::sync::OnceLock;
+
 use include_blob::include_blob;
-use once_cell::sync::Lazy;
 use zaru_linalg::vec2;
 
 use crate::image::Resolution;
+use crate::nn::{ColorMapper, Outputs};
+use crate::num::sigmoid;
+use crate::rect::Rect;
 use crate::{
     detection::{
         ssd::{Anchor, AnchorParams, Anchors, LayerInfo},
@@ -17,16 +18,6 @@ use crate::{
     },
     nn::{Cnn, CnnInputShape, NeuralNetwork},
 };
-
-static MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob!("../../3rdparty/onnx/pose_detection.onnx");
-    Cnn::new(
-        NeuralNetwork::from_onnx(model_data).load().unwrap(),
-        CnnInputShape::NCHW,
-        ColorMapper::linear(-1.0..=1.0),
-    )
-    .unwrap()
-});
 
 /// Body pose detection network.
 ///
@@ -39,11 +30,22 @@ impl Network for PoseNetwork {
     type Classes = ();
 
     fn cnn(&self) -> &Cnn {
-        &MODEL
+        static MODEL: OnceLock<Cnn> = OnceLock::new();
+        MODEL.get_or_init(|| {
+            let model_data = include_blob!("../../3rdparty/onnx/pose_detection.onnx");
+            Cnn::new(
+                NeuralNetwork::from_onnx(model_data).load().unwrap(),
+                CnnInputShape::NCHW,
+                ColorMapper::linear(-1.0..=1.0),
+            )
+            .unwrap()
+        })
     }
 
     fn extract(&self, outputs: &Outputs, threshold: f32, detections: &mut Detections) {
-        static ANCHORS: Lazy<Anchors> = Lazy::new(|| {
+        static ANCHORS: OnceLock<Anchors> = OnceLock::new();
+
+        let anchors = ANCHORS.get_or_init(|| {
             Anchors::calculate(&AnchorParams {
                 layers: &[
                     LayerInfo::new(2, 28, 28),
@@ -54,8 +56,8 @@ impl Network for PoseNetwork {
         });
 
         extract_outputs(
-            MODEL.input_resolution(),
-            &ANCHORS,
+            self.cnn().input_resolution(),
+            anchors,
             outputs,
             threshold,
             detections,

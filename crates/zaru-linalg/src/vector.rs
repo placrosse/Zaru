@@ -529,7 +529,8 @@ impl<T> Vector<T, 2> {
 
     /// Computes the (signed) clockwise rotation in radians needed to align `self` with `other`.
     ///
-    /// This operation assumes that the Y axis points up, and the X axis points to the right.
+    /// This operation assumes that the Y axis points up, and the X axis points to the right. If the
+    /// Y axis points *down*, swap the arguments to make the method work correctly.
     ///
     /// Also see [`Vector::abs_angle_to`] for a more general way of getting the unsigned angle
     /// between vectors.

@@ -4,6 +4,7 @@ use std::{
     num::NonZeroU32,
     panic::catch_unwind,
     process,
+    sync::OnceLock,
 };
 
 use anyhow::bail;
@@ -11,13 +12,41 @@ use fev::{
     display::Display,
     jpeg::{JpegDecodeSession, JpegInfo},
 };
-use once_cell::sync::Lazy;
+
+/// Turned off by default, because VA-API does not work at all on Mesa/AMD, and on Intel the
+/// performance is too unpredictable (10-50ms for a 4K image) to be even remotely usable.
+const DEFAULT_VAAPI: VaApi = VaApi::Off;
+
+const DEFAULT_BACKEND: JpegBackend = JpegBackend::ZuneJpeg;
 
 #[derive(PartialEq, Eq)]
 enum VaApi {
     On,
     Off,
     Force,
+}
+
+impl VaApi {
+    fn get() -> &'static VaApi {
+        static USE_VAAPI: OnceLock<VaApi> = OnceLock::new();
+        USE_VAAPI.get_or_init(|| match env::var("ZARU_JPEG_VAAPI") {
+            Ok(v) if v == "1" || v == "true" || v == "on" => VaApi::On,
+            Ok(v) if v == "0" || v == "false" || v == "off" => VaApi::Off,
+            Ok(v) if v == "force" => VaApi::Force,
+            Ok(v) => {
+                eprintln!("invalid value set for `ZARU_JPEG_VAAPI` variable: '{v}'; exiting");
+                process::exit(1);
+            }
+            Err(VarError::NotPresent) => DEFAULT_VAAPI,
+            Err(VarError::NotUnicode(s)) => {
+                eprintln!(
+                    "invalid value set for `ZARU_JPEG_VAAPI` variable: {}; exiting",
+                    s.to_string_lossy()
+                );
+                process::exit(1);
+            }
+        })
+    }
 }
 
 /// Because computers, we support several different JPEG decoding backends.
@@ -39,61 +68,43 @@ enum JpegBackend {
     FastButWrong,
 }
 
-/// Turned off by default, because VA-API does not work at all on Mesa/AMD, and on Intel the
-/// performance is too unpredictable (10-50ms for a 4K image) to be even remotely usable.
-const DEFAULT_VAAPI: VaApi = VaApi::Off;
-
-const DEFAULT_BACKEND: JpegBackend = JpegBackend::ZuneJpeg;
-
-static USE_VAAPI: Lazy<VaApi> = Lazy::new(|| match env::var("ZARU_JPEG_VAAPI") {
-    Ok(v) if v == "1" || v == "true" || v == "on" => VaApi::On,
-    Ok(v) if v == "0" || v == "false" || v == "off" => VaApi::Off,
-    Ok(v) if v == "force" => VaApi::Force,
-    Ok(v) => {
-        eprintln!("invalid value set for `ZARU_JPEG_VAAPI` variable: '{v}'; exiting");
-        process::exit(1);
+impl JpegBackend {
+    fn get() -> &'static JpegBackend {
+        static JPEG_BACKEND: OnceLock<JpegBackend> = OnceLock::new();
+        JPEG_BACKEND.get_or_init(|| {
+            let backend = match env::var("ZARU_JPEG_BACKEND") {
+                Ok(v) if v == "fast-but-wrong" => JpegBackend::FastButWrong,
+                Ok(v) if v == "mozjpeg" => JpegBackend::MozJpeg,
+                Ok(v) if v == "libjpeg-turbo" => JpegBackend::LibjpegTurbo,
+                Ok(v) if v == "zune-jpeg" => JpegBackend::ZuneJpeg,
+                Ok(v) if v == "jpeg-decoder" => JpegBackend::JpegDecoder,
+                Ok(v) => {
+                    eprintln!("invalid value set for `ZARU_JPEG_BACKEND` variable: '{v}'; exiting");
+                    process::exit(1);
+                }
+                Err(VarError::NotPresent) => DEFAULT_BACKEND,
+                Err(VarError::NotUnicode(s)) => {
+                    eprintln!(
+                        "invalid value set for `ZARU_JPEG_BACKEND` variable: {}; exiting",
+                        s.to_string_lossy()
+                    );
+                    process::exit(1);
+                }
+            };
+            log::debug!("using JPEG decode backend: {:?}", backend);
+            backend
+        })
     }
-    Err(VarError::NotPresent) => DEFAULT_VAAPI,
-    Err(VarError::NotUnicode(s)) => {
-        eprintln!(
-            "invalid value set for `ZARU_JPEG_VAAPI` variable: {}; exiting",
-            s.to_string_lossy()
-        );
-        process::exit(1);
-    }
-});
+}
 
-static JPEG_BACKEND: Lazy<JpegBackend> = Lazy::new(|| {
-    let backend = match env::var("ZARU_JPEG_BACKEND") {
-        Ok(v) if v == "fast-but-wrong" => JpegBackend::FastButWrong,
-        Ok(v) if v == "mozjpeg" => JpegBackend::MozJpeg,
-        Ok(v) if v == "libjpeg-turbo" => JpegBackend::LibjpegTurbo,
-        Ok(v) if v == "zune-jpeg" => JpegBackend::ZuneJpeg,
-        Ok(v) if v == "jpeg-decoder" => JpegBackend::JpegDecoder,
-        Ok(v) => {
-            eprintln!("invalid value set for `ZARU_JPEG_BACKEND` variable: '{v}'; exiting");
-            process::exit(1);
-        }
-        Err(VarError::NotPresent) => DEFAULT_BACKEND,
-        Err(VarError::NotUnicode(s)) => {
-            eprintln!(
-                "invalid value set for `ZARU_JPEG_BACKEND` variable: {}; exiting",
-                s.to_string_lossy()
-            );
-            process::exit(1);
-        }
-    };
-    log::debug!("using JPEG decode backend: {:?}", backend);
-    backend
-});
-
-pub(super) struct DecodedImage {
+// FIXME: make those private again once everything is using zaru_image::Image
+pub struct DecodedImage {
     pub width: u32,
     pub height: u32,
     pub data: Vec<u8>,
 }
 
-pub(super) fn decode_jpeg(data: &[u8]) -> anyhow::Result<DecodedImage> {
+pub fn decode_jpeg(data: &[u8]) -> anyhow::Result<DecodedImage> {
     match decode_jpeg_vaapi(data) {
         Ok(image) => return Ok(image),
         Err(e) => {
@@ -101,7 +112,7 @@ pub(super) fn decode_jpeg(data: &[u8]) -> anyhow::Result<DecodedImage> {
         }
     }
 
-    let buf = match *JPEG_BACKEND {
+    let buf = match JpegBackend::get() {
         JpegBackend::JpegDecoder => {
             let mut decoder = jpeg_decoder::Decoder::new(data);
             let data = decoder.decode()?;
@@ -212,10 +223,12 @@ pub(super) fn decode_jpeg(data: &[u8]) -> anyhow::Result<DecodedImage> {
 
 #[allow(unreachable_code, unused_variables)]
 fn decode_jpeg_vaapi(jpeg: &[u8]) -> anyhow::Result<DecodedImage> {
-    let display = match *USE_VAAPI {
+    let display = match VaApi::get() {
         VaApi::Off => bail!("VA-API use disabled by env var"),
         VaApi::Force | VaApi::On => {
-            static DISPLAY: Lazy<Option<Display>> = Lazy::new(|| {
+            static DISPLAY: OnceLock<Option<Display>> = OnceLock::new();
+
+            let display = DISPLAY.get_or_init(|| {
                 /*let display = match unsafe { Display::new_unmanaged(gui::Display::get()) } {
                     Ok(display) => display,
                     Err(e) => {
@@ -229,7 +242,7 @@ fn decode_jpeg_vaapi(jpeg: &[u8]) -> anyhow::Result<DecodedImage> {
 
                 match display.query_vendor_string() {
                     Ok(vendor) => {
-                        if !vendor.contains("Intel") && *USE_VAAPI == VaApi::On {
+                        if !vendor.contains("Intel") && *VaApi::get() == VaApi::On {
                             log::debug!("VA-API implementation vendor '{vendor}' is not supported; not using VA-API");
                             log::debug!("(set ZARU_JPEG_VAAPI=force to override; it probably won't work, but it might be funny)");
                             return None;
@@ -246,7 +259,7 @@ fn decode_jpeg_vaapi(jpeg: &[u8]) -> anyhow::Result<DecodedImage> {
                 }
             });
 
-            match &*DISPLAY {
+            match display {
                 Some(display) => display,
                 None => bail!("VA-API not initialized"),
             }

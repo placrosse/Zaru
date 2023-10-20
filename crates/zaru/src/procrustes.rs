@@ -252,11 +252,10 @@ impl AnalysisResult {
 
 #[cfg(test)]
 mod tests {
-    use std::f32::consts::PI;
+    use std::{f32::consts::PI, sync::OnceLock};
 
     use approx::assert_relative_eq;
     use nalgebra::{Point3, Rotation3};
-    use once_cell::sync::Lazy;
     use zaru_linalg::{assert_approx_eq, vec3, Vec3};
 
     use super::*;
@@ -271,12 +270,15 @@ mod tests {
         vec3(-1.0, -1.0, 0.0),
         vec3(1.0, 1.0, 5.0),
     ];
-    static ANALYZER: Lazy<ProcrustesAnalyzer> =
-        Lazy::new(|| ProcrustesAnalyzer::new(REFERENCE_POINTS.iter().copied()));
 
     const LOG: bool = false;
     const MAX_DELTA: f32 = 0.00001;
     const MAX_TRANSLATION_DELTA: f32 = 0.001;
+
+    fn analyzer() -> &'static ProcrustesAnalyzer {
+        static ANALYZER: OnceLock<ProcrustesAnalyzer> = OnceLock::new();
+        ANALYZER.get_or_init(|| ProcrustesAnalyzer::new(REFERENCE_POINTS.iter().copied()))
+    }
 
     fn analyze(transform: Matrix4<f32>) -> AnalysisResult {
         if LOG {
@@ -286,10 +288,12 @@ mod tests {
                 .ok();
         }
 
-        ANALYZER.clone().analyze(REFERENCE_POINTS.iter().map(|&v| {
-            let pt = transform.transform_point(&Point3::new(v.x, v.y, v.z));
-            vec3(pt.x, pt.y, pt.z)
-        }))
+        analyzer()
+            .clone()
+            .analyze(REFERENCE_POINTS.iter().map(|&v| {
+                let pt = transform.transform_point(&Point3::new(v.x, v.y, v.z));
+                vec3(pt.x, pt.y, pt.z)
+            }))
     }
 
     /// Applies `transform` to `orig`, then applies procrustes analysis and checks if we get
@@ -460,14 +464,16 @@ mod tests {
         let rot = UnitQuaternion::from_euler_angles(expected_roll, expected_pitch, expected_yaw);
         let offset = vec3(50.0, 200.0, -20.0);
         let mut rng = fastrand::Rng::with_seed(0x3024b6663d843ca2);
-        let res = ANALYZER.clone().analyze(REFERENCE_POINTS.iter().map(|&v| {
-            let rotated = rot * Vector3::new(v.x, v.y, v.z);
-            vec3(
-                rotated.x * 100.0 + offset.x + rng.f32() - 0.5,
-                rotated.y * 100.0 + offset.y + rng.f32() - 0.5,
-                rotated.z * 100.0 + offset.z + rng.f32() - 0.5,
-            )
-        }));
+        let res = analyzer()
+            .clone()
+            .analyze(REFERENCE_POINTS.iter().map(|&v| {
+                let rotated = rot * Vector3::new(v.x, v.y, v.z);
+                vec3(
+                    rotated.x * 100.0 + offset.x + rng.f32() - 0.5,
+                    rotated.y * 100.0 + offset.y + rng.f32() - 0.5,
+                    rotated.z * 100.0 + offset.z + rng.f32() - 0.5,
+                )
+            }));
         assert_approx_eq!(res.scale(), 100.0).abs(0.1);
         assert_approx_eq!(res.translation(), offset).abs(0.5);
         let (roll, pitch, yaw) = res.rotation().euler_angles();

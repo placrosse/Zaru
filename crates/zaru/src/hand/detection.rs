@@ -2,13 +2,13 @@
 
 // TODO(GPU/wonnx): support mode=linear for `Resize` node
 
+use std::sync::OnceLock;
+
 use crate::nn::{ColorMapper, Outputs};
 use crate::num::sigmoid;
 use crate::{image::Resolution, rect::Rect};
 use include_blob::include_blob;
-use nalgebra::{Point2, Rotation2, Vector2};
-use once_cell::sync::Lazy;
-use zaru_linalg::vec2;
+use zaru_linalg::{vec2, Vec2};
 
 use crate::{
     detection::{
@@ -48,21 +48,20 @@ pub const ALL_KEYPOINTS: &[Keypoint] = &[
 /// for example.
 pub struct LiteNetwork;
 
-static LITE_MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob!("../../3rdparty/onnx/palm_detection_lite.onnx");
-    Cnn::new(
-        NeuralNetwork::from_onnx(model_data).load().unwrap(),
-        CnnInputShape::NCHW,
-        ColorMapper::linear(0.0..=1.0),
-    )
-    .unwrap()
-});
-
 impl Network for LiteNetwork {
     type Classes = ();
 
     fn cnn(&self) -> &Cnn {
-        &LITE_MODEL
+        static MODEL: OnceLock<Cnn> = OnceLock::new();
+        MODEL.get_or_init(|| {
+            let model_data = include_blob!("../../3rdparty/onnx/palm_detection_lite.onnx");
+            Cnn::new(
+                NeuralNetwork::from_onnx(model_data).load().unwrap(),
+                CnnInputShape::NCHW,
+                ColorMapper::linear(0.0..=1.0),
+            )
+            .unwrap()
+        })
     }
 
     fn extract(&self, outputs: &Outputs, threshold: f32, detections: &mut Detections) {
@@ -80,21 +79,20 @@ impl Network for LiteNetwork {
 /// This is about 15% slower than [`LiteNetwork`].
 pub struct FullNetwork;
 
-static FULL_MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob!("../../3rdparty/onnx/palm_detection_full.onnx");
-    Cnn::new(
-        NeuralNetwork::from_onnx(model_data).load().unwrap(),
-        CnnInputShape::NCHW,
-        ColorMapper::linear(0.0..=1.0),
-    )
-    .unwrap()
-});
-
 impl Network for FullNetwork {
     type Classes = ();
 
     fn cnn(&self) -> &Cnn {
-        &FULL_MODEL
+        static MODEL: OnceLock<Cnn> = OnceLock::new();
+        MODEL.get_or_init(|| {
+            let model_data = include_blob!("../../3rdparty/onnx/palm_detection_full.onnx");
+            Cnn::new(
+                NeuralNetwork::from_onnx(model_data).load().unwrap(),
+                CnnInputShape::NCHW,
+                ColorMapper::linear(0.0..=1.0),
+            )
+            .unwrap()
+        })
     }
 
     fn extract(&self, outputs: &Outputs, threshold: f32, detections: &mut Detections) {
@@ -113,13 +111,14 @@ fn extract_outputs(
     thresh: f32,
     detections: &mut Detections,
 ) {
-    static ANCHORS: Lazy<Anchors> = Lazy::new(|| {
+    static ANCHORS: OnceLock<Anchors> = OnceLock::new();
+    let anchors = ANCHORS.get_or_init(|| {
         Anchors::calculate(&AnchorParams {
             layers: &[LayerInfo::new(2, 24, 24), LayerInfo::new(6, 12, 12)],
         })
     });
 
-    let num_anchors = ANCHORS.anchor_count();
+    let num_anchors = anchors.anchor_count();
     let boxes = &outputs[0];
     let confidences = &outputs[1];
 
@@ -137,7 +136,7 @@ fn extract_outputs(
         let box_params = tensor_view.as_slice();
         detections.push(
             (),
-            extract_detection(&ANCHORS[index], input_res, box_params, conf),
+            extract_detection(&anchors[index], input_res, box_params, conf),
         );
     }
 }
@@ -170,13 +169,11 @@ fn extract_detection(
         ],
     );
 
-    let a = det.keypoints()[Keypoint::MiddleFingerMcp as usize];
-    let finger = Point2::new(a.x(), a.y());
-    let b = det.keypoints()[Keypoint::Wrist as usize];
-    let wrist = Point2::new(b.x(), b.y());
+    let finger = det.keypoints()[Keypoint::MiddleFingerMcp as usize].position();
+    let wrist = det.keypoints()[Keypoint::Wrist as usize].position();
 
     let rel = wrist - finger;
-    det.set_angle(Rotation2::rotation_between(&Vector2::y(), &rel).angle());
+    det.set_angle(rel.signed_angle_to(Vec2::Y));
 
     det
 }

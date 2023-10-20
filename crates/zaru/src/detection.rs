@@ -400,10 +400,17 @@ impl Keypoint {
         Self { p: point.into() }
     }
 
+    #[inline]
+    pub fn position(&self) -> Vec2f {
+        self.p
+    }
+
+    #[inline]
     pub fn x(&self) -> f32 {
         self.p.x
     }
 
+    #[inline]
     pub fn y(&self) -> f32 {
         self.p.y
     }

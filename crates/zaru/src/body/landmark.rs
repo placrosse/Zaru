@@ -2,17 +2,15 @@
 
 // TODO(GPU/wonnx): support mode=linear for `Resize` node
 
+use std::sync::OnceLock;
+
+use include_blob::include_blob;
+
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
 use crate::landmark::{Confidence, Estimate, Landmark, Landmarks, Network};
-use crate::nn::{ColorMapper, Outputs};
+use crate::nn::{Cnn, CnnInputShape, ColorMapper, NeuralNetwork, Outputs};
 use crate::num::sigmoid;
-use include_blob::include_blob;
-use once_cell::sync::Lazy;
-
-use crate::{
-    nn::{Cnn, CnnInputShape, NeuralNetwork},
-    slice::SliceExt,
-};
+use crate::slice::SliceExt;
 
 #[derive(Clone)]
 pub struct LandmarkResult {
@@ -143,7 +141,8 @@ impl Network for LiteNetwork {
     type Output = LandmarkResult;
 
     fn cnn(&self) -> &Cnn {
-        static MODEL: Lazy<Cnn> = Lazy::new(|| {
+        static MODEL: OnceLock<Cnn> = OnceLock::new();
+        MODEL.get_or_init(|| {
             let model_data = include_blob!("../../3rdparty/onnx/pose_landmark_lite.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
@@ -154,9 +153,7 @@ impl Network for LiteNetwork {
                 ColorMapper::linear(0.0..=1.0),
             )
             .unwrap()
-        });
-
-        &MODEL
+        })
     }
 
     fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
@@ -170,7 +167,8 @@ impl Network for FullNetwork {
     type Output = LandmarkResult;
 
     fn cnn(&self) -> &Cnn {
-        static MODEL: Lazy<Cnn> = Lazy::new(|| {
+        static MODEL: OnceLock<Cnn> = OnceLock::new();
+        MODEL.get_or_init(|| {
             let model_data = include_blob!("../../3rdparty/onnx/pose_landmark_full.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data)
@@ -181,9 +179,7 @@ impl Network for FullNetwork {
                 ColorMapper::linear(0.0..=1.0),
             )
             .unwrap()
-        });
-
-        &MODEL
+        })
     }
 
     fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {

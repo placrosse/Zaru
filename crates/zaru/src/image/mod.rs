@@ -8,7 +8,6 @@
 //! - A variety of [`draw`] functions to quickly visualize objects.
 
 pub mod draw;
-mod jpeg;
 
 #[cfg(test)]
 mod tests;
@@ -18,11 +17,10 @@ use std::{fmt, ops::Index, path::Path};
 use embedded_graphics::{pixelcolor::raw::RawU32, prelude::PixelColor};
 use image::{GenericImage, GenericImageView, ImageBuffer, Rgba, RgbaImage};
 
+use zaru_image::jpeg;
 pub use zaru_image::{AspectRatio, Resolution};
 
 use crate::rect::{Rect, RotatedRect};
-
-use self::jpeg::DecodedImage;
 
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
@@ -77,7 +75,7 @@ impl Image {
 
     /// Decodes a JFIF JPEG or Motion JPEG from a byte slice.
     pub fn decode_jpeg(data: &[u8]) -> anyhow::Result<Self> {
-        let DecodedImage {
+        let jpeg::DecodedImage {
             width,
             height,
             data,

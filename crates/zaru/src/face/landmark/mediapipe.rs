@@ -9,9 +9,10 @@
 // eye and mouth landmarks. However, it uses custom ops, and so can't be converted to a
 // non-TensorFlow format.
 
+use std::sync::OnceLock;
+
 use include_blob::include_blob;
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use zaru_linalg::{vec2, Vec2, Vec3f};
 
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
@@ -28,26 +29,6 @@ use crate::{
     slice::SliceExt,
 };
 
-static MODEL_V1: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob!("../../3rdparty/onnx/face_landmark.onnx");
-    Cnn::new(
-        NeuralNetwork::from_onnx(model_data).load().unwrap(),
-        CnnInputShape::NCHW,
-        ColorMapper::linear(-1.0..=1.0),
-    )
-    .unwrap()
-});
-
-static MODEL_V2: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob!("../../3rdparty/onnx/face_landmarks_detector.onnx");
-    Cnn::new(
-        NeuralNetwork::from_onnx(model_data).load().unwrap(),
-        CnnInputShape::NCHW,
-        ColorMapper::linear(-1.0..=1.0),
-    )
-    .unwrap()
-});
-
 /// Estimates facial landmarks using the MediaPipe Face Mesh network.
 ///
 /// The input image must be a cropped image of a face.
@@ -63,7 +44,16 @@ impl landmark::Network for FaceMeshV1 {
     type Output = LandmarkResultV1;
 
     fn cnn(&self) -> &Cnn {
-        &MODEL_V1
+        static MODEL_V1: OnceLock<Cnn> = OnceLock::new();
+        MODEL_V1.get_or_init(|| {
+            let model_data = include_blob!("../../3rdparty/onnx/face_landmark.onnx");
+            Cnn::new(
+                NeuralNetwork::from_onnx(model_data).load().unwrap(),
+                CnnInputShape::NCHW,
+                ColorMapper::linear(-1.0..=1.0),
+            )
+            .unwrap()
+        })
     }
 
     fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
@@ -94,7 +84,16 @@ impl landmark::Network for FaceMeshV2 {
     type Output = LandmarkResultV2;
 
     fn cnn(&self) -> &Cnn {
-        &MODEL_V2
+        static MODEL_V2: OnceLock<Cnn> = OnceLock::new();
+        MODEL_V2.get_or_init(|| {
+            let model_data = include_blob!("../../3rdparty/onnx/face_landmarks_detector.onnx");
+            Cnn::new(
+                NeuralNetwork::from_onnx(model_data).load().unwrap(),
+                CnnInputShape::NCHW,
+                ColorMapper::linear(-1.0..=1.0),
+            )
+            .unwrap()
+        })
     }
 
     fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {

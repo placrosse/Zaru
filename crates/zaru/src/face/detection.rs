@@ -5,13 +5,13 @@
 //!
 //! [Face Detection]: https://google.github.io/mediapipe/solutions/face_detection
 
+use std::sync::OnceLock;
+
 use crate::nn::{ColorMapper, Outputs};
 use crate::num::sigmoid;
 use crate::{image::Resolution, rect::Rect};
 use include_blob::include_blob;
-use nalgebra::{Rotation2, Vector2};
-use once_cell::sync::Lazy;
-use zaru_linalg::vec2;
+use zaru_linalg::{vec2, Vec2};
 
 use crate::{
     detection::{
@@ -29,32 +29,32 @@ pub enum Keypoint {
 /// A small and efficient face detection network, best for faces in <3m of the camera.
 pub struct ShortRangeNetwork;
 
-static SHORT_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob!("../../3rdparty/onnx/face_detection_short_range.onnx");
-    Cnn::new(
-        NeuralNetwork::from_onnx(model_data).load().unwrap(),
-        CnnInputShape::NCHW,
-        ColorMapper::linear(-1.0..=1.0),
-    )
-    .unwrap()
-});
-
 impl Network for ShortRangeNetwork {
     type Classes = ();
 
     fn cnn(&self) -> &Cnn {
-        &SHORT_RANGE_MODEL
+        static MODEL: OnceLock<Cnn> = OnceLock::new();
+        MODEL.get_or_init(|| {
+            let model_data = include_blob!("../../3rdparty/onnx/face_detection_short_range.onnx");
+            Cnn::new(
+                NeuralNetwork::from_onnx(model_data).load().unwrap(),
+                CnnInputShape::NCHW,
+                ColorMapper::linear(-1.0..=1.0),
+            )
+            .unwrap()
+        })
     }
 
     fn extract(&self, outputs: &Outputs, thresh: f32, detections: &mut Detections) {
-        static ANCHORS: Lazy<Anchors> = Lazy::new(|| {
+        static ANCHORS: OnceLock<Anchors> = OnceLock::new();
+
+        let anchors = ANCHORS.get_or_init(|| {
             Anchors::calculate(&AnchorParams {
                 layers: &[LayerInfo::new(2, 16, 16), LayerInfo::new(6, 8, 8)],
             })
         });
-
-        let res = SHORT_RANGE_MODEL.input_resolution();
-        extract_outputs(res, &ANCHORS, outputs, thresh, detections);
+        let res = self.cnn().input_resolution();
+        extract_outputs(res, anchors, outputs, thresh, detections);
     }
 }
 
@@ -64,32 +64,32 @@ pub struct FullRangeNetwork;
 
 // TODO(GPU/wonnx): support mode=linear for `Resize` node
 
-static FULL_RANGE_MODEL: Lazy<Cnn> = Lazy::new(|| {
-    let model_data = include_blob!("../../3rdparty/onnx/face_detection_full_range.onnx");
-    Cnn::new(
-        NeuralNetwork::from_onnx(model_data).load().unwrap(),
-        CnnInputShape::NCHW,
-        ColorMapper::linear(-1.0..=1.0),
-    )
-    .unwrap()
-});
-
 impl Network for FullRangeNetwork {
     type Classes = ();
 
     fn cnn(&self) -> &Cnn {
-        &FULL_RANGE_MODEL
+        static MODEL: OnceLock<Cnn> = OnceLock::new();
+        MODEL.get_or_init(|| {
+            let model_data = include_blob!("../../3rdparty/onnx/face_detection_full_range.onnx");
+            Cnn::new(
+                NeuralNetwork::from_onnx(model_data).load().unwrap(),
+                CnnInputShape::NCHW,
+                ColorMapper::linear(-1.0..=1.0),
+            )
+            .unwrap()
+        })
     }
 
     fn extract(&self, outputs: &Outputs, thresh: f32, detections: &mut Detections) {
-        static ANCHORS: Lazy<Anchors> = Lazy::new(|| {
+        static ANCHORS: OnceLock<Anchors> = OnceLock::new();
+
+        let anchors = ANCHORS.get_or_init(|| {
             Anchors::calculate(&AnchorParams {
                 layers: &[LayerInfo::new(1, 48, 48)],
             })
         });
-
-        let res = FULL_RANGE_MODEL.input_resolution();
-        extract_outputs(res, &ANCHORS, outputs, thresh, detections);
+        let res = self.cnn().input_resolution();
+        extract_outputs(res, anchors, outputs, thresh, detections);
     }
 }
 
@@ -148,12 +148,10 @@ fn extract_detection(
         ],
     );
 
-    let left_eye = det.keypoints()[Keypoint::LeftEye as usize];
-    let right_eye = det.keypoints()[Keypoint::RightEye as usize];
-    let left_to_right_eye =
-        Vector2::new(right_eye.x() - left_eye.x(), right_eye.y() - left_eye.y());
-    let angle = Rotation2::rotation_between(&Vector2::x(), &left_to_right_eye).angle();
-    det.set_angle(angle);
+    let left_eye = det.keypoints()[Keypoint::LeftEye as usize].position();
+    let right_eye = det.keypoints()[Keypoint::RightEye as usize].position();
+    let left_to_right_eye = right_eye - left_eye;
+    det.set_angle(left_to_right_eye.signed_angle_to(Vec2::X));
 
     det
 }
@@ -171,6 +169,6 @@ mod tests {
 
         assert!(detection.confidence() >= 0.8, "{}", detection.confidence());
         let angle = detection.angle().to_degrees();
-        assert!(angle < 5.0, "{angle}");
+        assert!(angle.abs() < 5.0, "{angle}");
     }
 }

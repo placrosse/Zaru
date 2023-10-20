@@ -1,10 +1,11 @@
 //! Hand landmark prediction.
 
+use std::sync::OnceLock;
+
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
 use crate::iter::zip_exact;
 use crate::nn::ColorMapper;
 use include_blob::include_blob;
-use once_cell::sync::Lazy;
 use zaru_linalg::{vec2, Vec2, Vec3, Vec3f};
 
 use crate::{
@@ -251,7 +252,8 @@ impl Network for LiteNetwork {
     type Output = LandmarkResult;
 
     fn cnn(&self) -> &Cnn {
-        static MODEL: Lazy<Cnn> = Lazy::new(|| {
+        static MODEL: OnceLock<Cnn> = OnceLock::new();
+        MODEL.get_or_init(|| {
             let model_data = include_blob!("../../3rdparty/onnx/hand_landmark_lite.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data).load().unwrap(),
@@ -259,9 +261,7 @@ impl Network for LiteNetwork {
                 ColorMapper::linear(0.0..=1.0),
             )
             .unwrap()
-        });
-
-        &MODEL
+        })
     }
 
     fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
@@ -278,7 +278,8 @@ impl Network for FullNetwork {
     type Output = LandmarkResult;
 
     fn cnn(&self) -> &Cnn {
-        static MODEL: Lazy<Cnn> = Lazy::new(|| {
+        static MODEL: OnceLock<Cnn> = OnceLock::new();
+        MODEL.get_or_init(|| {
             let model_data = include_blob!("../../3rdparty/onnx/hand_landmark_full.onnx");
             Cnn::new(
                 NeuralNetwork::from_onnx(model_data).load().unwrap(),
@@ -286,9 +287,7 @@ impl Network for FullNetwork {
                 ColorMapper::linear(0.0..=1.0),
             )
             .unwrap()
-        });
-
-        &MODEL
+        })
     }
 
     fn extract(&self, outputs: &Outputs, estimate: &mut Self::Output) {
