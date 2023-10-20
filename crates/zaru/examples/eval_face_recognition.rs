@@ -13,7 +13,6 @@
 use std::{collections::HashMap, convert::identity, fs, time::Instant};
 
 use itertools::Itertools;
-use nalgebra::RealField;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use zaru::{
     detection::Detector,
@@ -115,7 +114,7 @@ fn main() -> anyhow::Result<()> {
             continue;
         }
 
-        let mut max_diff = 0.0;
+        let mut max_diff = 0.0_f32;
         for (a, b) in embeddings.iter().tuple_combinations() {
             max_diff = max_diff.max(a.difference(b));
         }

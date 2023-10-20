@@ -9,7 +9,6 @@
 use std::sync::OnceLock;
 
 use include_blob::include_blob;
-use nalgebra::Point2;
 use zaru_linalg::Vec3f;
 
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut, Resolution};
@@ -104,16 +103,14 @@ impl EyeLandmarks {
 
     /// Computes the iris diameter from the landmarks.
     pub fn iris_diameter(&self) -> f32 {
-        let c = self.iris_center();
-        let center = Point2::new(c.x, c.y);
+        let center = self.iris_center();
 
         // Average data from all landmarks.
-        let mut acc_radius = 0.0;
+        let mut radius = 0.0;
         for p in self.iris_contour() {
-            acc_radius += nalgebra::distance(&center, &Point2::new(p.x, p.y));
+            radius += (center - p).length();
         }
-        let diameter = acc_radius / self.iris_contour().count() as f32 * 2.0;
-        diameter
+        radius / self.iris_contour().count() as f32 * 2.0
     }
 
     pub fn eye_contour(&self) -> impl Iterator<Item = Vec3f> + '_ {
