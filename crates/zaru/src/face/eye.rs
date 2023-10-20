@@ -9,6 +9,7 @@
 use include_blob::include_blob;
 use nalgebra::Point2;
 use once_cell::sync::Lazy;
+use zaru_linalg::Vec3f;
 
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut, Resolution};
 use crate::iter::zip_exact;
@@ -48,22 +49,18 @@ impl Network for EyeNetwork {
         let eye_contour = &outputs[0];
         let iris_contour = &outputs[1];
 
-        for (&[x, y, z], [out_x, out_y, out_z]) in zip_exact(
+        for (&[x, y, z], out) in zip_exact(
             eye_contour.index([0]).as_slice().array_chunks_exact::<3>(), // x, y, and z coordinates
             estimate.landmarks.positions_mut()[5..].iter_mut(),
         ) {
-            *out_x = x;
-            *out_y = y;
-            *out_z = z;
+            *out = [x, y, z].into();
         }
 
-        for (&[x, y, z], [out_x, out_y, out_z]) in zip_exact(
+        for (&[x, y, z], out) in zip_exact(
             iris_contour.index([0]).as_slice().array_chunks_exact::<3>(), // x, y, and z coordinates
             estimate.landmarks.positions_mut()[..5].iter_mut(),
         ) {
-            *out_x = x;
-            *out_y = y;
-            *out_z = z;
+            *out = [x, y, z].into();
         }
     }
 }
@@ -96,30 +93,30 @@ impl EyeLandmarks {
     }
 
     /// Returns the center coordinates of the iris.
-    pub fn iris_center(&self) -> [f32; 3] {
+    pub fn iris_center(&self) -> Vec3f {
         self.landmarks.positions()[0]
     }
 
     /// Returns the outer landmarks of the iris.
-    pub fn iris_contour(&self) -> impl Iterator<Item = [f32; 3]> + '_ {
+    pub fn iris_contour(&self) -> impl Iterator<Item = Vec3f> + '_ {
         self.landmarks.positions()[1..=4].iter().copied()
     }
 
     /// Computes the iris diameter from the landmarks.
     pub fn iris_diameter(&self) -> f32 {
-        let [cx, cy, _] = self.iris_center();
-        let center = Point2::new(cx, cy);
+        let c = self.iris_center();
+        let center = Point2::new(c.x, c.y);
 
         // Average data from all landmarks.
         let mut acc_radius = 0.0;
-        for [x, y, _] in self.iris_contour() {
-            acc_radius += nalgebra::distance(&center, &Point2::new(x, y));
+        for p in self.iris_contour() {
+            acc_radius += nalgebra::distance(&center, &Point2::new(p.x, p.y));
         }
         let diameter = acc_radius / self.iris_contour().count() as f32 * 2.0;
         diameter
     }
 
-    pub fn eye_contour(&self) -> impl Iterator<Item = [f32; 3]> + '_ {
+    pub fn eye_contour(&self) -> impl Iterator<Item = Vec3f> + '_ {
         self.landmarks.positions()[5..].iter().copied()
     }
 
@@ -127,7 +124,7 @@ impl EyeLandmarks {
     pub fn flip_horizontal_in_place(&mut self, full_res: Resolution) {
         let half_width = full_res.width() as f32 / 2.0;
         self.landmarks
-            .map_positions(|[x, y, z]| [-(x - half_width) + half_width, y, z]);
+            .map_positions(|p| [-(p.x - half_width) + half_width, p.y, p.z].into());
     }
 
     /// Draws the eye landmarks onto an image.
@@ -136,14 +133,20 @@ impl EyeLandmarks {
     }
 
     fn draw_impl(&self, mut image: ImageViewMut<'_>) {
-        let [x, y, _] = self.iris_center();
-        draw::marker(&mut image, x, y).size(3).color(Color::CYAN);
+        let c = self.iris_center();
+        draw::marker(&mut image, c.x, c.y)
+            .size(3)
+            .color(Color::CYAN);
 
-        for [x, y, _] in self.eye_contour().take(16) {
-            draw::marker(&mut image, x, y).size(1).color(Color::MAGENTA);
+        for p in self.eye_contour().take(16) {
+            draw::marker(&mut image, p.x, p.y)
+                .size(1)
+                .color(Color::MAGENTA);
         }
-        for [x, y, _] in self.eye_contour().skip(16) {
-            draw::marker(&mut image, x, y).size(1).color(Color::GREEN);
+        for p in self.eye_contour().skip(16) {
+            draw::marker(&mut image, p.x, p.y)
+                .size(1)
+                .color(Color::GREEN);
         }
     }
 }

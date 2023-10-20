@@ -2,6 +2,8 @@
 
 use std::iter;
 
+use zaru_linalg::{Vec3, Vec3f};
+
 use crate::image::{AsImageView, AspectRatio, ImageView, Resolution};
 use crate::iter::zip_exact;
 
@@ -12,11 +14,9 @@ use crate::{
     timer::Timer,
 };
 
-type Position = [f32; 3];
-
 #[derive(Clone)]
 pub struct Landmarks {
-    positions: Box<[Position]>,
+    positions: Box<[Vec3f]>,
     visibility: Option<Box<[f32]>>,
     presence: Option<Box<[f32]>>,
 }
@@ -27,7 +27,7 @@ impl Landmarks {
     /// All landmarks will start with all coordinates at `0.0`.
     pub fn new(len: usize) -> Self {
         Self {
-            positions: vec![[0.0, 0.0, 0.0]; len].into_boxed_slice(),
+            positions: vec![Vec3::ZERO; len].into_boxed_slice(),
             visibility: None,
             presence: None,
         }
@@ -63,25 +63,24 @@ impl Landmarks {
         }
     }
 
-    pub fn positions(&self) -> &[Position] {
+    pub fn positions(&self) -> &[Vec3f] {
         &self.positions
     }
 
-    pub fn positions_mut(&mut self) -> &mut [Position] {
+    pub fn positions_mut(&mut self) -> &mut [Vec3f] {
         &mut self.positions
     }
 
-    pub fn average_position(&self) -> Position {
-        let mut center = [0.0; 3];
-        for pos in self.positions() {
-            center[0] += pos[0] / self.positions().len() as f32;
-            center[1] += pos[1] / self.positions().len() as f32;
-            center[2] += pos[2] / self.positions().len() as f32;
+    pub fn average_position(&self) -> Vec3f {
+        let mut center = Vec3::ZERO;
+        let inv_len = 1.0 / self.positions().len() as f32;
+        for &pos in self.positions() {
+            center += pos * inv_len;
         }
         center
     }
 
-    pub fn map_positions(&mut self, mut f: impl FnMut(Position) -> Position) {
+    pub fn map_positions(&mut self, mut f: impl FnMut(Vec3f) -> Vec3f) {
         for pos in self.positions_mut() {
             *pos = f(*pos);
         }
@@ -89,17 +88,17 @@ impl Landmarks {
 }
 
 /// A landmark in 3D space.
-#[derive(Debug, Default, PartialEq, PartialOrd, Clone, Copy)]
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub struct Landmark {
-    pos: [f32; 3],
+    pos: Vec3f,
     visibility: Option<f32>,
     presence: Option<f32>,
 }
 
 impl Landmark {
-    pub fn new(position: [f32; 3]) -> Self {
+    pub fn new(position: impl Into<Vec3f>) -> Self {
         Self {
-            pos: position,
+            pos: position.into(),
             visibility: None,
             presence: None,
         }
@@ -120,7 +119,7 @@ impl Landmark {
     }
 
     #[inline]
-    pub fn position(&self) -> Position {
+    pub fn position(&self) -> Vec3f {
         self.pos
     }
 
@@ -183,7 +182,7 @@ impl LandmarkFilter {
         Self {
             filter: Box::new(move |landmarks| {
                 for (lm, state) in zip_exact(&mut *landmarks.positions, &mut states) {
-                    for (coord, state) in zip_exact(lm, state) {
+                    for (coord, state) in zip_exact(lm.as_mut_array(), state) {
                         *coord = filter.filter(state, *coord);
                     }
                 }
@@ -480,8 +479,10 @@ impl<E: Estimate + Confidence> LandmarkTracker<E> {
         let angle = roi.rotation_radians() + estimate.angle_radians().unwrap_or(0.0);
 
         // Map all landmarks to the image coordinate system.
-        for [x, y, _] in estimate.landmarks_mut().positions_mut() {
-            [*x, *y] = view_rect.transform_out([*x, *y]).into();
+        for p in estimate.landmarks_mut().positions_mut() {
+            let out = view_rect.transform_out([p.x, p.y]);
+            p.x = out.x;
+            p.y = out.y;
         }
 
         let updated_roi = RotatedRect::bounding(

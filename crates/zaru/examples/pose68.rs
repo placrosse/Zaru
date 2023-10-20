@@ -34,11 +34,16 @@ fn main() -> anyhow::Result<()> {
             draw::rect(&mut image, rect).color(Color::RED);
             let mut view = image.view_mut(rect);
             let lms = estimator.estimate(&view);
-            for &[x, y, _] in lms.landmarks_mut().positions() {
-                draw::marker(&mut view, x, y).color(Color::RED);
+            for p in lms.landmarks_mut().positions() {
+                draw::marker(&mut view, p.x, p.y).color(Color::RED);
             }
 
-            let result = dlt.solve(lms.landmarks().positions().iter().map(|&[x, y, _]| [x, -y]));
+            let result = dlt.solve(
+                lms.landmarks()
+                    .positions()
+                    .iter()
+                    .map(|p| [p.x, -p.y].into()),
+            );
             let rot = UnitQuaternion::from(*result.rotation());
             let (r, p, y) = rot.euler_angles();
             println!(
@@ -48,8 +53,8 @@ fn main() -> anyhow::Result<()> {
                 y.to_degrees(),
             );
 
-            let [x, y, _] = lms.landmarks().average_position();
-            draw::quaternion(&mut view, x, y, rot);
+            let p = lms.landmarks().average_position();
+            draw::quaternion(&mut view, p.x, p.y, rot);
         }
         gui::show_image("facemarks", &image);
     }

@@ -170,10 +170,7 @@ impl LandmarkResultV1 {
                 LandmarkIdx::LeftEyeTop,
             ]
             .into_iter()
-            .map(|idx| {
-                let [x, y, ..] = self.landmarks().get(idx as usize).position();
-                [x, y]
-            }),
+            .map(|idx| self.landmarks().get(idx as usize).position().truncate()),
         )
         .unwrap()
     }
@@ -189,10 +186,7 @@ impl LandmarkResultV1 {
                 LandmarkIdx::RightEyeTop,
             ]
             .into_iter()
-            .map(|idx| {
-                let [x, y, ..] = self.landmarks().get(idx as usize).position();
-                [x, y]
-            }),
+            .map(|idx| self.landmarks().get(idx as usize).position().truncate()),
         )
         .unwrap()
     }
@@ -203,8 +197,8 @@ impl LandmarkResultV1 {
     }
 
     fn draw_impl(&self, image: &mut ImageViewMut<'_>) {
-        for &[x, y, ..] in self.landmarks().positions() {
-            draw::marker(image, x, y).size(3);
+        for pos in self.landmarks().positions() {
+            draw::marker(image, pos.x, pos.y).size(3);
         }
 
         let color = match self.confidence() {
@@ -216,7 +210,7 @@ impl LandmarkResultV1 {
             .landmarks()
             .positions()
             .iter()
-            .map(|[x, ..]| TotalF32(*x))
+            .map(|p| TotalF32(p.x))
             .minmax()
             .into_option()
             .unwrap();
@@ -225,7 +219,7 @@ impl LandmarkResultV1 {
             .landmarks()
             .positions()
             .iter()
-            .map(|[_, y, ..]| TotalF32(*y))
+            .map(|p| TotalF32(p.y))
             .min()
             .unwrap()
             .0;
@@ -328,10 +322,7 @@ impl LandmarkResultV2 {
                 LandmarkIdx::LeftEyeTop,
             ]
             .into_iter()
-            .map(|idx| {
-                let [x, y, ..] = self.landmarks().get(idx as usize).position();
-                [x, y]
-            }),
+            .map(|idx| self.landmarks().get(idx as usize).position().truncate()),
         )
         .unwrap()
     }
@@ -347,10 +338,7 @@ impl LandmarkResultV2 {
                 LandmarkIdx::RightEyeTop,
             ]
             .into_iter()
-            .map(|idx| {
-                let [x, y, ..] = self.landmarks().get(idx as usize).position();
-                [x, y]
-            }),
+            .map(|idx| self.landmarks().get(idx as usize).position().truncate()),
         )
         .unwrap()
     }
@@ -461,7 +449,7 @@ impl LandmarkResultV2 {
             .landmarks()
             .positions()
             .iter()
-            .map(|[x, ..]| TotalF32(*x))
+            .map(|p| TotalF32(p.x))
             .minmax()
             .into_option()
             .unwrap();
@@ -470,7 +458,7 @@ impl LandmarkResultV2 {
             .landmarks()
             .positions()
             .iter()
-            .map(|[_, y, ..]| TotalF32(*y))
+            .map(|p| TotalF32(p.y))
             .min()
             .unwrap()
             .0;
@@ -600,11 +588,11 @@ mod tests {
 
         let mut pa = ProcrustesAnalyzer::new(reference_positions());
 
-        let res = pa.analyze(landmarks.landmarks().positions().iter().map(|&[x, y, z]| {
+        let res = pa.analyze(landmarks.landmarks().positions().iter().map(|p| {
             // Flip Y to bring us to canonical 3D coordinates (where Y points up).
             // Only rotation matters, so we don't have to correct for the added
             // translation.
-            vec3(x, -y, z)
+            vec3(p.x, -p.y, p.z)
         }));
         let (roll, pitch, yaw) = res.rotation().euler_angles();
         check_angle(0.0, roll);

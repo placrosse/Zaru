@@ -49,8 +49,8 @@ fn main() -> anyhow::Result<()> {
                 draw::rect(&mut image, rect).color(algo.color);
                 let mut view = image.view_mut(rect);
                 let lms = algo.estimator.estimate(&view);
-                for &[x, y, _] in lms.landmarks_mut().positions() {
-                    draw::marker(&mut view, x, y).color(algo.color);
+                for p in lms.landmarks_mut().positions() {
+                    draw::marker(&mut view, p.x, p.y).color(algo.color);
                 }
                 algo.fps.tick_with(algo.estimator.timers());
             }

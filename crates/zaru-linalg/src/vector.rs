@@ -362,7 +362,28 @@ impl<T: Zero + One> Vector<T, 4> {
     pub const W: Self = Self([T::ZERO, T::ZERO, T::ZERO, T::ONE]);
 }
 
+impl<T> Vector<T, 1> {
+    pub fn truncate(self) -> Vector<T, 0> {
+        [].into()
+    }
+
+    pub fn extend(self, value: T) -> Vector<T, 2> {
+        let [x] = self.into_array();
+        [x, value].into()
+    }
+}
+
 impl<T> Vector<T, 2> {
+    pub fn truncate(self) -> Vector<T, 1> {
+        let [x, ..] = self.into_array();
+        [x].into()
+    }
+
+    pub fn extend(self, value: T) -> Vector<T, 3> {
+        let [x, y] = self.into_array();
+        [x, y, value].into()
+    }
+
     /// Rotates `self` clockwise in the 2D plane.
     pub fn rotate_clockwise(self, radians: T) -> Self
     where
@@ -377,6 +398,18 @@ impl<T> Vector<T, 2> {
         T: Number + Trig,
     {
         Mat2::rotation_counterclockwise(radians) * self
+    }
+}
+
+impl<T> Vector<T, 3> {
+    pub fn truncate(self) -> Vector<T, 2> {
+        let [x, y, ..] = self.into_array();
+        [x, y].into()
+    }
+
+    pub fn extend(self, value: T) -> Vector<T, 4> {
+        let [x, y, z] = self.into_array();
+        [x, y, z, value].into()
     }
 }
 

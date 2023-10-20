@@ -6,6 +6,7 @@ use crate::nn::ColorMapper;
 use include_blob::include_blob;
 use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
+use zaru_linalg::{Vec3, Vec3f};
 
 use crate::{
     landmark::{Confidence, Estimate, Landmarks, Network},
@@ -33,48 +34,42 @@ impl Default for LandmarkResult {
 
 impl LandmarkResult {
     /// Returns the 3D landmark positions in the input image's coordinate system.
-    pub fn landmark_positions(&self) -> impl Iterator<Item = [f32; 3]> + '_ {
+    pub fn landmark_positions(&self) -> impl Iterator<Item = Vec3f> + '_ {
         (0..self.landmarks.len()).map(|index| self.landmark_position(index))
     }
 
     /// Returns a landmark's position in the input image's coordinate system.
-    pub fn landmark_position(&self, index: usize) -> [f32; 3] {
+    pub fn landmark_position(&self, index: usize) -> Vec3f {
         self.landmarks.positions()[index]
     }
 
     /// Returns an iterator over the landmarks that surround the palm.
-    pub fn palm_landmarks(&self) -> impl Iterator<Item = [f32; 3]> + '_ {
+    pub fn palm_landmarks(&self) -> impl Iterator<Item = Vec3f> + '_ {
         PALM_LANDMARKS
             .iter()
             .map(|lm| self.landmark_position(*lm as usize))
     }
 
     /// Computes the center position of the hand's palm by averaging some of the landmarks.
-    pub fn palm_center(&self) -> [f32; 3] {
-        let mut pos = (0.0, 0.0, 0.0);
+    pub fn palm_center(&self) -> Vec3f {
+        let mut pos = Vec3::ZERO;
         let mut count = 0;
-        for [x, y, z] in self.palm_landmarks() {
-            pos.0 += x;
-            pos.1 += y;
-            pos.2 += z;
+        for lm in self.palm_landmarks() {
+            pos += lm;
             count += 1;
         }
 
-        [
-            pos.0 / count as f32,
-            pos.1 / count as f32,
-            pos.2 / count as f32,
-        ]
+        pos / count as f32
     }
 
     /// Computes the clockwise rotation of the palm compared to an upright position.
     ///
     /// A rotation of 0° means that fingers are pointed upwards.
     pub fn rotation_radians(&self) -> f32 {
-        let [x, y, _] = self.landmark_position(LandmarkIdx::MiddleFingerMcp as usize);
-        let finger = Point2::new(x, y);
-        let [x, y, _] = self.landmark_position(LandmarkIdx::Wrist as usize);
-        let wrist = Point2::new(x, y);
+        let p = self.landmark_position(LandmarkIdx::MiddleFingerMcp as usize);
+        let finger = Point2::new(p.x, p.y);
+        let p = self.landmark_position(LandmarkIdx::Wrist as usize);
+        let wrist = Point2::new(p.x, p.y);
 
         let rel = wrist - finger;
         Rotation2::rotation_between(&Vector2::y(), &rel).angle()
@@ -102,35 +97,39 @@ impl LandmarkResult {
             Handedness::Right => "R",
         };
 
-        let [palm_x, palm_y, _] = self.palm_center();
+        let palm = self.palm_center().truncate();
 
-        let [a_x, a_y, _] = self.landmark_position(LandmarkIdx::MiddleFingerMcp as usize);
-        let [b_x, b_y, _] = self.landmark_position(LandmarkIdx::Wrist as usize);
-        draw::line(target, a_x, a_y, b_x, b_y).color(Color::from_rgb8(127, 127, 127));
+        let a = self
+            .landmark_position(LandmarkIdx::MiddleFingerMcp as usize)
+            .truncate();
+        let b = self
+            .landmark_position(LandmarkIdx::Wrist as usize)
+            .truncate();
+        draw::line(target, a.x, a.y, b.x, b.y).color(Color::from_rgb8(127, 127, 127));
         draw::text(
             target,
-            b_x,
-            b_y,
+            b.x,
+            b.y,
             &format!("{:.1} deg", self.rotation_radians().to_degrees()),
         )
         .align_top();
 
-        draw::text(target, palm_x, palm_y - 5.0, hand);
+        draw::text(target, palm.x, palm.y - 5.0, hand);
         draw::text(
             target,
-            palm_x,
-            palm_y + 5.0,
+            palm.x,
+            palm.y + 5.0,
             &format!("confidence={:.2}", self.confidence()),
         );
 
         for (a, b) in CONNECTIVITY {
-            let [a_x, a_y, _] = self.landmark_position(*a as usize);
-            let [b_x, b_y, _] = self.landmark_position(*b as usize);
+            let a = self.landmark_position(*a as usize).truncate();
+            let b = self.landmark_position(*b as usize).truncate();
 
-            draw::line(target, a_x, a_y, b_x, b_y).color(Color::GREEN);
+            draw::line(target, a.x, a.y, b.x, b.y).color(Color::GREEN);
         }
-        for [x, y, _] in self.landmark_positions() {
-            draw::marker(target, x, y);
+        for pos in self.landmark_positions() {
+            draw::marker(target, pos.x, pos.y);
         }
     }
 }
