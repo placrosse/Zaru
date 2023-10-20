@@ -6,7 +6,7 @@ use crate::nn::ColorMapper;
 use include_blob::include_blob;
 use nalgebra::{Point2, Rotation2, Vector2};
 use once_cell::sync::Lazy;
-use zaru_linalg::{Vec3, Vec3f};
+use zaru_linalg::{vec2, Vec3, Vec3f};
 
 use crate::{
     landmark::{Confidence, Estimate, Landmarks, Network},
@@ -105,20 +105,18 @@ impl LandmarkResult {
         let b = self
             .landmark_position(LandmarkIdx::Wrist as usize)
             .truncate();
-        draw::line(target, a.x, a.y, b.x, b.y).color(Color::from_rgb8(127, 127, 127));
+        draw::line(target, a, b).color(Color::from_rgb8(127, 127, 127));
         draw::text(
             target,
-            b.x,
-            b.y,
+            b,
             &format!("{:.1} deg", self.rotation_radians().to_degrees()),
         )
         .align_top();
 
-        draw::text(target, palm.x, palm.y - 5.0, hand);
+        draw::text(target, palm - vec2(0.0, 5.0), hand);
         draw::text(
             target,
-            palm.x,
-            palm.y + 5.0,
+            palm + vec2(0.0, 5.0),
             &format!("confidence={:.2}", self.confidence()),
         );
 
@@ -126,10 +124,10 @@ impl LandmarkResult {
             let a = self.landmark_position(*a as usize).truncate();
             let b = self.landmark_position(*b as usize).truncate();
 
-            draw::line(target, a.x, a.y, b.x, b.y).color(Color::GREEN);
+            draw::line(target, a, b).color(Color::GREEN);
         }
         for pos in self.landmark_positions() {
-            draw::marker(target, pos.x, pos.y);
+            draw::marker(target, pos.truncate());
         }
     }
 }

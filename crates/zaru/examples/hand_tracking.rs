@@ -7,6 +7,7 @@ use zaru::{
     timer::FpsCounter,
     video::webcam::{Webcam, WebcamOptions},
 };
+use zaru_linalg::vec2;
 
 const USE_FULL_DETECTION_NETWORK: bool = true;
 const USE_FULL_LANDMARK_NETWORK: bool = true;
@@ -45,8 +46,7 @@ fn main() -> anyhow::Result<()> {
             draw::rotated_rect(target, view);
             draw::text(
                 target,
-                rect.center().x,
-                rect.y(),
+                vec2(rect.center().x, rect.y()),
                 &format!("{:?}", hand.id()),
             )
             .align_top();

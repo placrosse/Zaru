@@ -35,7 +35,7 @@ fn main() -> anyhow::Result<()> {
             let mut view = image.view_mut(rect);
             let lms = estimator.estimate(&view);
             for p in lms.landmarks_mut().positions() {
-                draw::marker(&mut view, p.x, p.y).color(Color::RED);
+                draw::marker(&mut view, p.truncate()).color(Color::RED);
             }
 
             let result = dlt.solve(
@@ -54,7 +54,7 @@ fn main() -> anyhow::Result<()> {
             );
 
             let p = lms.landmarks().average_position();
-            draw::quaternion(&mut view, p.x, p.y, rot);
+            draw::quaternion(&mut view, p.truncate(), rot);
         }
         gui::show_image("facemarks", &image);
     }

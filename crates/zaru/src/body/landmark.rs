@@ -69,14 +69,14 @@ impl LandmarkResult {
         for (a, b) in COARSE_CONNECTIVITY {
             let a = self.get(*a);
             let b = self.get(*b);
-            draw::line(target, a.x(), a.y(), b.x(), b.y());
+            draw::line(target, a.position().truncate(), b.position().truncate());
         }
 
         for lm in self.pose_landmarks() {
-            draw::marker(target, lm.x(), lm.y()).size(9);
+            draw::marker(target, lm.position().truncate()).size(9);
         }
         for lm in self.aux_landmarks() {
-            draw::marker(target, lm.x(), lm.y()).color(Color::YELLOW);
+            draw::marker(target, lm.position().truncate()).color(Color::YELLOW);
         }
     }
 }

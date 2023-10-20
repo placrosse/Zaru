@@ -13,7 +13,7 @@ use include_blob::include_blob;
 use itertools::Itertools;
 use nalgebra::{Rotation2, Vector2};
 use once_cell::sync::Lazy;
-use zaru_linalg::Vec3f;
+use zaru_linalg::{vec2, Vec3f};
 
 use crate::image::{draw, AsImageViewMut, Color, ImageViewMut};
 use crate::landmark::{Confidence, Landmark};
@@ -198,7 +198,7 @@ impl LandmarkResultV1 {
 
     fn draw_impl(&self, image: &mut ImageViewMut<'_>) {
         for pos in self.landmarks().positions() {
-            draw::marker(image, pos.x, pos.y).size(3);
+            draw::marker(image, pos.truncate()).size(3);
         }
 
         let color = match self.confidence() {
@@ -225,8 +225,7 @@ impl LandmarkResultV1 {
             .0;
         draw::text(
             image,
-            x,
-            y - 3.0,
+            vec2(x, y - 3.0),
             &format!("conf={:.01}", self.confidence()),
         )
         .align_bottom()
@@ -235,16 +234,17 @@ impl LandmarkResultV1 {
         let left_eye = self
             .landmarks()
             .get(LandmarkIdx::LeftEyeOuterCorner as _)
-            .position();
+            .position()
+            .truncate();
         let right_eye = self
             .landmarks()
             .get(LandmarkIdx::RightEyeOuterCorner as _)
-            .position();
-        draw::line(image, left_eye[0], left_eye[1], right_eye[0], right_eye[1]).color(Color::WHITE);
+            .position()
+            .truncate();
+        draw::line(image, left_eye, right_eye).color(Color::WHITE);
         draw::text(
             image,
-            (left_eye[0] + right_eye[0]) / 2.0,
-            (left_eye[1] + right_eye[1]) / 2.0,
+            (left_eye + right_eye) * 0.5,
             &format!("{:.1} deg", self.rotation_radians().to_degrees()),
         )
         .align_bottom()
@@ -425,17 +425,17 @@ impl LandmarkResultV2 {
 
     fn draw_impl(&self, image: &mut ImageViewMut<'_>) {
         for lm in self.mesh_landmarks() {
-            draw::marker(image, lm.x(), lm.y()).size(3);
+            draw::marker(image, lm.position().truncate()).size(3);
         }
         for (i, lm) in self.left_iris().into_iter().enumerate() {
             let size = if i == 0 { 3 } else { 1 };
-            draw::marker(image, lm.x(), lm.y())
+            draw::marker(image, lm.position().truncate())
                 .size(size)
                 .color(Color::GREEN);
         }
         for (i, lm) in self.right_iris().into_iter().enumerate() {
             let size = if i == 0 { 3 } else { 1 };
-            draw::marker(image, lm.x(), lm.y())
+            draw::marker(image, lm.position().truncate())
                 .size(size)
                 .color(Color::BLUE);
         }
@@ -464,8 +464,7 @@ impl LandmarkResultV2 {
             .0;
         draw::text(
             image,
-            x,
-            y - 3.0,
+            vec2(x, y - 3.0),
             &format!(
                 "conf={:.01}, tongue={:.01}",
                 self.confidence(),
@@ -477,8 +476,7 @@ impl LandmarkResultV2 {
 
         draw::text(
             image,
-            x,
-            y + 10.0,
+            vec2(x, y + 10.0),
             &format!("{:.1} deg", self.rotation_radians().to_degrees()),
         )
         .align_bottom()

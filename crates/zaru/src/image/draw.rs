@@ -15,7 +15,8 @@ use embedded_graphics::{
     text::{Alignment, Baseline, Text, TextStyleBuilder},
 };
 use itertools::Itertools;
-use nalgebra::{UnitQuaternion, Vector2, Vector3};
+use nalgebra::{UnitQuaternion, Vector3};
+use zaru_linalg::{vec2, Vec2f};
 
 use crate::image::{AsImageViewMut, Color, ImageViewMut, Rect};
 
@@ -40,7 +41,7 @@ impl Drop for DrawRect<'_> {
     fn drop(&mut self) {
         let corners = self.rect.corners();
         for (start, end) in corners.into_iter().circular_tuple_windows().take(4) {
-            line(&mut self.image, start.x, start.y, end.x, end.y).color(self.color);
+            line(&mut self.image, start, end).color(self.color);
         }
     }
 }
@@ -65,7 +66,7 @@ impl<'a> Drop for DrawRotatedRect<'a> {
     fn drop(&mut self) {
         let corners = self.rect.rotated_corners();
         for (start, end) in corners.into_iter().circular_tuple_windows().take(4) {
-            line(&mut self.image, start.x, start.y, end.x, end.y).color(self.color);
+            line(&mut self.image, start, end).color(self.color);
         }
     }
 }
@@ -73,8 +74,7 @@ impl<'a> Drop for DrawRotatedRect<'a> {
 /// Guard returned by [`marker`]; draws the marker when dropped and allows customization.
 pub struct DrawMarker<'a> {
     image: ImageViewMut<'a>,
-    x: f32,
-    y: f32,
+    pos: Vec2f,
     color: Color,
     size: u32,
 }
@@ -107,8 +107,8 @@ impl Drop for DrawMarker<'_> {
         {
             match Pixel(
                 Point {
-                    x: self.x.round() as i32 + xoff,
-                    y: self.y.round() as i32 + yoff,
+                    x: self.pos.x.round() as i32 + xoff,
+                    y: self.pos.y.round() as i32 + yoff,
                 },
                 self.color,
             )
@@ -124,10 +124,8 @@ impl Drop for DrawMarker<'_> {
 /// Guard returned by [`line`][line()]; draws the line when dropped and allows customization.
 pub struct DrawLine<'a> {
     image: ImageViewMut<'a>,
-    start_x: f32,
-    start_y: f32,
-    end_x: f32,
-    end_y: f32,
+    start: Vec2f,
+    end: Vec2f,
     color: Color,
 }
 
@@ -142,8 +140,8 @@ impl<'a> DrawLine<'a> {
 impl<'a> Drop for DrawLine<'a> {
     fn drop(&mut self) {
         match Line::new(
-            Point::new(self.start_x.round() as i32, self.start_y.round() as i32),
-            Point::new(self.end_x.round() as i32, self.end_y.round() as i32),
+            Point::new(self.start.x.round() as i32, self.start.y.round() as i32),
+            Point::new(self.end.x.round() as i32, self.end.y.round() as i32),
         )
         .into_styled(PrimitiveStyle::with_stroke(self.color, 1))
         .draw(&mut Target(self.image.reborrow()))
@@ -157,8 +155,7 @@ impl<'a> Drop for DrawLine<'a> {
 /// Guard returned by [`text`]; draws the text when dropped and allows customization.
 pub struct DrawText<'a> {
     image: ImageViewMut<'a>,
-    x: f32,
-    y: f32,
+    pos: Vec2f,
     text: &'a str,
     color: Color,
     alignment: Alignment,
@@ -207,7 +204,7 @@ impl<'a> Drop for DrawText<'a> {
             .build();
         match Text::with_text_style(
             self.text,
-            Point::new(self.x.round() as i32, self.y.round() as i32),
+            Point::new(self.pos.x.round() as i32, self.pos.y.round() as i32),
             character_style,
             text_style,
         )
@@ -222,8 +219,7 @@ impl<'a> Drop for DrawText<'a> {
 /// Guard returned by [`quaternion`]; draws the rotated coordinate system when dropped.
 pub struct DrawQuaternion<'a> {
     image: ImageViewMut<'a>,
-    x: f32,
-    y: f32,
+    pos: Vec2f,
     quaternion: UnitQuaternion<f32>,
     axis_length: f32,
 }
@@ -239,19 +235,18 @@ impl<'a> DrawQuaternion<'a> {
 impl<'a> Drop for DrawQuaternion<'a> {
     fn drop(&mut self) {
         let axis_length = self.axis_length;
-        let origin = Vector2::new(self.x, self.y);
 
         let x = (self.quaternion * Vector3::x() * axis_length).xy();
         let y = (self.quaternion * Vector3::y() * axis_length).xy();
         let z = (self.quaternion * Vector3::z() * axis_length).xy();
         // Flip Y axis, since it points up in 3D space but down in image coordinates.
-        let x_end = origin + Vector2::new(x.x, -x.y);
-        let y_end = origin + Vector2::new(y.x, -y.y);
-        let z_end = origin + Vector2::new(z.x, -z.y);
+        let x_end = self.pos + vec2(x.x, -x.y);
+        let y_end = self.pos + vec2(y.x, -y.y);
+        let z_end = self.pos + vec2(z.x, -z.y);
 
-        line(&mut self.image, self.x, self.y, x_end.x, x_end.y).color(Color::RED);
-        line(&mut self.image, self.x, self.y, y_end.x, y_end.y).color(Color::GREEN);
-        line(&mut self.image, self.x, self.y, z_end.x, z_end.y).color(Color::BLUE);
+        line(&mut self.image, self.pos, x_end).color(Color::RED);
+        line(&mut self.image, self.pos, y_end).color(Color::GREEN);
+        line(&mut self.image, self.pos, z_end).color(Color::BLUE);
     }
 }
 
@@ -276,11 +271,10 @@ pub fn rotated_rect<I: AsImageViewMut>(image: &mut I, rect: RotatedRect) -> Draw
 /// Draws a marker onto an image.
 ///
 /// This can be used to visualize shape landmarks or points of interest.
-pub fn marker<I: AsImageViewMut>(image: &mut I, x: f32, y: f32) -> DrawMarker<'_> {
+pub fn marker<I: AsImageViewMut>(image: &mut I, pos: impl Into<Vec2f>) -> DrawMarker<'_> {
     DrawMarker {
         image: image.as_view_mut(),
-        x,
-        y,
+        pos: pos.into(),
         color: Color::RED,
         size: 5,
     }
@@ -289,17 +283,13 @@ pub fn marker<I: AsImageViewMut>(image: &mut I, x: f32, y: f32) -> DrawMarker<'_
 /// Draws a line onto an image.
 pub fn line<I: AsImageViewMut>(
     image: &mut I,
-    start_x: f32,
-    start_y: f32,
-    end_x: f32,
-    end_y: f32,
+    start: impl Into<Vec2f>,
+    end: impl Into<Vec2f>,
 ) -> DrawLine<'_> {
     DrawLine {
         image: image.as_view_mut(),
-        start_x,
-        start_y,
-        end_x,
-        end_y,
+        start: start.into(),
+        end: end.into(),
         color: Color::BLUE,
     }
 }
@@ -309,14 +299,12 @@ pub fn line<I: AsImageViewMut>(
 /// By default, the text is drawn centered horizontally and vertically around `x` and `y`.
 pub fn text<'a, I: AsImageViewMut>(
     image: &'a mut I,
-    x: f32,
-    y: f32,
+    pos: impl Into<Vec2f>,
     text: &'a str,
 ) -> DrawText<'a> {
     DrawText {
         image: image.as_view_mut(),
-        x,
-        y,
+        pos: pos.into(),
         text,
         color: Color::RED,
         alignment: Alignment::Center,
@@ -333,14 +321,12 @@ pub fn text<'a, I: AsImageViewMut>(
 /// this is the center of an image or of the object of interest.
 pub fn quaternion<'a, I: AsImageViewMut>(
     image: &'a mut I,
-    x: f32,
-    y: f32,
+    pos: impl Into<Vec2f>,
     quaternion: UnitQuaternion<f32>,
 ) -> DrawQuaternion<'a> {
     DrawQuaternion {
         image: image.as_view_mut(),
-        x,
-        y,
+        pos: pos.into(),
         quaternion,
         axis_length: 10.0,
     }

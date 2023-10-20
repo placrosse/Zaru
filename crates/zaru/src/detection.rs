@@ -361,7 +361,7 @@ impl Detection {
         draw::rotated_rect(image, RotatedRect::new(self.bounding_rect(), self.angle()))
             .color(Color::from_rgb8(170, 0, 0));
         for lm in self.keypoints() {
-            draw::marker(image, lm.x(), lm.y());
+            draw::marker(image, lm.p);
         }
 
         let color = match self.confidence() {
@@ -369,11 +369,10 @@ impl Detection {
             0.4..=0.8 => Color::YELLOW,
             _ => Color::RED,
         };
-        let [xc, yc] = self.bounding_rect().center().into();
+        let c = self.bounding_rect().center();
         draw::text(
             image,
-            xc,
-            yc + self.bounding_rect().height() * 0.5,
+            vec2(c.x, c.y + self.bounding_rect().height() * 0.5),
             &format!("conf={:.01}", self.confidence()),
         )
         .align_top()
