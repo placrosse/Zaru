@@ -117,23 +117,23 @@ where
 }
 
 /// Element-wise addition.
-impl<T, U, const N: usize> Add<Vector<U, N>> for Vector<T, N>
+impl<T, const N: usize> Add<Vector<T, N>> for Vector<T, N>
 where
-    T: Add<U>,
+    T: Add,
 {
     type Output = Vector<T::Output, N>;
 
-    fn add(self, rhs: Vector<U, N>) -> Self::Output {
+    fn add(self, rhs: Vector<T, N>) -> Self::Output {
         self.zip(rhs).map(|(l, r)| l + r)
     }
 }
 
 /// Element-wise addition.
-impl<T, U, const N: usize> AddAssign<Vector<U, N>> for Vector<T, N>
+impl<T, const N: usize> AddAssign<Vector<T, N>> for Vector<T, N>
 where
-    T: AddAssign<U>,
+    T: AddAssign,
 {
-    fn add_assign(&mut self, rhs: Vector<U, N>) {
+    fn add_assign(&mut self, rhs: Vector<T, N>) {
         self.as_mut_slice()
             .iter_mut()
             .zip(rhs.into_array())
@@ -142,23 +142,23 @@ where
 }
 
 /// Element-wise subtraction.
-impl<T, U, const N: usize> Sub<Vector<U, N>> for Vector<T, N>
+impl<T, const N: usize> Sub<Vector<T, N>> for Vector<T, N>
 where
-    T: Sub<U>,
+    T: Sub,
 {
     type Output = Vector<T::Output, N>;
 
-    fn sub(self, rhs: Vector<U, N>) -> Self::Output {
+    fn sub(self, rhs: Vector<T, N>) -> Self::Output {
         self.zip(rhs).map(|(l, r)| l - r)
     }
 }
 
 /// Element-wise subtraction.
-impl<T, U, const N: usize> SubAssign<Vector<U, N>> for Vector<T, N>
+impl<T, const N: usize> SubAssign<Vector<T, N>> for Vector<T, N>
 where
-    T: SubAssign<U>,
+    T: SubAssign,
 {
-    fn sub_assign(&mut self, rhs: Vector<U, N>) {
+    fn sub_assign(&mut self, rhs: Vector<T, N>) {
         self.as_mut_slice()
             .iter_mut()
             .zip(rhs.into_array())
@@ -253,23 +253,23 @@ where
 }
 
 /// Element-wise bitwise and.
-impl<T, U, const N: usize> BitAnd<Vector<U, N>> for Vector<T, N>
+impl<T, const N: usize> BitAnd<Vector<T, N>> for Vector<T, N>
 where
-    T: BitAnd<U>,
+    T: BitAnd,
 {
     type Output = Vector<T::Output, N>;
 
-    fn bitand(self, rhs: Vector<U, N>) -> Self::Output {
+    fn bitand(self, rhs: Vector<T, N>) -> Self::Output {
         self.zip(rhs).map(|(l, r)| l & r)
     }
 }
 
 /// Element-wise bitwise and.
-impl<T, U, const N: usize> BitAndAssign<Vector<U, N>> for Vector<T, N>
+impl<T, const N: usize> BitAndAssign<Vector<T, N>> for Vector<T, N>
 where
-    T: BitAndAssign<U>,
+    T: BitAndAssign,
 {
-    fn bitand_assign(&mut self, rhs: Vector<U, N>) {
+    fn bitand_assign(&mut self, rhs: Vector<T, N>) {
         self.as_mut_slice()
             .iter_mut()
             .zip(rhs.into_array())
@@ -278,29 +278,32 @@ where
 }
 
 /// Element-wise bitwise or.
-impl<T, U, const N: usize> BitOr<Vector<U, N>> for Vector<T, N>
+impl<T, const N: usize> BitOr<Vector<T, N>> for Vector<T, N>
 where
-    T: BitOr<U>,
+    T: BitOr,
 {
     type Output = Vector<T::Output, N>;
 
-    fn bitor(self, rhs: Vector<U, N>) -> Self::Output {
+    fn bitor(self, rhs: Vector<T, N>) -> Self::Output {
         self.zip(rhs).map(|(l, r)| l | r)
     }
 }
 
 /// Element-wise bitwise or.
-impl<T, U, const N: usize> BitOrAssign<Vector<U, N>> for Vector<T, N>
+impl<T, const N: usize> BitOrAssign<Vector<T, N>> for Vector<T, N>
 where
-    T: BitOrAssign<U>,
+    T: BitOrAssign,
 {
-    fn bitor_assign(&mut self, rhs: Vector<U, N>) {
+    fn bitor_assign(&mut self, rhs: Vector<T, N>) {
         self.as_mut_slice()
             .iter_mut()
             .zip(rhs.into_array())
             .for_each(|(lhs, rhs)| *lhs |= rhs);
     }
 }
+
+// NB: operations are deliberately not as generic as they could be (eg. using `T: Add<U>`) to allow
+// for adding vector-scalar operations in the future.
 
 // NB: a few rarely used ones are omitted (eg. `Rem`) because it is not clear whether elementwise
 // or scalar operation is more helpful there.
