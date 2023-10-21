@@ -3,7 +3,7 @@
 use std::ops;
 
 /// Types that support the trigonometric functions.
-pub trait Trig {
+pub trait Trig: Sized + Copy {
     /// Computes the sine of the angle `self` (in radians).
     fn sin(self) -> Self;
     /// Computes the cosine of the angle `self` (in radians).
@@ -14,10 +14,14 @@ pub trait Trig {
     fn acos(self) -> Self;
     fn atan(self) -> Self;
     fn atan2(self, other: Self) -> Self;
+
+    fn sin_cos(self) -> (Self, Self) {
+        (self.sin(), self.cos())
+    }
 }
 
 /// Types that support computing their square root.
-pub trait Sqrt {
+pub trait Sqrt: Sized {
     fn sqrt(self) -> Self;
 }
 
@@ -69,20 +73,21 @@ impl MinMax for f64 {
 }
 
 /// Types that have a "zero" value (an additive identity).
-pub trait Zero {
+pub trait Zero: Sized {
     /// The *0* value of this type.
     const ZERO: Self;
 }
 
 /// Types that have a "one" value (a multiplicative identity).
-pub trait One {
+pub trait One: Sized {
     /// The *1* value of this type.
     const ONE: Self;
 }
 
 /// A trait for numeric types that support basic arithmetic operations.
 pub trait Number:
-    Zero
+    Sized
+    + Zero
     + One
     + ops::Neg<Output = Self>
     + ops::Add<Output = Self>

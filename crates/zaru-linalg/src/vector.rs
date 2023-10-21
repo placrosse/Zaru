@@ -43,12 +43,24 @@ pub type Vec4f = Vec4<f32>;
 ///
 /// # Element Access
 ///
-/// Vector elements can be accessed and inspected in a few different ways:
+/// The following example shows a variety of ways to access vector elements:
 ///
-/// - For vectors with up to 4 dimensions, elements can be accessed as fields `x`, `y`, `z`, or `w`.
-///   - Aliases `r`, `g`, `b`, and `a` are also provided, as well as aliases `w` and `h` for
-///     2-dimensional vectors.
-/// - The [`Index`] and [`IndexMut`] impls can be used just like on arrays.
+/// ```
+/// # use zaru_linalg::*;
+/// let v = vec4(0, 1, 2, 3);
+///
+/// // For vectors with up to 4 dimensions, elements can be accessed as fields `x`, `y`, `z`, or `w`.
+/// assert_eq!([v.x, v.y, v.z, v.w], [0, 1, 2, 3]);
+/// // Aliases `r`, `g`, `b`, and `a` are also provided, for vectors that represent colors.
+/// assert_eq!([v.r, v.g, v.b, v.a], [0, 1, 2, 3]);
+/// // For vectors with exactly 2 elements, aliases `w` and `h` also exist, for vectors that represent dimensions.
+/// let v2 = Vec2f::Y;
+/// assert_eq!([v2.x, v2.y], [v2.w, v2.h]);
+/// // And lastly, vectors of any size can be indexed by `usize`, just like slices.
+/// assert_eq!([v[0], v[1], v[2], v[3]], [0, 1, 2, 3]);
+/// ```
+///
+/// Additionally, [`Vector`] elements can be access in the following ways:
 /// - The [`AsRef`] and [`AsMut`] impls can be used to access the underlying elements as a slice or
 ///   array.
 /// - A [`From`] impl allows conversion from a [`Vector`] to an array of the same length.

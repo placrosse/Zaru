@@ -36,9 +36,11 @@
 
 pub mod approx;
 mod matrix;
+mod quat;
 mod traits;
 mod vector;
 
 pub use matrix::*;
+pub use quat::*;
 pub use traits::*;
 pub use vector::*;
